@@ -4,7 +4,7 @@ Version de référence : 1.0 (Mission 2, 2026-11-08). Nom de code : **LORAKUS** 
 
 ## 1. Vue d'ensemble
 
-LORAKUS est un **monolithe modulaire** : une seule image Docker lancée sous trois rôles (`api`, `worker`, `migrate`), une seule base PostgreSQL 18, un Core de douze services transverses, un AI Engine derrière un port, et des modules métier qui ne se connaissent pas. Les clients (PWA, bot Telegram, puis LORAKUS Sensors et l'extension navigateur) passent tous par Caddy et l'API.
+LORAKUS est un **monolithe modulaire** : une seule image Docker lancée sous trois rôles (`api`, `worker`, `migrate`), une seule base PostgreSQL 18, un Core de treize services transverses, un AI Engine derrière un port, et des modules métier qui ne se connaissent pas. Les clients (PWA, bot Telegram, puis LORAKUS Sensors et l'extension navigateur) passent tous par Caddy et l'API.
 
 ```mermaid
 flowchart TB
@@ -36,7 +36,7 @@ flowchart TB
       PORT["AIProvider"]
     end
     subgraph Mods["Modules"]
-      M["assistant · academic · projects · calendars<br/>knowledge · digital_activity · fitness · motivation<br/>chess · finance · news"]
+      M["assistant · academic · projects · calendars<br/>knowledge · focus · fitness · motivation<br/>chess · finance · news"]
     end
   end
   PG[("PostgreSQL 18 + pgvector")]
@@ -83,6 +83,7 @@ Le DDD complet (agrégats, repositories systématiques) n'est appliqué que là 
 | `tools` | Registre des outils IA, validation des arguments, permission, niveau de risque (`read`, `write`, `sensitive`), confirmation utilisateur, audit | `@tool` | 2 |
 | `audit` | Journal append-only des actions sensibles | `Audit.record` | 2 |
 | `storage` | Fichiers (pièces jointes, médias, imports, exports) derrière le port `BlobStore` : disque local puis stockage compatible S3 (ADR 0024) | `BlobStore` | 3 |
+| `agents` | Registre des spécialistes, contrat question/rapport, orchestrateur, filtre de confidentialité, préparations, file d'approbation, traçabilité `core_agent_runs` (ADR 0025 à 0028) | `SpecialistProfile`, `Orchestrator` | 2 → 5 |
 | `memory` | Faits typés (`verified`, `proposed`, `inferred`), épisodes, recherche hybride (plein texte + vecteurs locaux) | `Memory.remember`, `Memory.retrieve` | 3 |
 | `planning` | Tâches génériques, créneaux d'agenda, planificateur de journée et de semaine | `Tasks`, `Agenda`, `Planner` | 4 |
 | `signals` | Réception des signaux des modules, `InterventionPolicy` (niveaux 0–3, budget, quiet hours, cooldown, dédup, groupement, backoff), canaux (Web Push, Telegram, puis notifications locales Android) | `Signals.emit` | 5 |
@@ -108,7 +109,8 @@ Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 so
 | `calendars` | Abonnements ICS en lecture vers l'`Agenda` | 4 |
 | `academic` | Cours, examens, devoirs (crée des tâches), coefficients, retards | 4 |
 | `projects` | Idées, projets, tâches de projet, projets inactifs, capture Telegram | 4 |
-| `digital_activity` | Sessions d'apps et de pages web, lignes de base, signaux d'attention | 7 (collecte), 11 (signaux) |
+| `focus` (ex-`digital_activity`) | Spécialiste Sergent : échéances et découpage de tâches (v0), puis sessions d'apps et de pages web, lignes de base, signaux d'attention | 4 (v0), 8 (collecte), 12 (interventions) |
+| `sentinel` | Spécialiste Veilleur : inventaire des hôtes déclarés, vulnérabilités, exposition | 7 |
 | `knowledge` | Inbox universelle, ingestion, résumés, collections, recherche | 8 |
 | `fitness` | Activités multi-sources fusionnées, saisie musculation, objectifs, progression | 9 |
 | `motivation` | Curation de contenus Knowledge, sélection contextuelle, « mes raisons » | 10 |
@@ -173,3 +175,27 @@ Deux hôtes Oracle Ampere A1 (prod et staging, sous réserve de la décision D-A
 | Session | Période continue d'utilisation d'une app ou d'une catégorie de page |
 | Activité canonique | Activité sportive fusionnée à partir de plusieurs sources |
 | Contrainte de licence | Règle d'usage attachée à une donnée par sa source (ex. `no_ai`) |
+
+## 13. Architecture multi-agents (Mission 3)
+
+Statut : **proposée** (ADR 0025 à 0027, décision D-H). Le reste de ce document reste valable ; cette section décrit comment les spécialistes s'y insèrent.
+
+- **Majordome** : le module `assistant`, unique interlocuteur. Routage d'intention en trois paliers (règles, similarité d'embeddings locaux, LLM léger si ambigu), synthèse, adaptation du ton. Nom affiché configurable.
+- **Spécialistes** : des modules qui déclarent un `SpecialistProfile` (voir `MODULE_SYSTEM.md` §10).
+
+| Spécialiste | Module | LLM |
+| --- | --- | --- |
+| Sergent (Focus & Work) | `focus` | Découpage de tâches seulement |
+| Trésorier (Finance) | `finance` | Aucun |
+| Préparateur (Health & Fitness) | `fitness` | Aucun |
+| Archiviste (Knowledge) | `knowledge` | Résumés et questions de révision citées |
+| Analyste (Chess) | `chess` | Aucun (Stockfish) |
+| Veilleur (Cybersécurité) | `sentinel` | Aucun |
+
+- **Orchestration** (service `agents`) : questions en parallèle (au plus 4, délai 3 s), rapports typés de 300 tokens maximum, cache invalidé par événements, disjoncteur, traçabilité `core_agent_runs`.
+- **Confidentialité** : les faits `sensitive` partent vers le LLM sous forme de marqueurs, réinsérés localement ; `no_ai` n'est jamais transmis (ADR 0027).
+- **Proactivité** : signaux → moteur de situations (`signals`, ADR 0030) → `InterventionPolicy`, seul décideur ; friction en trois niveaux, le troisième uniquement par pactes volontaires (ADR 0029).
+- **Préparations et approbations** : travaux de fond budgétés, affichés dans Today ; toute action à conséquence externe attend votre accord (ADR 0028).
+- **Communication entre spécialistes** : événements et ports lus via le Core ; aucun appel direct.
+
+Chemin d'une question : routage (souvent sans LLM) → orchestrateur → rapports → filtre de confidentialité → synthèse par LLM léger → réinsertion locale → réponse en streaming, le tout dans une seule trace OpenTelemetry.
