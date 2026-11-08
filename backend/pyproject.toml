@@ -1,0 +1,61 @@
+[project]
+name = "lorakus"
+version = "0.1.0"
+description = "Lorakus : backend (Core platform et modules)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.162.2",
+    "pydantic-settings>=2.16.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lorakus"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+]
+
+# --- Ruff : linter + formateur ---------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # erreurs de style (PEP 8)
+    "F",        # erreurs logiques (variables inutilisées, imports manquants...)
+    "I",        # ordre des imports
+    "B",        # bugs fréquents (flake8-bugbear)
+    "UP",       # syntaxe Python moderne
+    "S",        # sécurité (équivalent de Bandit)
+    "SIM",      # simplifications
+    "N",        # conventions de nommage
+    "ASYNC",    # pièges du code asynchrone
+    "RUF",      # règles propres à Ruff
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]   # assert est normal dans les tests
+
+# --- Pyright : vérification des types --------------------------------------
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+strict = ["lorakus"]
+include = ["lorakus", "tests"]
+venvPath = "."
+venv = ".venv"
+
+# --- Pytest -----------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
