@@ -1,0 +1,15 @@
+# Ce que Prometheus collecte, et a quelle frequence.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Metriques de l'API (port separe 9464, jamais publie).
+  - job_name: lorakus-api
+    static_configs:
+      - targets: ["api:9464"]
+
+  # Prometheus se surveille lui-meme.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

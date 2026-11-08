@@ -3,11 +3,12 @@
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
-        image up down logs
+        image up down logs obs-up obs-check
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
 COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
+OBS := $(COMPOSE) -f compose.observability.yml
 IMAGE := lorakus-api:dev
 
 help: ## Affiche cette aide
@@ -37,13 +38,13 @@ format: ## Formate le code et corrige ce qui peut l'etre automatiquement
 typecheck: ## Verifie les types (pyright strict)
 > $(UV) run pyright
 
-check: lint typecheck test-all db-check ## Tout verifier avant d'ouvrir une PR
+check: lint typecheck test-all db-check obs-check ## Tout verifier avant d'ouvrir une PR
 
 db-up: ## Demarre PostgreSQL en local et attend qu'il soit pret
 > $(COMPOSE) up -d --wait postgres
 
 db-down: ## Arrete tous les conteneurs (les donnees sont conservees)
-> $(COMPOSE) down
+> $(OBS) down
 
 db-reset: ## SUPPRIME la base locale et la recree a neuf
 > $(COMPOSE) down -v
@@ -75,8 +76,15 @@ up: image db-up ## Lance la pile en conteneurs : PostgreSQL, migrations, API (80
 > $(COMPOSE) run --rm migrate
 > $(COMPOSE) up -d --wait api
 
-down: ## Arrete la pile complete (les donnees sont conservees)
-> $(COMPOSE) down
+down: ## Arrete tous les conteneurs, observabilite comprise (donnees conservees)
+> $(OBS) down
 
 logs: ## Affiche les journaux de l'API en direct (Ctrl+C pour quitter)
 > $(COMPOSE) logs -f api
+
+obs-up: up ## Ajoute Prometheus (9090) et Grafana (3000) a la pile
+> $(OBS) up -d --wait prometheus grafana
+
+obs-check: ## Valide la configuration Prometheus et les tableaux de bord Grafana
+> python3 -m json.tool infra/observability/grafana/dashboards/lorakus-api.json > /dev/null
+> $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
