@@ -19,3 +19,5 @@ SigNoz (ClickHouse trop lourd) ; Sentry self-hosted.
 ## Conséquences
 
 Bascule vers un SaaS en changeant l'exporter si la RAM manque.
+
+Amendement du 2026-11-08 (déploiement par paliers, pour limiter la maintenance) : P1 = journaux structurés JSON, métriques Prometheus, Grafana, alertes, Uptime Kuma ; P3 = traces (Tempo), utiles dès que l'orchestrateur appelle plusieurs spécialistes. Le code est instrumenté avec OpenTelemetry dès P1 : ajouter Tempo ne demande aucune modification du code.

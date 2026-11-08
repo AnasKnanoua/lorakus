@@ -158,3 +158,7 @@ Checklist de revue d'un spécialiste, en plus de la checklist du §9 :
 - [ ] Classe maximale des rapports correcte ; aucune valeur `sensitive` hors marqueurs (test d'interception)
 - [ ] Délai de réponse respecté sur données réelles
 - [ ] Limites rédigées et testées (refus des demandes hors périmètre)
+
+## 11. Règle de passage à l'échelle : aucune tâche planifiée par utilisateur
+
+Un rappel ou un traitement récurrent ne crée jamais un minuteur par utilisateur (1 000 utilisateurs ne doivent pas donner 1 000 minuteurs). Un module déclare **un seul** job périodique qui traite, par lots, tout ce qui est dû maintenant (« tâches dont l'échéance tombe dans la prochaine minute »), à partir d'un index sur la date d'échéance. Cette règle garde le coût de planification constant quel que soit le nombre d'utilisateurs.

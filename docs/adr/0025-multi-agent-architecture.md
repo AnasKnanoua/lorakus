@@ -1,6 +1,6 @@
 # ADR-0025 — Architecture multi-agents hiérarchique
 
-- **Statut** : Proposé (décision D-H)
+- **Statut** : Validé (2026-11-08), décision D-H
 - **Date** : 2026-11-08
 - **Revue prévue** : Fin de la phase 3
 

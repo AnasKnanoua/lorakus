@@ -178,7 +178,7 @@ Deux hôtes Oracle Ampere A1 (prod et staging, sous réserve de la décision D-A
 
 ## 13. Architecture multi-agents (Mission 3)
 
-Statut : **proposée** (ADR 0025 à 0027, décision D-H). Le reste de ce document reste valable ; cette section décrit comment les spécialistes s'y insèrent.
+Statut : **validée** le 2026-11-08 (ADR 0025 à 0027, décisions D-H et D-I). Le reste de ce document reste valable ; cette section décrit comment les spécialistes s'y insèrent.
 
 - **Majordome** : le module `assistant`, unique interlocuteur. Routage d'intention en trois paliers (règles, similarité d'embeddings locaux, LLM léger si ambigu), synthèse, adaptation du ton. Nom affiché configurable.
 - **Spécialistes** : des modules qui déclarent un `SpecialistProfile` (voir `MODULE_SYSTEM.md` §10).

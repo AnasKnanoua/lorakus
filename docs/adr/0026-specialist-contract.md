@@ -1,6 +1,6 @@
 # ADR-0026 — Contrat des spécialistes, registre et orchestrateur
 
-- **Statut** : Proposé (décision D-H)
+- **Statut** : Validé (2026-11-08), décision D-H
 - **Date** : 2026-11-08
 - **Revue prévue** : Fin de la phase 3
 
@@ -23,4 +23,4 @@ Contrat libre en texte (non testable) ; appels directs entre spécialistes (cont
 
 ## Conséquences
 
-P2 : profil, registre, modèles et table ; P3 : orchestrateur et cache. Tests de contrat obligatoires pour chaque profil.
+P2 : profil, registre, modèles et table ; P3 : orchestrateur et cache. Les champs `report_class` et `actions` existent dès P2, leur logique arrive avec le premier besoin réel (ADR 0027, 0028). Tests de contrat obligatoires pour chaque profil.

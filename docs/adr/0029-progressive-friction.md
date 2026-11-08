@@ -1,6 +1,6 @@
 # ADR-0029 — Friction progressive et pactes volontaires
 
-- **Statut** : Proposé (décision D-J) — amende l'ADR 0016
+- **Statut** : Validé (2026-11-08), décision D-J — amende l'ADR 0016
 - **Date** : 2026-11-08
 - **Revue prévue** : Phase 12
 
