@@ -2,11 +2,12 @@
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
-        db-up db-down db-reset db-shell db-check migrate migration migrate-check
+        db-up db-down db-reset db-shell db-check migrate migration migrate-check image image-run
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
 COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
+IMAGE := lorakus-api:dev
 
 help: ## Affiche cette aide
 > @grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -65,3 +66,9 @@ migrate-check: ## Verifie que les migrations sont rejouables (montee, descente, 
 > $(UV) run alembic downgrade base
 > $(UV) run alembic upgrade heads
 > $(UV) run alembic check
+
+image: ## Construit l'image Docker de l'API
+> docker build -t $(IMAGE) $(BACKEND)
+
+image-run: db-up ## Lance l'image en local, reliee a PostgreSQL, sur le port 8001
+> docker run --rm --name lorakus-api-dev --network lorakus_internal --env-file .env -e LORAKUS_DB_HOST=postgres -p 127.0.0.1:8001:8000 $(IMAGE)
