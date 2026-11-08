@@ -21,3 +21,7 @@ SigNoz (ClickHouse trop lourd) ; Sentry self-hosted.
 Bascule vers un SaaS en changeant l'exporter si la RAM manque.
 
 Amendement du 2026-11-08 (déploiement par paliers, pour limiter la maintenance) : P1 = journaux structurés JSON, métriques Prometheus, Grafana, alertes, Uptime Kuma ; P3 = traces (Tempo), utiles dès que l'orchestrateur appelle plusieurs spécialistes. Le code est instrumenté avec OpenTelemetry dès P1 : ajouter Tempo ne demande aucune modification du code.
+
+
+
+Précision du 2026-11-08 (PR n°9) : en P1, les métriques utilisent la bibliothèque officielle `prometheus-client` (format Prometheus natif, bien typée), exposées sur un port séparé (9464) jamais publié. OpenTelemetry est introduit en P3 pour les traces ; un pont vers OpenTelemetry pour les métriques reste possible sans changer les noms des métriques.
