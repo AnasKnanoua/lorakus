@@ -19,7 +19,7 @@
 
 ## En cours
 
-- Documentation Mission 3 et revue (cette PR).
+- P1, PR n°7 : CI GitHub Actions (lint, types, tests avec PostgreSQL, rôles, migrations, Gitleaks sur tout l'historique), contrôle du titre des PR, Dependabot avec délai de 14 jours.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)

@@ -1,0 +1,78 @@
+# Integration continue : chaque PR et chaque push sur main sont verifies.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Droits minimaux : le jeton de la CI peut seulement lire le depot.
+permissions:
+  contents: read
+
+# Une nouvelle poussee sur la meme branche annule la verification en cours.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Installer les dependances (versions exactes du lockfile)
+        run: uv --directory backend sync --locked
+
+      - name: Creer un .env jetable (mots de passe aleatoires, jamais reutilises)
+        run: |
+          cp .env.example .env
+          for var in POSTGRES_PASSWORD LORAKUS_MIGRATOR_DB_PASSWORD LORAKUS_APP_DB_PASSWORD; do
+            sed -i "s/^${var}=.*/${var}=$(openssl rand -hex 24)/" .env
+          done
+
+      - name: Lint, types, tests avec PostgreSQL, roles
+        run: make check
+
+      - name: Migrations rejouables (montee, descente, montee)
+        run: make migrate-check
+
+      - name: Arreter PostgreSQL
+        if: always()
+        run: make db-down
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Recuperer tout l'historique
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Installer Gitleaks (version figee, empreinte verifiee)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITLEAKS_VERSION: "8.30.1"
+        run: |
+          gh release download "v${GITLEAKS_VERSION}" --repo gitleaks/gitleaks \
+            --pattern "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --pattern "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+
+      - name: Rechercher des secrets dans tout l'historique
+        run: ./gitleaks git --redact --verbose .
