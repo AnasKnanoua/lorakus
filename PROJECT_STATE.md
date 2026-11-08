@@ -15,7 +15,7 @@
 
 ## En cours
 
-- P1, PR n°1 : ADR 0013 révisé (réévaluation en phase 7), ADR 0024 `BlobStore`.
+- P1, PR n°2 : squelette du backend (FastAPI, `/api/health`, tests, Ruff, pyright strict, Makefile).
 - Dépôt : https://github.com/AnasKnanoua/lorakus
 
 ## Décisions en attente (voir `DECISIONS.md`)
