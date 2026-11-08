@@ -90,9 +90,9 @@ jobs:
       - name: Construire l'image
         run: docker build -t lorakus-api:ci backend
 
-      - name: Verifier que le conteneur demarre, repond et tourne sans root
+      - name: Verifier demarrage, utilisateur, journaux JSON et metriques
         run: |
-          docker run -d --name api-ci -p 127.0.0.1:8000:8000 lorakus-api:ci
+          docker run -d --name api-ci -p 127.0.0.1:8000:8000 -p 127.0.0.1:9464:9464 lorakus-api:ci
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:8000/api/health; then echo; break; fi
             sleep 1
@@ -100,6 +100,8 @@ jobs:
           curl -fsS http://127.0.0.1:8000/api/health
           test "$(docker inspect -f '{{.Config.User}}' api-ci)" = "lorakus"
           test "$(docker exec api-ci id -u)" = "10001"
+          curl -fsS http://127.0.0.1:9464/metrics | grep -q 'lorakus_http_requests_total{method="GET",route="/api/health"'
+          docker logs api-ci 2>&1 | tail -n 1 | python3 -c 'import json, sys; json.loads(sys.stdin.read())'
           docker rm -f api-ci
 
       - name: Installer Trivy (version figee, empreinte verifiee)

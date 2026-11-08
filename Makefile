@@ -17,7 +17,7 @@ bootstrap: ## Installe les dependances et les hooks pre-commit
 > pre-commit install
 
 dev: ## Lance l'API en local avec rechargement automatique
-> $(UV) run uvicorn --factory lorakus.api.app:create_app --reload --host 127.0.0.1 --port 8000
+> LORAKUS_LOG_FORMAT=console $(UV) run uvicorn --factory lorakus.api.app:create_app --reload --host 127.0.0.1 --port 8000 --no-access-log
 
 test: ## Tests unitaires (sans base de donnees)
 > $(UV) run pytest -m "not integration"
@@ -70,5 +70,5 @@ migrate-check: ## Verifie que les migrations sont rejouables (montee, descente, 
 image: ## Construit l'image Docker de l'API
 > docker build -t $(IMAGE) $(BACKEND)
 
-image-run: db-up ## Lance l'image en local, reliee a PostgreSQL, sur le port 8001
-> docker run --rm --name lorakus-api-dev --network lorakus_internal --env-file .env -e LORAKUS_DB_HOST=postgres -p 127.0.0.1:8001:8000 $(IMAGE)
+image-run: db-up ## Lance l'image en local, reliee a PostgreSQL (API 8001, metriques 9464)
+> docker run --rm --name lorakus-api-dev --network lorakus_internal --env-file .env -e LORAKUS_DB_HOST=postgres -p 127.0.0.1:8001:8000 -p 127.0.0.1:9464:9464 $(IMAGE)

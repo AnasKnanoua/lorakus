@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 Environment = Literal["development", "test", "staging", "production"]
+LogFormat = Literal["json", "console"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 
 # backend/lorakus/settings.py -> racine du depot (ou se trouve .env en local).
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +31,12 @@ class Settings(BaseSettings):
 
     app_display_name: str = "Lorakus"
     environment: Environment = "development"
+
+    # --- Observabilite ---
+    log_format: LogFormat = "json"
+    log_level: LogLevel = "INFO"
+    # Port des metriques Prometheus ; None = pas de serveur de metriques (tests, dev).
+    metrics_port: int | None = Field(default=None, ge=1024, le=65535)
 
     # --- PostgreSQL ---
     db_host: str = "127.0.0.1"

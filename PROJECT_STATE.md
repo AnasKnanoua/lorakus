@@ -19,7 +19,7 @@
 
 ## En cours
 
-- P1, PR n°8 : image Docker de l'API (deux étapes, non-root, images de base épinglées), job CI `image` (démarrage, utilisateur, scan Trivy bloquant sur CRITICAL).
+- P1, PR n°9 : observabilité côté application (journaux JSON structlog avec `request_id` et masquage des secrets, métriques Prometheus sur le port 9464, middleware de requêtes).
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)

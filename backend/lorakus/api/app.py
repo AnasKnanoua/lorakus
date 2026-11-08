@@ -8,13 +8,19 @@ from fastapi import FastAPI
 
 from lorakus.api.routes import health
 from lorakus.db.database import Database
+from lorakus.observability.logging import configure_logging
+from lorakus.observability.metrics import start_metrics_server
+from lorakus.observability.request_context import RequestContextMiddleware
 from lorakus.settings import get_settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Ouvre les ressources au demarrage et les ferme a l'arret."""
-    database = Database.connect(get_settings())
+    settings = get_settings()
+    if settings.metrics_port is not None:
+        start_metrics_server(settings.metrics_port)
+    database = Database.connect(settings)
     app.state.database = database
     try:
         yield
@@ -29,6 +35,7 @@ def create_app() -> FastAPI:
     propre application isolee, et la configuration est lue au bon moment.
     """
     settings = get_settings()
+    configure_logging(log_format=settings.log_format, level=settings.log_level)
     is_production = settings.environment == "production"
 
     app = FastAPI(
@@ -40,5 +47,6 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url=None if is_production else "/api/openapi.json",
     )
+    app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix="/api")
     return app
