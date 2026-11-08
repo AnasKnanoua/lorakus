@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Secrets et données : ne doivent JAMAIS entrer dans le dépôt
+.env
+.env.*
+!.env.example
+*.age
+*.dump
+backups/
+
+# Éditeurs et système
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store

@@ -1,0 +1,52 @@
+# Décisions
+
+Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Statuts : **Validé** (par le propriétaire du projet), **Accepté** (tranché par délégation, réversible), **Proposé** (en attente d'avis), **Remplacé**.
+
+## Index des ADR
+
+| ADR | Titre | Statut | Revue prévue |
+| --- | --- | --- | --- |
+| [0001](docs/adr/0001-modular-monolith.md) | Monolithe modulaire | Validé | Si > 3 contributeurs ou besoin d'extraire un module |
+| [0002](docs/adr/0002-backend-fastapi.md) | Backend FastAPI + SQLAlchemy 2 + Alembic | Accepté | Phase 6 |
+| [0003](docs/adr/0003-postgresql-only.md) | PostgreSQL seul (relationnel, vecteurs, jobs, cache) | Accepté | > 10 utilisateurs ou > 1 M vecteurs |
+| [0004](docs/adr/0004-job-queue.md) | File de jobs Procrastinate derrière le port `JobQueue` | Accepté (amendé 2026-11-08) | Si la maintenance du projet faiblit |
+| [0005](docs/adr/0005-frontend.md) | Frontend SPA + PWA, framework | **Proposé** (React recommandé) | Avant la phase 3 |
+| [0006](docs/adr/0006-ai-abstraction.md) | Abstraction IA maison | Accepté | Phase 15 |
+| [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08) | À chaque changement de tarif |
+| [0008](docs/adr/0008-multi-tenancy-rls.md) | Multi-tenant dans les fondations (`user_id` + RLS) | Validé | Ouverture à d'autres utilisateurs |
+| [0009](docs/adr/0009-compose-before-k3s.md) | Docker Compose avant k3s ; hébergement Always Free (prod + staging) | Validé (D-A, 2026-11-08) | Changement d'hébergeur |
+| [0010](docs/adr/0010-observability.md) | OpenTelemetry → Grafana LGTM self-hosted | Validé (exigence) / Accepté (outils) | Phase 6 (mesure RAM) |
+| [0011](docs/adr/0011-migrations.md) | Migrations expand/contract, backup obligatoire | Validé (exigence) / Accepté (méthode) | — |
+| [0012](docs/adr/0012-untrusted-content.md) | Contenu externe non fiable, outils à permissions | Accepté | Après chaque campagne red team |
+| [0013](docs/adr/0013-lorakus-sensors.md) | App Android compagnon séparée (PWA + capteurs, lots HTTPS) | Validé (2026-11-08) | Quand un domaine stable existe |
+| [0014](docs/adr/0014-context-intervention.md) | Context Engine et InterventionPolicy dans le Core | Accepté | Phase 11 |
+| [0015](docs/adr/0015-data-provenance.md) | Provenance et contraintes de licence des données | Accepté | À chaque nouveau connecteur |
+| [0016](docs/adr/0016-minimal-usage-collection.md) | Collecte d'usage numérique minimale | Accepté | Phase 11 |
+| [0017](docs/adr/0017-motivation-curation.md) | Motivation = curation, pas un flux | Accepté | 2 mois après la phase 10 |
+| [0018](docs/adr/0018-planning-in-core.md) | Tâches et agenda dans le Core (`planning`) | **Proposé** | Avant la phase 4 |
+| [0019](docs/adr/0019-unified-signals.md) | Signaux unifiés, aucune notification directe | Accepté | — |
+| [0020](docs/adr/0020-mvp-integrations.md) | Intégrations du MVP : ICS en lecture, Telegram, Web Push | Accepté | Phase 8 |
+| [0021](docs/adr/0021-baseline-versions.md) | Socle de versions (Python 3.13, PostgreSQL 18) | Accepté | Tous les 12 mois |
+| [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
+| [0023](docs/adr/0023-codename-lorakus.md) | Nom de code LORAKUS | Validé (2026-11-08) | Avant toute ouverture commerciale |
+
+## Décisions en attente d'avis
+
+| Id | Question | Recommandation | Bloque |
+| --- | --- | --- | --- |
+| D-C | Framework frontend (ADR 0005) | React SPA (Vite, TanStack, shadcn/ui) | Phase 3 |
+| D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | Phase 3 |
+| D-E | Place du bien-être numérique | Collecte en phase 7, interventions en phase 11 | Phase 7 |
+| D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
+| D-G | Adresse publique HTTPS (domaine acheté ou sous-domaine gratuit deSEC) | Sous-domaine deSEC gratuit en attendant ; choisir une fois pour toutes | Début de la phase 3 |
+
+## Décisions prises
+
+| Id | Décision | Date |
+| --- | --- | --- |
+| D-A | Oracle Always Free : `OracleWorker` = production, 2e instance A1 = staging ; pas de k3s sur Oracle | 2026-11-08 |
+| D-B | Dépôt GitHub public ; aucun secret dans le dépôt, même chiffré | 2026-11-08 |
+| — | Architecture clients : PWA + app Android compagnon séparée (ADR 0013) | 2026-11-08 |
+| — | Nom de code LORAKUS (ADR 0023) ; pas d'achat de domaine pour l'instant | 2026-11-08 |
+
+Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

@@ -1,0 +1,174 @@
+# Architecture de LORAKUS
+
+Version de référence : 1.0 (Mission 2, 2026-11-08). Nom de code : **LORAKUS** (anciennement JARVIS, ADR 0023). Ce document remplace les dossiers de conception des Missions 0 et 1, qui restent consultables pour le raisonnement et les sources.
+
+## 1. Vue d'ensemble
+
+LORAKUS est un **monolithe modulaire** : une seule image Docker lancée sous trois rôles (`api`, `worker`, `migrate`), une seule base PostgreSQL 18, un Core de onze services transverses, un AI Engine derrière un port, et des modules métier qui ne se connaissent pas. Les clients (PWA, bot Telegram, puis LORAKUS Sensors et l'extension navigateur) passent tous par Caddy et l'API.
+
+```mermaid
+flowchart TB
+  subgraph Clients["Clients — zone non fiable"]
+    PWA["PWA (seule UI)"]
+    SENS["LORAKUS Sensors (Android) — phase 7"]
+    EXT["Extension navigateur — phase 7"]
+    TG["Bot Telegram"]
+  end
+  CADDY["Caddy — TLS, rate limit, en-têtes"]
+  subgraph App["Monolithe LORAKUS"]
+    API["FastAPI — REST + SSE"]
+    WORKER["Worker — jobs, crons, outbox"]
+    subgraph Core["Core Platform"]
+      IAM["identity & tenancy"]
+      REG["modules"]
+      BUS["events (outbox)"]
+      JOBS["jobs (JobQueue)"]
+      TOOLS["tools"]
+      PLAN["planning"]
+      CTX["context"]
+      SIG["signals → InterventionPolicy → channels"]
+      MEM["memory"]
+      ING["device_ingest"]
+      AUD["audit"]
+    end
+    subgraph AI["AI Engine"]
+      ROUTER["ModelRouter"]
+      PORT["AIProvider"]
+    end
+    subgraph Mods["Modules"]
+      M["assistant · academic · projects · calendars<br/>knowledge · digital_activity · fitness · motivation<br/>chess · finance · news"]
+    end
+  end
+  PG[("PostgreSQL 18 + pgvector")]
+  OBS["Alloy → Loki · Prometheus · Tempo → Grafana"]
+  EXTP["Claude API · Gemini API · Telegram · Web Push · Strava · Chess.com · RSS"]
+  PWA --> CADDY
+  SENS --> CADDY
+  EXT --> CADDY
+  TG --> CADDY
+  CADDY --> API
+  API --> Core
+  API --> Mods
+  WORKER --> Core
+  WORKER --> Mods
+  Mods -->|ports du Core| Core
+  Mods --> ROUTER
+  MEM --> ROUTER
+  ROUTER --> PORT --> EXTP
+  SIG --> EXTP
+  Core --> PG
+  Mods --> PG
+  App -. OTel .-> OBS
+```
+
+## 2. Couches (hexagonal pragmatique)
+
+| Couche | Contenu | Dépend de |
+| --- | --- | --- |
+| `domain` | Entités, value objects, règles pures, événements de domaine | Rien (Python standard + Pydantic) |
+| `application` | Cas d'usage, ports (`typing.Protocol`) | `domain` |
+| `infrastructure` | Adaptateurs : SQLAlchemy, SDK, HTTP, JobQueue | `application`, `domain` |
+| `interfaces` | Routes FastAPI, handlers de jobs, outils IA, handlers d'événements | `application` |
+
+Le DDD complet (agrégats, repositories systématiques) n'est appliqué que là où les règles métier sont riches : `planning`, `academic`, `finance`, `signals`. Les modules de type pipeline (`news`, `chess`) gardent une structure plus simple.
+
+## 3. Core Platform
+
+| Service | Responsabilité | Port exposé aux modules | Phase |
+| --- | --- | --- | --- |
+| `identity` | Utilisateurs, sessions révocables, TOTP (puis passkeys), rôles `owner`/`admin`, API keys à portée, tenancy et RLS | `CurrentUser`, `PermissionChecker` | 2 |
+| `modules` | Découverte (entry points `lorakus.modules`), manifeste, résolution des dépendances, config validée, activation par utilisateur, health checks | `ModuleContext` | 2 |
+| `events` | Outbox transactionnelle relayée par le worker, livraison au moins une fois, handlers idempotents | `EventPublisher`, décorateur `@on` | 2 |
+| `jobs` | Jobs différés et périodiques, port `JobQueue` (implémentation Procrastinate) | `@job`, `@periodic` | 2 |
+| `tools` | Registre des outils IA, validation des arguments, permission, niveau de risque (`read`, `write`, `sensitive`), confirmation utilisateur, audit | `@tool` | 2 |
+| `audit` | Journal append-only des actions sensibles | `Audit.record` | 2 |
+| `memory` | Faits typés (`verified`, `proposed`, `inferred`), épisodes, recherche hybride (plein texte + vecteurs locaux) | `Memory.remember`, `Memory.retrieve` | 3 |
+| `planning` | Tâches génériques, créneaux d'agenda, planificateur de journée et de semaine | `Tasks`, `Agenda`, `Planner` | 4 |
+| `signals` | Réception des signaux des modules, `InterventionPolicy` (niveaux 0–3, budget, quiet hours, cooldown, dédup, groupement, backoff), canaux (Web Push, Telegram, puis notifications locales Android) | `Signals.emit` | 5 |
+| `context` | `PersonalContext` : créneau courant et suivant, deadlines proches, quiet hours, budget restant ; puis état numérique et sportif fournis par les modules | `ContextProvider` (implémenté par les modules) | 5 → 7 |
+| `device_ingest` | Réception des lots des appareils (Sensors, extension), clés par appareil, idempotence | Routage vers `device.*` | 7 |
+
+Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 sous forme de `Protocol`, couverts par des tests de contrat.
+
+## 4. AI Engine
+
+- **Port `AIProvider`** : `chat` (streaming, appels d'outils), `structured` (sortie validée par un modèle Pydantic), `embed`, `capabilities`.
+- **Adaptateurs** : Anthropic, Gemini (deux configurations : free tier et payant), OpenAI-compatible (Ollama, NVIDIA NIM, vLLM), `FakeProvider` pour les tests.
+- **Embeddings des données personnelles** : locaux (`fastembed`, modèle multilingue compact) — aucune donnée personnelle ne sort pour être vectorisée.
+- **`ModelRouter`** : choisit une chaîne `[primaire, fallback…]` selon la tâche, la classe de données et les contraintes de licence (`routing.yaml`), applique budget, retries, circuit breaker et cache ; refuse structurellement tout appel externe sur `sensitive` ou `no_ai`.
+- **Coûts** : `pricing.yaml` daté, compteurs par fournisseur et par utilisateur, alerte à 80 % du budget, mode dégradé explicite à 100 %.
+- **Sécurité** : profil `ingest` (lit du contenu externe, aucun outil, sortie structurée) et profil `assistant` (outils, jamais de contenu externe brut).
+
+## 5. Modules
+
+| Module | Rôle | Phase |
+| --- | --- | --- |
+| `assistant` | Conversations, composition des outils des modules actifs, briefing | 3 |
+| `calendars` | Abonnements ICS en lecture vers l'`Agenda` | 4 |
+| `academic` | Cours, examens, devoirs (crée des tâches), coefficients, retards | 4 |
+| `projects` | Idées, projets, tâches de projet, projets inactifs, capture Telegram | 4 |
+| `digital_activity` | Sessions d'apps et de pages web, lignes de base, signaux d'attention | 7 (collecte), 11 (signaux) |
+| `knowledge` | Inbox universelle, ingestion, résumés, collections, recherche | 8 |
+| `fitness` | Activités multi-sources fusionnées, saisie musculation, objectifs, progression | 9 |
+| `motivation` | Curation de contenus Knowledge, sélection contextuelle, « mes raisons » | 10 |
+| `chess` | PubAPI Chess.com + sessions web `chess:*` | 12 |
+| `finance` | Imports bancaires, catégorisation locale, budgets — 100 % local | 13 |
+| `news` | Collecte RSS, déduplication, pertinence, briefing | 14 |
+
+Les règles de couplage et le contrat de manifeste sont dans [`MODULE_SYSTEM.md`](MODULE_SYSTEM.md).
+
+## 6. Clients
+
+| Client | Rôle | Authentification |
+| --- | --- | --- |
+| PWA | Unique interface utilisateur, sur PC et dans le navigateur Android : chat, Today, pages des modules, réglages, partage Android (Web Share Target) | Cookie de session HttpOnly + CSRF |
+| Bot Telegram | Notifications, alertes d'exploitation, capture rapide d'idées et de liens | Webhook avec secret, compte Telegram lié à l'utilisateur |
+| Lorakus Sensors (app Android séparée, Kotlin) | Collecte UsageStats et Health Connect, sessionisation locale, tampon chiffré, lots HTTPS toutes les 15 min (pas de WebSocket), tuiles « pause » et « concentration », notifications locales pendant une session de concentration ; aucune interface métier (ADR 0013) | Clé d'appareil (Android Keystore), portées `usage:write`, `health:write` |
+| Extension navigateur (MV3) | Sessions sur domaines suivis, catégorie de page sans URL complète | Clé d'appareil, portée `usage:write` |
+
+## 7. Flux principaux
+
+1. **Chat** : PWA → SSE → `assistant` → `Memory.retrieve` → `ModelRouter.chat` avec les outils autorisés → boucle d'outils via `tools` (permission, confirmation, audit) → réponse streamée → job de mémorisation (faits proposés).
+2. **Signal → intervention** : un module émet `Signals.emit(Signal)` → `InterventionPolicy` consulte `context` → applique niveau, budget, cooldown → au plus une notification, éventuellement avec une pièce jointe fournie par un port (`InspirationProvider`) → feedback de l'utilisateur enregistré.
+3. **Calendrier** : job `calendars.sync` (30 min) → lecture ICS → créneaux dans l'`Agenda` → le planificateur et le briefing les voient.
+4. **Appareil** (phase 7) : Sensors sessionise localement → lot signé toutes les 15 min → `device_ingest` → événement `device.usage_batch` / `device.health_batch` → modules propriétaires.
+5. **Contenu externe** (phase 8) : partage → `knowledge.ingest` (profil `ingest`) → item → collections.
+
+## 8. Données
+
+- **Tenancy** : toute table métier porte `user_id` ; Row Level Security active ; la session SQL pose `app.current_user` ; le rôle applicatif n'est pas superutilisateur.
+- **Classes** : `public`, `personal`, `sensitive`. **Contraintes de licence** : `no_ai`, `owner_display_only` (ex. données Strava).
+- **Propriété** : chaque module possède ses tables (préfixe `acad_`, `proj_`, `cal_`, `da_`, `know_`, `fit_`, `motiv_`, `chess_`, `fin_`, `news_`) et sa branche Alembic ; le Core utilise `core_`, `mem_`, `plan_`, `sig_`.
+- **Migrations** : Alembic, une branche par module, stratégie expand/contract, rejouées en CI (voir [`DEVELOPMENT.md`](DEVELOPMENT.md)).
+
+## 9. Frontières de confiance
+
+| Frontière | Contrôles |
+| --- | --- |
+| Internet → Caddy | TLS, ports 80/443 seuls, rate limit, fail2ban, en-têtes de sécurité |
+| Caddy → API | Session ou clé à portée, validation Pydantic stricte, limites de taille |
+| Appareils → `device_ingest` | Clé par appareil révocable, schéma strict, horodatages bornés, idempotence, rate limit |
+| API/worker → PostgreSQL | Rôle non superutilisateur, RLS |
+| App → fournisseurs IA | `ModelRouter` : classes de données, licences, budget, liste blanche de domaines sortants |
+| Contenu externe → LLM | Profil `ingest` sans outils, encapsulation « donnée non fiable », sortie validée |
+
+Détails dans [`SECURITY.md`](SECURITY.md).
+
+## 10. Observabilité
+
+`structlog` (JSON, masquage des secrets et des données sensibles), OpenTelemetry (traces et métriques, attributs `gen_ai.*` pour les appels IA), Alloy comme collecteur, Loki (7 jours), Prometheus (15 jours), Tempo (3 jours, 20 % d'échantillonnage hors erreurs), Grafana (tableaux Plateforme, IA, Notifications, Appareils), Uptime Kuma pour la disponibilité externe, alertes vers Telegram. Page `/admin` côté produit.
+
+## 11. Déploiement
+
+Deux hôtes Oracle Ampere A1 (prod et staging, sous réserve de la décision D-A), Docker Compose, images multi-architectures publiées sur GHCR, déploiement staging automatique et prod sur tag approuvé, sauvegardes chiffrées hors Oracle. Voir [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+## 12. Glossaire
+
+| Terme | Définition |
+| --- | --- |
+| Signal | Fait émis par un module qui *pourrait* justifier une interruption (`academic.deadline_approaching`, `digital.long_session`) |
+| Intervention | Décision de l'`InterventionPolicy` d'informer l'utilisateur, avec un niveau (0 à 3) |
+| Contexte | Instantané de la situation de l'utilisateur, calculé par `context` |
+| Session | Période continue d'utilisation d'une app ou d'une catégorie de page |
+| Activité canonique | Activité sportive fusionnée à partir de plusieurs sources |
+| Contrainte de licence | Règle d'usage attachée à une donnée par sa source (ex. `no_ai`) |
