@@ -36,3 +36,14 @@ updates:
     commit-message:
       prefix: build
       include: scope
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: build
+      include: scope

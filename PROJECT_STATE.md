@@ -19,7 +19,7 @@
 
 ## En cours
 
-- P1, PR n°7 : CI GitHub Actions (lint, types, tests avec PostgreSQL, rôles, migrations, Gitleaks sur tout l'historique), contrôle du titre des PR, Dependabot avec délai de 14 jours.
+- P1, PR n°8 : image Docker de l'API (deux étapes, non-root, images de base épinglées), job CI `image` (démarrage, utilisateur, scan Trivy bloquant sur CRITICAL).
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
@@ -67,6 +67,7 @@
 
 - Quota Oracle Always Free réduit en juin 2026 ; aucune marge pour un 3e serveur gratuit.
 - `httpx` déprécié par Starlette au profit de `httpx2` : à prendre en compte pour le client HTTP des connecteurs.
+- Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
 
 ## Dette technique acceptée
 

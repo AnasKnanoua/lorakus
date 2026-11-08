@@ -76,3 +76,45 @@ jobs:
 
       - name: Rechercher des secrets dans tout l'historique
         run: ./gitleaks git --redact --verbose .
+
+  image:
+    name: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Construire l'image
+        run: docker build -t lorakus-api:ci backend
+
+      - name: Verifier que le conteneur demarre, repond et tourne sans root
+        run: |
+          docker run -d --name api-ci -p 127.0.0.1:8000:8000 lorakus-api:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8000/api/health; then echo; break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/api/health
+          test "$(docker inspect -f '{{.Config.User}}' api-ci)" = "lorakus"
+          test "$(docker exec api-ci id -u)" = "10001"
+          docker rm -f api-ci
+
+      - name: Installer Trivy (version figee, empreinte verifiee)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIVY_VERSION: "0.76.1"
+        run: |
+          gh release download "v${TRIVY_VERSION}" --repo aquasecurity/trivy \
+            --pattern "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            --pattern "trivy_${TRIVY_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "trivy_${TRIVY_VERSION}_checksums.txt"
+          tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
+
+      - name: Vulnerabilites critiques corrigeables (bloquant)
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress lorakus-api:ci
+
+      - name: Vulnerabilites hautes (rapport, non bloquant)
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress lorakus-api:ci
