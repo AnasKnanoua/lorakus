@@ -2,9 +2,9 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -47,15 +47,6 @@ class Settings(BaseSettings):
     migrator_db_user: str = "lorakus_migrator"
     migrator_db_password: SecretStr = SecretStr("")
 
-    @model_validator(mode="after")
-    def require_secrets_outside_development(self) -> Self:
-        """Refuse de demarrer en staging/production sans mot de passe de base."""
-        if self.environment in ("staging", "production") and not (
-            self.app_db_password.get_secret_value()
-        ):
-            raise ValueError("LORAKUS_APP_DB_PASSWORD est obligatoire en staging et production")
-        return self
-
     def app_database_url(self) -> URL:
         """URL de connexion de l'application (role lorakus_app)."""
         return self._database_url(self.app_db_user, self.app_db_password)
@@ -65,6 +56,10 @@ class Settings(BaseSettings):
         return self._database_url(self.migrator_db_user, self.migrator_db_password)
 
     def _database_url(self, user: str, password: SecretStr) -> URL:
+        # Chaque conteneur ne recoit que le mot de passe du role qu'il utilise :
+        # le controle se fait donc role par role, au moment ou l'URL est demandee.
+        if self.environment in ("staging", "production") and not password.get_secret_value():
+            raise ValueError(f"Mot de passe manquant pour le role {user} en {self.environment}")
         # URL.create echappe les caracteres speciaux et masque le mot de passe
         # quand l'URL est affichee ou journalisee.
         return URL.create(

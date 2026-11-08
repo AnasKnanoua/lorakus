@@ -2,7 +2,8 @@
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
-        db-up db-down db-reset db-shell db-check migrate migration migrate-check image image-run
+        db-up db-down db-reset db-shell db-check migrate migration migrate-check \
+        image up down logs
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -16,7 +17,7 @@ bootstrap: ## Installe les dependances et les hooks pre-commit
 > $(UV) sync
 > pre-commit install
 
-dev: ## Lance l'API en local avec rechargement automatique
+dev: ## Lance l'API en local avec rechargement automatique (port 8000)
 > LORAKUS_LOG_FORMAT=console $(UV) run uvicorn --factory lorakus.api.app:create_app --reload --host 127.0.0.1 --port 8000 --no-access-log
 
 test: ## Tests unitaires (sans base de donnees)
@@ -41,7 +42,7 @@ check: lint typecheck test-all db-check ## Tout verifier avant d'ouvrir une PR
 db-up: ## Demarre PostgreSQL en local et attend qu'il soit pret
 > $(COMPOSE) up -d --wait postgres
 
-db-down: ## Arrete PostgreSQL (les donnees sont conservees)
+db-down: ## Arrete tous les conteneurs (les donnees sont conservees)
 > $(COMPOSE) down
 
 db-reset: ## SUPPRIME la base locale et la recree a neuf
@@ -70,5 +71,12 @@ migrate-check: ## Verifie que les migrations sont rejouables (montee, descente, 
 image: ## Construit l'image Docker de l'API
 > docker build -t $(IMAGE) $(BACKEND)
 
-image-run: db-up ## Lance l'image en local, reliee a PostgreSQL (API 8001, metriques 9464)
-> docker run --rm --name lorakus-api-dev --network lorakus_internal --env-file .env -e LORAKUS_DB_HOST=postgres -p 127.0.0.1:8001:8000 -p 127.0.0.1:9464:9464 $(IMAGE)
+up: image db-up ## Lance la pile en conteneurs : PostgreSQL, migrations, API (8001)
+> $(COMPOSE) run --rm migrate
+> $(COMPOSE) up -d --wait api
+
+down: ## Arrete la pile complete (les donnees sont conservees)
+> $(COMPOSE) down
+
+logs: ## Affiche les journaux de l'API en direct (Ctrl+C pour quitter)
+> $(COMPOSE) logs -f api

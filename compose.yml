@@ -1,10 +1,25 @@
 # Services communs a tous les environnements (dev, staging, production).
-# En local, toujours via le Makefile : make db-up, make db-down, ...
+# En local, toujours via le Makefile : make up, make down, make db-up, ...
 name: lorakus
+
+# Journaux : rotation (10 Mo x 3 par conteneur) pour ne jamais remplir le disque,
+# et nom du conteneur ajoute a chaque ligne.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+    tag: "{{.Name}}"
+
+# Durcissement des conteneurs de l'application (API et migrations).
+x-app-hardening: &app-hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:size=16m"]
 
 services:
   postgres:
-
     image: pgvector/pgvector:pg18@sha256:c29f30688a9ad961691bdf0ec1650717cc132a5814619d80f80463d6e4c42e47
     restart: unless-stopped
     environment:
@@ -24,10 +39,51 @@ services:
       retries: 10
       start_period: 10s
     networks: [internal]
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
     deploy:
       resources:
         limits:
           memory: 768m
+
+  # Conteneur ponctuel : applique les migrations puis s'arrete (make up, deploiement).
+  migrate:
+    <<: *app-hardening
+    image: ${LORAKUS_API_IMAGE:-lorakus-api:dev}
+    command: ["alembic", "upgrade", "heads"]
+    restart: "no"
+    profiles: ["tools"]
+    environment:
+      LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
+      LORAKUS_DB_HOST: postgres
+      LORAKUS_MIGRATOR_DB_PASSWORD: ${LORAKUS_MIGRATOR_DB_PASSWORD:?manquant dans .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  api:
+    <<: *app-hardening
+    image: ${LORAKUS_API_IMAGE:-lorakus-api:dev}
+    restart: unless-stopped
+    environment:
+      LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
+      LORAKUS_DB_HOST: postgres
+      LORAKUS_APP_DB_PASSWORD: ${LORAKUS_APP_DB_PASSWORD:?manquant dans .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 384m
 
 networks:
   internal:

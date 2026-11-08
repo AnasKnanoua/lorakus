@@ -120,3 +120,21 @@ jobs:
 
       - name: Vulnerabilites hautes (rapport, non bloquant)
         run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress lorakus-api:ci
+
+      - name: Creer un .env jetable pour la pile complete
+        run: |
+          cp .env.example .env
+          for var in POSTGRES_PASSWORD LORAKUS_MIGRATOR_DB_PASSWORD LORAKUS_APP_DB_PASSWORD; do
+            sed -i "s/^${var}=.*/${var}=$(openssl rand -hex 24)/" .env
+          done
+
+      - name: Pile complete en conteneurs (migrations puis API durcie)
+        run: |
+          make up
+          curl -fsS http://127.0.0.1:8001/api/health/ready
+          test "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' lorakus-api-1)" = "true"
+          ! docker exec lorakus-api-1 touch /app/intrusion
+
+      - name: Arreter la pile
+        if: always()
+        run: make down
