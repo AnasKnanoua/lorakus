@@ -19,7 +19,7 @@
 
 ## En cours
 
-- P1, PR n°9 : observabilité côté application (journaux JSON structlog avec `request_id` et masquage des secrets, métriques Prometheus sur le port 9464, middleware de requêtes).
+- P1, PR n°10 : pile complète en conteneurs (`migrate` puis `api`), conteneurs durcis (lecture seule, aucune capacité, no-new-privileges), un mot de passe par service, rotation des journaux, `make up`/`down`/`logs`.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)

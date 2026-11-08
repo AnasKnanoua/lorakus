@@ -4,3 +4,13 @@ services:
     ports:
       # 127.0.0.1 : accessible depuis le Dell seulement, jamais depuis le reseau.
       - "127.0.0.1:5432:5432"
+
+  migrate:
+    # Image construite localement par "make image" : ne jamais la chercher sur Internet.
+    pull_policy: never
+
+  api:
+    pull_policy: never
+    ports:
+      - "127.0.0.1:8001:8000"   # API
+      - "127.0.0.1:9464:9464"   # metriques Prometheus
