@@ -4,7 +4,7 @@ Version de référence : 1.0 (Mission 2, 2026-11-08). Nom de code : **LORAKUS** 
 
 ## 1. Vue d'ensemble
 
-LORAKUS est un **monolithe modulaire** : une seule image Docker lancée sous trois rôles (`api`, `worker`, `migrate`), une seule base PostgreSQL 18, un Core de onze services transverses, un AI Engine derrière un port, et des modules métier qui ne se connaissent pas. Les clients (PWA, bot Telegram, puis LORAKUS Sensors et l'extension navigateur) passent tous par Caddy et l'API.
+LORAKUS est un **monolithe modulaire** : une seule image Docker lancée sous trois rôles (`api`, `worker`, `migrate`), une seule base PostgreSQL 18, un Core de douze services transverses, un AI Engine derrière un port, et des modules métier qui ne se connaissent pas. Les clients (PWA, bot Telegram, puis LORAKUS Sensors et l'extension navigateur) passent tous par Caddy et l'API.
 
 ```mermaid
 flowchart TB
@@ -82,6 +82,7 @@ Le DDD complet (agrégats, repositories systématiques) n'est appliqué que là 
 | `jobs` | Jobs différés et périodiques, port `JobQueue` (implémentation Procrastinate) | `@job`, `@periodic` | 2 |
 | `tools` | Registre des outils IA, validation des arguments, permission, niveau de risque (`read`, `write`, `sensitive`), confirmation utilisateur, audit | `@tool` | 2 |
 | `audit` | Journal append-only des actions sensibles | `Audit.record` | 2 |
+| `storage` | Fichiers (pièces jointes, médias, imports, exports) derrière le port `BlobStore` : disque local puis stockage compatible S3 (ADR 0024) | `BlobStore` | 3 |
 | `memory` | Faits typés (`verified`, `proposed`, `inferred`), épisodes, recherche hybride (plein texte + vecteurs locaux) | `Memory.remember`, `Memory.retrieve` | 3 |
 | `planning` | Tâches génériques, créneaux d'agenda, planificateur de journée et de semaine | `Tasks`, `Agenda`, `Planner` | 4 |
 | `signals` | Réception des signaux des modules, `InterventionPolicy` (niveaux 0–3, budget, quiet hours, cooldown, dédup, groupement, backoff), canaux (Web Push, Telegram, puis notifications locales Android) | `Signals.emit` | 5 |

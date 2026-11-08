@@ -18,7 +18,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0010](docs/adr/0010-observability.md) | OpenTelemetry → Grafana LGTM self-hosted | Validé (exigence) / Accepté (outils) | Phase 6 (mesure RAM) |
 | [0011](docs/adr/0011-migrations.md) | Migrations expand/contract, backup obligatoire | Validé (exigence) / Accepté (méthode) | — |
 | [0012](docs/adr/0012-untrusted-content.md) | Contenu externe non fiable, outils à permissions | Accepté | Après chaque campagne red team |
-| [0013](docs/adr/0013-lorakus-sensors.md) | App Android compagnon séparée (PWA + capteurs, lots HTTPS) | Validé (2026-11-08) | Quand un domaine stable existe |
+| [0013](docs/adr/0013-lorakus-sensors.md) | App Android compagnon séparée (PWA + capteurs, lots HTTPS) | Validé (2026-11-08) | Phase 7 (deux apps ou une seule) |
 | [0014](docs/adr/0014-context-intervention.md) | Context Engine et InterventionPolicy dans le Core | Accepté | Phase 11 |
 | [0015](docs/adr/0015-data-provenance.md) | Provenance et contraintes de licence des données | Accepté | À chaque nouveau connecteur |
 | [0016](docs/adr/0016-minimal-usage-collection.md) | Collecte d'usage numérique minimale | Accepté | Phase 11 |
@@ -29,6 +29,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0021](docs/adr/0021-baseline-versions.md) | Socle de versions (Python 3.13, PostgreSQL 18) | Accepté | Tous les 12 mois |
 | [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
 | [0023](docs/adr/0023-codename-lorakus.md) | Nom de code LORAKUS | Validé (2026-11-08) | Avant toute ouverture commerciale |
+| [0024](docs/adr/0024-blobstore-port.md) | Stockage de fichiers derrière le port `BlobStore` | Accepté | Passage à un hébergeur payant |
 
 ## Décisions en attente d'avis
 
