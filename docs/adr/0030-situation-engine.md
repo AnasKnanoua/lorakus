@@ -18,4 +18,4 @@ Corrélation faite par chaque spécialiste (duplication, couplage) ; corrélatio
 
 ## Conséquences
 
-Livré en phase 5 avec les premières situations du Sergent v0 ; enrichi à chaque nouveau spécialiste.
+Livré en phase 10, quand deux spécialistes produisent des signaux (Sergent et Préparateur). Jusque-là, l'`InterventionPolicy` applique directement les règles du Sergent v0.

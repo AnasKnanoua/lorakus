@@ -30,11 +30,11 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
 | [0023](docs/adr/0023-codename-lorakus.md) | Nom de code LORAKUS | Validé (2026-11-08) | Avant toute ouverture commerciale |
 | [0024](docs/adr/0024-blobstore-port.md) | Stockage de fichiers derrière le port `BlobStore` | Accepté | Passage à un hébergeur payant |
-| [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | **Proposé** (D-H) | Fin de la phase 3 |
-| [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | **Proposé** (D-H) | Fin de la phase 3 |
-| [0027](docs/adr/0027-report-confidentiality.md) | Confidentialité des rapports transmis au LLM | **Proposé** (D-I) | Après la phase 14 |
+| [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | Validé (D-H) | Fin de la phase 3 |
+| [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | Validé (D-H) | Fin de la phase 3 |
+| [0027](docs/adr/0027-report-confidentiality.md) | Confidentialité des rapports transmis au LLM | Validé (D-I) | Après la phase 14 |
 | [0028](docs/adr/0028-preparations-approvals.md) | Préparations en arrière-plan et file d'approbation | Accepté | Phase 6 |
-| [0029](docs/adr/0029-progressive-friction.md) | Friction progressive et pactes volontaires (amende 0016) | **Proposé** (D-J) | Phase 12 |
+| [0029](docs/adr/0029-progressive-friction.md) | Friction progressive et pactes volontaires (amende 0016) | Validé (D-J) | Phase 12 |
 | [0030](docs/adr/0030-situation-engine.md) | Moteur de situations | Accepté | Phase 12 |
 | [0031](docs/adr/0031-sentinel-push-probes.md) | Veilleur par sondes qui poussent leurs données | Accepté | Phase 17 |
 | [0032](docs/adr/0032-chess-stockfish.md) | Analyste : Stockfish | Accepté | Avant toute distribution |
@@ -45,12 +45,9 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | Id | Question | Recommandation | Bloque |
 | --- | --- | --- | --- |
 | D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | Phase 3 |
-| D-E | Place du bien-être numérique | Collecte en phase 7, interventions en phase 11 | Phase 7 |
+| D-E | Place du bien-être numérique | Collecte en phase 8, interventions en phase 12 | Phase 8 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
 | D-G | Adresse publique HTTPS (domaine acheté ou sous-domaine gratuit deSEC) | Sous-domaine deSEC gratuit en attendant ; choisir une fois pour toutes | Début de la phase 3 |
-| D-H | Architecture multi-agents (ADR 0025, 0026) | Profils de spécialiste sur les modules, orchestrateur dans le Core | Phase 2 |
-| D-I | Confidentialité des rapports sensibles (ADR 0027) | Marqueurs stricts par défaut | Phase 3 |
-| D-J | Friction de niveau 3 par pactes volontaires (ADR 0029) | Autoriser, uniquement par pactes préconfigurés | Phase 12 |
 
 ## Décisions prises
 
@@ -59,6 +56,10 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | D-A | Oracle Always Free : `OracleWorker` = production, 2e instance A1 = staging ; pas de k3s sur Oracle | 2026-11-08 |
 | D-B | Dépôt GitHub public ; aucun secret dans le dépôt, même chiffré | 2026-11-08 |
 | D-C | Frontend React / TypeScript (ADR 0005 validé) | 2026-11-08 |
+| D-H | Architecture multi-agents : profils de spécialiste sur les modules, orchestrateur au Core (ADR 0025, 0026) | 2026-11-08 |
+| D-I | Confidentialité des rapports sensibles par marqueurs stricts (ADR 0027) | 2026-11-08 |
+| D-J | Friction de niveau 3 uniquement par pactes préconfigurés (ADR 0029) | 2026-11-08 |
+| D-K | Accès privé par réseau chiffré **non retenu** : l'API reste exposée publiquement, en vue d'une éventuelle commercialisation | 2026-11-08 |
 | — | Architecture clients : PWA + app Android compagnon séparée (ADR 0013) | 2026-11-08 |
 | — | Nom de code LORAKUS (ADR 0023) ; pas d'achat de domaine pour l'instant | 2026-11-08 |
 

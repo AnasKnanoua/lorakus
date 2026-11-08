@@ -1,8 +1,8 @@
 # ADR-0027 — Confidentialité des rapports transmis au LLM
 
-- **Statut** : Proposé (décision D-I)
+- **Statut** : Validé (2026-11-08), décision D-I
 - **Date** : 2026-11-08
-- **Revue prévue** : Après la phase 14 (Trésorier)
+- **Revue prévue** : Après la phase 14 (Trésorier) ; **livré en phase 10**, avec le premier spécialiste sensible (Préparateur)
 
 ## Contexte
 

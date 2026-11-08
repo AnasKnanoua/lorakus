@@ -18,4 +18,4 @@ Exécution directe des actions par les spécialistes ; préparations sans budget
 
 ## Conséquences
 
-Livré en phase 5. Généralise les cartes de confirmation du Tool Runtime.
+Préparations livrées en phase 5 (briefing du lendemain). File d'approbation livrée avec la **première action à conséquence externe**, pas avant ; d'ici là, les cartes de confirmation du Tool Runtime suffisent.

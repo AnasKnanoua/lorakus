@@ -5,6 +5,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 ## [Non publié]
 
 ### Ajouté
+- 2026-11-08 — Décisions D-H, D-I, D-J validées ; D-K (accès privé) refusée. Revue « regard neuf » : MVP allégé (filtre de confidentialité et moteur de situations en P10, file d'approbation au premier besoin), observabilité par paliers, gel de la conception jusqu'à la v0.5, règles « pas de tâche planifiée par utilisateur » et « Telegram sans contenu sensible ».
 - 2026-11-08 — Mission 3 : architecture multi-agents (Majordome et six spécialistes) proposée ; ADR 0025 à 0033 ; roadmap réordonnée (P1 à P17) ; décisions D-H, D-I, D-J ouvertes.
 - 2026-11-08 — Nom de code LORAKUS (ADR 0023) ; architecture clients PWA + app Android compagnon séparée (ADR 0013 réécrit) ; décision D-G (adresse HTTPS) ouverte.
 - 2026-11-08 — Décisions D-A (Always Free, prod + staging) et D-B (dépôt public) validées ; ADR 0022.

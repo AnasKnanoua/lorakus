@@ -1,6 +1,6 @@
 # ADR-0016 — Collecte d'usage numérique minimale
 
-- **Statut** : Accepté — amendé par l'ADR 0029 si celui-ci est validé (blocage uniquement par pactes volontaires)
+- **Statut** : Accepté — amendé par l'ADR 0029 (blocage uniquement par pactes volontaires)
 - **Date** : 2026-11-08
 - **Revue prévue** : Phase 11
 

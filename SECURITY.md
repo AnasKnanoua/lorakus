@@ -97,3 +97,5 @@ Runbooks à rédiger en phase 6 : `restore.md`, `rotate-secrets.md`, `block-ai-p
 - **Friction** : niveau 3 uniquement par pactes préconfigurés, bornés, journalisés, avec sortie de secours (ADR 0029).
 - **Veilleur** : sondes en lecture seule qui poussent un inventaire (clé `host:report`) ; Lorakus ne détient aucune clé SSH ni accès entrant ; aucun test intrusif ; uniquement les hôtes déclarés (ADR 0031). Distinct de l'agent Red Team.
 - **Traçabilité** : toute question, préparation, intervention et approbation laisse une trace consultable (« pourquoi m'as-tu dit ça ? »).
+- **Canaux de notification** : les messages de bot Telegram ne sont pas chiffrés de bout en bout ; une notification issue d'un fait `sensitive` ne contient jamais la valeur (« Nouvelle alerte finance, ouvrez Lorakus »). Les notifications Web Push sont chiffrées de bout en bout et peuvent porter le détail.
+- **Exposition** : l'API reste publique (décision D-K du 2026-11-08 : accès privé par réseau chiffré non retenu, en vue d'une éventuelle commercialisation) ; authentification, limitation du débit, en-têtes de sécurité et ZAP sont donc obligatoires dès la première route authentifiée.
