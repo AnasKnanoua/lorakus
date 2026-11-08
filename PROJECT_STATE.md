@@ -3,7 +3,7 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS).*
 
 - **Version** : aucune (pré-v0.1.0)
-- **Phase** : P0 — Préparation (en cours)
+- **Phase** : P1 — Fondations techniques (en cours)
 - **Dernière mise à jour** : 2026-11-08
 - **Déploiement** : rien de déployé. Production prévue sur `OracleWorker` ; staging sur une 2e instance A1 (à préparer en fin de P1).
 
@@ -15,7 +15,8 @@
 
 ## En cours
 
-- P0 étape 5 : création du dépôt `lorakus`.
+- P1, PR n°1 : ADR 0013 révisé (réévaluation en phase 7), ADR 0024 `BlobStore`.
+- Dépôt : https://github.com/AnasKnanoua/lorakus
 
 ## Décisions en attente (voir `DECISIONS.md`)
 
@@ -41,7 +42,7 @@
 2. ~~Vérifier l'exposition du Dell~~ (fait).
 3. ~~Installer les outils de développement~~ (fait : uv 0.13, Python 3.13.16, Node 26, pnpm 12, Docker 29, gh, pre-commit, Gitleaks, age).
 4. Domaine : reporté (D-G, début P3).
-5. Créer le dépôt public `lorakus` dans `~/Documents/projets/lorakus`, hooks pre-commit, premier commit, ruleset sur `main`.
+5. ~~Créer le dépôt public~~ (fait : ruleset `protect-main`, protection des secrets au push, Dependabot).
 6. Démarrer P1 (la 2e instance A1 est préparée à la fin de P1, avec un guide pas à pas).
 
 ## Hypothèses à vérifier

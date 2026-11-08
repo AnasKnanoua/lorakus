@@ -49,7 +49,9 @@ lorakus/
 
 - Trunk-based : branches courtes `feat/…`, `fix/…`, `chore/…`, `docs/…` ; protection de `main` (CI verte obligatoire, pas de push direct).
 - Pull request obligatoire, même seul : la CI est le relecteur ; squash merge.
-- Messages au format Conventional Commits (`feat(academic): …`) ; `release-please` génère le CHANGELOG et les tags.
+- Format Conventional Commits : `type(scope): description` — types `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`, `build`, `perf` ; scope = module ou `core` (ex. `feat(academic): ajoute la détection de retard`) ; `!` ou `BREAKING CHANGE:` pour une rupture de compatibilité.
+- Fusion par squash : **le titre de la PR devient le commit sur `main`** et doit respecter le format (vérifié en CI à partir de la phase 1) ; les commits intermédiaires de la branche sont libres.
+- `release-please` génère le CHANGELOG, le numéro de version et les tags à partir de l'historique de `main`.
 - Template de PR : tests, migration, documentation du module, `PROJECT_STATE.md`, impact sécurité (nouvel outil IA ? nouvelle donnée sensible ? nouvelle dépendance justifiée ?).
 
 ## 5. Standards de code
