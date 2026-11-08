@@ -1,6 +1,6 @@
 # Roadmap
 
-Version 1.0 (Mission 2, 2026-11-08). Durées indicatives à environ 8 h/semaine, à recaler après la phase 2 sur la vitesse réelle. Une phase n'est close que si la suite E2E des phases précédentes reste verte et si `PROJECT_STATE.md` est à jour.
+Version 2.0 (Mission 3, 2026-11-08) : intègre l'architecture multi-agents (ADR 0025 à 0033). Durées indicatives à environ 8 h/semaine, à recaler sur la vitesse réelle. Une phase n'est close que si la suite de tests des phases précédentes reste verte et si `PROJECT_STATE.md` est à jour.
 
 ```mermaid
 gantt
@@ -8,177 +8,107 @@ gantt
   dateFormat YYYY-MM-DD
   axisFormat %b %y
   section MVP
-  P0 Préparation              :p0, 2026-11-16, 7d
-  P1 Fondations               :p1, after p0, 18d
-  P2 Core platform            :p2, after p1, 18d
-  P3 IA, assistant, mémoire   :p3, after p2, 28d
-  P4 Planning, academic, projects :p4, after p3, 25d
-  P5 Notifications            :p5, after p4, 18d
-  P6 Stabilisation, v0.5      :p6, after p5, 10d
-  MVP v0.5                    :milestone, m1, after p6, 0d
-  section Après le MVP
-  P7 Attention : collecte     :p7, after p6, 32d
-  P8 Knowledge Collector      :p8, after p7, 21d
-  P9 Body                     :p9, after p8, 25d
-  P10 Motivation              :p10, after p9, 10d
-  P11 Attention : interventions :p11, after p10, 14d
-  P12 Chess                   :p12, after p11, 7d
-  P13 Finance                 :p13, after p12, 21d
-  P14 News                    :p14, after p13, 14d
-  P15 Voix et ML              :p15, after p14, 28d
-  P16 Red Team et durcissement :p16, after p15, 21d
+  P1 Fondations (reste)          :p1, 2026-11-09, 14d
+  P2 Core + registre d'agents    :p2, after p1, 21d
+  P3 Majordome, IA, mémoire      :p3, after p2, 35d
+  P4 Planning + Sergent v0       :p4, after p3, 28d
+  P5 Proactivité                 :p5, after p4, 25d
+  P6 Stabilisation, v0.5         :p6, after p5, 10d
+  MVP v0.5                       :milestone, m1, after p6, 0d
+  section Spécialistes
+  P7 Veilleur v1                 :p7, after p6, 18d
+  P8 Sergent v1 (collecte)       :p8, after p7, 32d
+  P9 Archiviste                  :p9, after p8, 28d
+  P10 Préparateur                :p10, after p9, 25d
+  P11 Motivation                 :p11, after p10, 10d
+  P12 Sergent v2 (interventions) :p12, after p11, 18d
+  P13 Analyste                   :p13, after p12, 21d
+  P14 Trésorier                  :p14, after p13, 21d
+  P15 News                       :p15, after p14, 14d
+  P16 Voix et ML                 :p16, after p15, 28d
+  P17 Red Team et durcissement   :p17, after p16, 21d
 ```
 
-## MVP — LORAKUS v0.5 (phases 0 à 6, ~17 semaines)
+## Déjà fait (P0 et début de P1)
+
+Dépôt public protégé, documentation et ADR, backend FastAPI (`/api/health`, `/api/health/ready`), couche base (SQLAlchemy 2 async, psycopg 3, timeouts), Alembic (branche `core`), PostgreSQL 18 + pgvector local avec rôles à moindre privilège, qualité locale (Ruff, pyright strict, pytest, Gitleaks, pre-commit).
+
+## MVP — v0.5 (environ 19 semaines)
 
 Scénarios d'acceptation :
 
-1. « Qu'est-ce que je dois faire aujourd'hui ? » → réponse juste (tâches, cours ICS, deadlines) en moins de 8 s.
+1. « Qu'est-ce que je dois faire aujourd'hui ? » → réponse juste (tâches, cours ICS, deadlines), passée par le Sergent, sources citées, en moins de 5 s.
 2. « Ajoute le devoir de Machine Learning pour vendredi, environ 3 h » → confirmation → tâche visible dans `/academic` et Today.
-3. Briefing à 7 h 30 ; aucune notification pendant les quiet hours.
-4. Un seul rappel J-3 pour un devoir non commencé.
+3. Briefing du lendemain préparé la nuit et présenté à 7 h 30 ; aucune notification pendant les quiet hours.
+4. Un seul rappel J-3 pour un devoir non commencé ; escalade au niveau 2 seulement si le niveau 1 est ignoré.
 5. Idée envoyée au bot Telegram → boîte d'idées de `projects`.
-6. Préférence exprimée en conversation → fait proposé → confirmé → utilisé par `plan_week`.
-7. API coupée → alerte Telegram en < 5 min ; fournisseur IA coupé → mode dégradé explicite, rappels intacts.
-8. Restauration automatique du dernier backup réussie.
+6. Préférence exprimée en conversation → fait proposé → confirmé → utilisé par la planification.
+7. « Pourquoi m'as-tu dit ça ? » → trace complète (spécialistes appelés, données utilisées, classes transmises au LLM).
+8. API coupée → alerte Telegram en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
+9. Restauration automatique du dernier backup réussie.
 
----
+### P1 — Fondations (reste : 2 semaines)
 
-### P0 — Préparation (1 semaine)
+- **Composants** : CI GitHub Actions (`make check` avec PostgreSQL de service, titre de PR au format Conventional Commits), `dependabot.yml` (uv, npm, Docker, Actions), CodeQL, image Docker de l'API (multi-arch, non-root), structlog + OpenTelemetry + stack Grafana, sauvegardes chiffrées + test de restauration, staging sur la 2e instance A1, premier déploiement sur `OracleWorker`.
+- **Tests** : CI obligatoire sur `main`, restauration, Trivy.
+- **Terminée quand** : un push déploie le staging ; une requête est visible dans Grafana (log, métrique, trace corrélés).
+- **Risque** : temps passé sur l'outillage.
 
-- **Objectif** : environnement prêt, décisions bloquantes prises.
-- **Composants** : aucun code.
-- **Dépendances** : décisions D-A (hébergement) et D-B (visibilité du dépôt).
-- **Tâches** : installer les outils (`DEVELOPMENT.md` §1) ; nom de domaine + DNS Cloudflare ; dépôt GitHub, protection de `main`, environnements `staging`/`production` ; préparer la 2e instance A1 comme staging (utilisateur `deploy`, Docker, firewalld) ; comptes Anthropic, Telegram (BotFather), B2/R2 ; copier cette documentation dans le dépôt.
-- **Tests** : —
-- **Terminée quand** : `docker run hello-world` passe sur le Dell et les deux instances ; le domaine résout ; le premier commit contient la documentation.
-- **Risques** : délais administratifs (domaine, compte Oracle).
+### P2 — Core platform + registre des spécialistes (3 semaines)
 
-### P1 — Fondations techniques (2,5 semaines)
+- **Composants** : identité, sessions, TOTP, rôles, RLS, API keys ; registre de modules, manifeste, config ; événements (outbox) ; `JobQueue` ; Tool Runtime ; audit ; **`SpecialistProfile`, registre `agents`, modèles `SpecialistRequest` / `SpecialistReport`, table `core_agent_runs`**.
+- **Tests** : isolation RLS à deux utilisateurs ; contrat de manifeste et de profil ; un profil invalide empêche le démarrage ; import-linter.
+- **Terminée quand** : deux spécialistes factices différents s'enregistrent et répondent via l'API interne.
+- **Risque** : contrat de profil trop rigide.
 
-- **Objectif** : un dépôt qui déploie du vide proprement, observé et sauvegardé.
-- **Composants** : workspace `uv`, FastAPI `/health`, configuration (`pydantic-settings`), PostgreSQL 18 + pgvector, Alembic (branche `core`), port `JobQueue` + Procrastinate, `structlog` + OpenTelemetry, Compose dev/staging/prod, Caddy, stack Grafana (Alloy, Loki, Prometheus, Tempo, Grafana), sauvegardes chiffrées, CI/CD.
-- **Dépendances** : P0.
-- **Tâches** : squelette backend et frontend vide ; Dockerfile multi-stage non-root ; `make` ; pre-commit (Ruff, Gitleaks) ; workflows `ci`, `build`, `deploy-staging`, `deploy-prod` ; conteneur `backup` + script de restauration ; tableau Grafana « Plateforme » ; alerte Uptime Kuma.
-- **Tests** : unitaires de base, migrations up/down/check en CI, test de restauration, smoke test post-déploiement, scan Trivy.
-- **Terminée quand** : `git push` → staging en < 15 min ; une requête visible dans Grafana (log, métrique, trace corrélés) ; restauration réussie ; tag `v0.1.0` déployé en prod.
-- **Risques** : s'enliser dans l'outillage → aucune dépendance hors liste.
+### P3 — Majordome, IA et mémoire (5 semaines)
 
-### P2 — Core platform (2,5 semaines)
+- **Composants** : `AIProvider`, `ModelRouter`, budgets ; mémoire ; conversations SSE ; frontend React (design system, login, chat, `/memory`, PWA) ; **orchestrateur (parallélisme, délais, cache, disjoncteur), routage à trois paliers, filtre de confidentialité (marqueurs et réinsertion)**.
+- **Dépend de** : D-D (budget IA), D-G (adresse HTTPS), D-H, D-I.
+- **Tests** : evals Promptfoo sur `FakeProvider` ; test d'interception : aucune valeur `sensitive` dans une requête sortante ; marqueur altéré → gabarit.
+- **Terminée quand** : une question multi-spécialistes (factices) obtient une réponse en moins de 5 s avec trace complète ; utilisé 5 jours de suite.
+- **Risque** : qualité perçue des réponses.
 
-- **Objectif** : identité, tenancy, modules, événements et sécurité des outils.
-- **Composants** : `identity` (users, sessions, TOTP, rôles, API keys), RLS, `modules` (registre, manifeste, config, activation), `events` (outbox), `tools` (registre, permission, risque, confirmation), `audit`, ports vides `context`/`signals`/`device_ingest`, module `_template`, page `/admin` minimale.
-- **Dépendances** : P1.
-- **Tâches** : modèles et migrations `core_*` ; middleware de session SQL `app.current_user` ; découverte par entry points ; outbox + relais dans le worker ; décorateur `@tool` ; contrats `import-linter` ; Semgrep règles maison.
-- **Tests** : isolation RLS à deux utilisateurs, contrat de manifeste, permissions d'outils (refus, confirmation), idempotence des handlers, import-linter.
-- **Terminée quand** : un module de test s'active, expose une route et un outil, émet un événement consommé par un handler ; un second utilisateur ne voit rien.
-- **Risques** : registre trop ambitieux → entry points simples, pas de chargement à chaud.
+### P4 — Planning, academic, projects, Sergent v0 (4 semaines)
 
-### P3 — AI Engine, assistant, mémoire (4 semaines)
+- **Composants** : `planning` (tâches, agenda, planificateur), `calendars` (ICS), `academic`, `projects`, Today, **module `focus` avec le profil Sergent (échéances, retards, découpage de tâches proposé)**.
+- **Dépend de** : D-F.
+- **Tests** : règles de retard et de planification ; découpage jamais appliqué sans validation ; synchro ICS sur fichiers réels anonymisés.
+- **Terminée quand** : scénarios 1, 2 et 6.
+- **Risque** : récurrences ICS et fuseaux horaires.
 
-- **Objectif** : converser avec un assistant qui se souvient.
-- **Composants** : `AIProvider` + adaptateurs Anthropic, Gemini, Fake ; `ModelRouter` (routing.yaml, budget, retries, circuit breaker, cache) ; module `assistant` (conversations SSE, boucle d'outils) ; `memory` (faits, épisodes, embeddings locaux `fastembed`, recherche hybride) ; frontend : design system, login + TOTP, chat, historique, `/memory`, PWA installable.
-- **Dépendances** : P2 ; décisions D-C (framework) et D-D (budget).
-- **Tâches** : streaming SSE de bout en bout ; cartes de confirmation ; extraction de faits proposés (job) ; résumé d'épisodes ; tableau Grafana « IA » (tokens, coût, latence, erreurs).
-- **Tests** : evals Promptfoo sur Fake (format, refus d'instruction injectée), tests du router (fallback, budget, refus `sensitive`), E2E login → chat → fait confirmé réutilisé.
-- **Terminée quand** : utilisé 5 jours consécutifs ; scénario 6 partiel (mémoire) ; coût réel mesuré.
-- **Risques** : qualité perçue → itérer sur prompts et contexte avant d'ajouter des fonctions.
+### P5 — Proactivité (3,5 semaines)
 
-### P4 — Planning, academic, projects (3,5 semaines)
+- **Composants** : `signals`, `InterventionPolicy` (niveaux 1 et 2, budget, quiet hours, dédoublonnage, escalade), **moteur de situations, préparations, file d'approbation**, Web Push, bot Telegram, alertes d'exploitation.
+- **Tests** : scénarios simulés ; approbation expirée ; approbation Telegram refusée pour une action `sensitive`.
+- **Terminée quand** : scénarios 3, 4, 5, 7 et 8 ; zéro doublon sur 2 semaines.
+- **Risque** : agacement → seuils prudents, budget de 3 interventions par jour.
 
-- **Objectif** : savoir quoi faire aujourd'hui et cette semaine.
-- **Composants** : Core `planning` (tâches, agenda, planificateur), modules `calendars` (ICS), `academic`, `projects`, page Today, outils IA (`create_task`, `list_tasks`, `plan_day`, `plan_week`, `add_assessment`, `create_project`, `capture_idea`, `get_schedule`).
-- **Dépendances** : P3 ; décision D-F (planning dans le Core).
-- **Tâches** : modèle de tâche générique ; import ICS (récurrences, fuseaux) ; règles de retard et d'urgence ; planificateur glouton sous contraintes (créneaux libres, `max_daily_minutes`) ; projets inactifs ; briefing (liste déterministe + texte généré).
-- **Tests** : règles (retard, urgence, planificateur), synchro ICS sur fichiers réels anonymisés, E2E scénarios 1, 2, 6.
-- **Terminée quand** : scénarios 1, 2 et 6 réussis sur vos vraies données.
-- **Risques** : récurrences ICS et fuseaux → bibliothèque éprouvée et jeux de tests réels.
+### P6 — Stabilisation et v0.5 (1,5 semaine)
 
-### P5 — Notifications et InterventionPolicy (2,5 semaines)
+Usage réel, ZAP baseline, exercice d'incident, runbooks, gel des fonctionnalités. Terminée quand les neuf scénarios passent.
 
-- **Objectif** : être prévenu au bon moment, sans spam.
-- **Composants** : `signals` (`Signals.emit`), `InterventionPolicy` (niveaux 0–3, budget, quiet hours, cooldown, dédup, groupement, backoff), `context` minimal, canaux Web Push et Telegram (webhook signé, liaison du compte, capture d'idées), préférences, historique, alertes d'exploitation vers Telegram.
-- **Dépendances** : P4.
-- **Tâches** : signaux `academic.deadline_approaching`, `academic.overdue`, `projects.inactive`, briefing planifié ; actions sur notification (fait, reporter, ignorer) ; tableau Grafana « Notifications ».
-- **Tests** : politique sur scénarios simulés (budget, quiet hours, dédup, backoff), webhook Telegram signé, E2E notification push.
-- **Terminée quand** : scénarios 3, 4, 5 et 7 réussis ; zéro doublon sur 2 semaines d'usage.
-- **Risques** : Web Push capricieux sur Android → Telegram en secours.
+## Après le MVP : un spécialiste à la fois
 
-### P6 — Stabilisation et release v0.5 (1,5 semaine)
+| Phase | Contenu | Dépend de | Terminée quand | Durée |
+| --- | --- | --- | --- | --- |
+| P7 | **Veilleur v1** : sondes en lecture seule (`OracleWorker`, staging, Dell), inventaire, OSV et avis des distributions, ports autorisés, rapport hebdomadaire | P5 | Une vulnérabilité réelle signalée avec les machines concernées ; aucune clé SSH détenue par Lorakus | 2,5 sem. |
+| P8 | **Sergent v1, collecte** : Lorakus Sensors (UsageStats), extension navigateur, sessions, lignes de base, `/attention`, passkeys | P5 | Sessions à ± 1 min sur 20 cas ; synchronisation sans trou sur 7 jours | 4,5 sem. |
+| P9 | **Archiviste** : inbox universelle, ingestion, graphe, FSRS, questions de révision citées | P3 | Lien partagé résumé en < 60 s ; séance de révision générée depuis vos cours | 4 sem. |
+| P10 | **Préparateur** : Health Connect, Strava (`no_ai`), séances, sommeil, situation `overloaded_day` | P8 | Course comptée une fois ; mauvaise nuit + journée chargée → programme allégé proposé | 3,5 sem. |
+| P11 | Motivation (module de domaine) | P9 | ≤ 3 présentations par semaine | 1,5 sem. |
+| P12 | **Sergent v2, interventions** : situations de Mission 1, pactes de niveau 3 | P8 + 8 semaines de données, P10, P11, D-J | Chaque activation journalisée ; sortie de secours testée | 2,5 sem. |
+| P13 | **Analyste** : PubAPI, Stockfish de nuit, gaffes, gestion du temps, exercices tirés de vos parties | P8 | Faiblesse au temps démontrée sur vos vraies parties | 3 sem. |
+| P14 | **Trésorier** : imports, catégorisation, récurrences, anomalies, projection d'épargne | P2, D-I | Aucune valeur financière dans une requête LLM (test) ; aucun appel réseau à l'import | 3 sem. |
+| P15 | News (module de domaine), alimente Veilleur et Archiviste | P9 | « Quoi de neuf ? » utile 4 jours sur 5 | 2 sem. |
+| P16 | Voix, ML (bandit, classifieurs) | ≥ 6 mois de données | Chaque modèle bat les règles en validation temporelle | Ouvert |
+| P17 | Red Team, durcissement, rôles PostgreSQL par spécialiste sensible | Tout | Rapport mensuel automatique ; aucune `high` ouverte > 30 jours | 3 sem. |
 
-- **Objectif** : un MVP fiable au quotidien.
-- **Composants** : aucun nouveau.
-- **Dépendances** : P5.
-- **Tâches** : corrections issues de l'usage réel ; ZAP baseline sans `medium` ; exercice d'incident ; runbooks ; documentation ; release `v0.5.0`.
-- **Tests** : suite E2E complète, scénario 8.
-- **Terminée quand** : les huit scénarios passent ; gel des fonctionnalités respecté.
-- **Risques** : tentation d'ajouter des fonctions → gel strict.
+## Risques transverses
 
----
-
-## Après le MVP
-
-### P7 — Attention : collecte (4,5 semaines)
-
-- **Objectif** : mesurer l'usage numérique sans intervenir.
-- **Composants** : `device_ingest`, LORAKUS Sensors (UsageStats, sessionisation, Room chiffrée, WorkManager, tuiles pause et concentration), extension navigateur MV3 (domaines suivis, catégories de page), module `digital_activity` (stockage, lignes de base, `/attention`), `context` complet, sessions de concentration, passkeys, page `/settings/devices` et `/settings/data`.
-- **Dépendances** : P2, P5 ; décision D-E.
-- **Tests** : sessionisation sur traces enregistrées, idempotence et validation des lots, mode dégradé sans permission, mesure batterie.
-- **Terminée quand** : sessions à ± 1 min sur 20 cas ; synchro sans trou sur 7 jours ; batterie < 2 %/jour.
-- **Risques** : optimisation batterie Samsung ; rétention des événements UsageStats.
-
-### P8 — Knowledge Collector (3 semaines)
-
-- **Objectif** : ne plus perdre ce que vous sauvegardez.
-- **Composants** : module `knowledge` (inbox, ingestion URL/texte/fichier, profil `ingest`, résumés, embeddings, collections, recherche), Web Share Target, adaptateur Gemini free tier pour contenus publics, liaison aux projets.
-- **Dépendances** : P3.
-- **Tests** : corpus d'injections, anti-SSRF, classification.
-- **Terminée quand** : un lien partagé depuis Android est résumé et classé en < 60 s ; une injection de test n'a aucun effet.
-- **Risques** : contenus TikTok/Instagram inaccessibles → dégradation acceptée (métadonnées).
-
-### P9 — Body (3,5 semaines)
-
-- **Objectif** : suivre le sport sans saisie pénible.
-- **Composants** : module `fitness` (Health Connect via Sensors, Strava OAuth + webhook + purge, fusion multi-sources, saisie rapide musculation, objectifs, progression, `/body`), contraintes de licence actives.
-- **Dépendances** : P4, P7.
-- **Tests** : fusion de doublons, garde `no_ai`, purge à la révocation Strava.
-- **Terminée quand** : une course de la montre comptée une fois ; muscu saisie en < 30 s ; aucun champ Strava dans un appel LLM (test automatisé).
-- **Risques** : types écrits par Mi Fitness dans Health Connect.
-
-### P10 — Motivation (1,5 semaine)
-
-- **Objectif** : une bibliothèque qui sert au bon moment, pas un fil.
-- **Composants** : module `motivation` (cartes sur items Knowledge, « mes raisons », sélection déterministe, `InspirationProvider`, `MotivationMoment`).
-- **Dépendances** : P8.
-- **Tests** : rotation, repos des contenus ignorés, budget de présentation.
-- **Terminée quand** : ≤ 3 présentations/semaine ; aucune redirection vers TikTok/Instagram.
-- **Risques** : glissement vers un fil → ADR 0017.
-
-### P11 — Attention : interventions (2 semaines)
-
-- **Objectif** : intervenir à bon escient.
-- **Composants** : signaux `digital.*` et `fitness.*`, règles de l'InterventionPolicy pour les situations A–D, étiquetage « c'était voulu », notifications locales Sensors pendant une session de concentration.
-- **Dépendances** : P7 + ≥ 8 semaines de données, P9, P10.
-- **Tests** : scénarios A–D simulés et réels, budget, backoff.
-- **Terminée quand** : situations A–D observées en conditions réelles ; taux de suivi mesuré par règle.
-- **Risques** : agacement → seuils prudents, budget de 3/jour.
-
-### P12 — Chess (1 semaine)
-
-PubAPI Chess.com (séquentielle, User-Agent, ETag), consommation des sessions `chess:*`, règle « session longue avec deadline < 48 h ». Terminée quand une session réelle est détectée à ± 2 min et réconciliée avec les parties.
-
-### P13 — Finance (3 semaines)
-
-Imports CSV/OFX, parsing déterministe, déduplication, catégorisation par règles puis classifieur local, budgets, récurrents, anomalies (MAD), prévision, export, suppression, ré-authentification. Terminée quand un import réel passe sans erreur et qu'un test prouve l'absence d'appel réseau pendant l'import.
-
-### P14 — News (2 semaines)
-
-Collecte RSS planifiée, déduplication, pertinence (intérêts, projets), résumés sur free tier (contenu public), briefing. Terminée quand « Quoi de neuf ? » est utile 4 jours sur 5.
-
-### P15 — Voix et ML (ouvert)
-
-Voix (STT/TTS), estimation ML des durées de tâches, classifieur de sessions, bandit d'interventions et de motivation, versionnement et dérive. Chaque modèle doit battre les règles en validation temporelle.
-
-### P16 — Red Team et durcissement (3 semaines)
-
-Agent Red Team isolé (planification, ZAP, Nuclei si utile, Promptfoo, rapports en issues), campagnes mensuelles, revue ASVS niveau 2, fuzzing de `device_ingest`, revue de l'APK, réévaluation de l'hébergement. Terminée quand le rapport mensuel est automatique et qu'aucune vulnérabilité `high` n'est ouverte depuis plus de 30 jours.
+| Risque | Mitigation |
+| --- | --- |
+| Sur-ingénierie de l'infrastructure d'agents | Un seul spécialiste réel au MVP ; aucun mécanisme sans consommateur |
+| Latence cumulée | Appels parallèles, délais, cache, préparations de nuit |
+| Fuite de valeurs sensibles via la synthèse | Filtre structurel + test d'interception en CI |
+| Trop de notifications à mesure que les spécialistes s'ajoutent | Moteur de situations et budget global unique |

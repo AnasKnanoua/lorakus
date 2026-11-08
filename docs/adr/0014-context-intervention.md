@@ -1,6 +1,6 @@
 # ADR-0014 — Context Engine et InterventionPolicy dans le Core
 
-- **Statut** : Accepté
+- **Statut** : Accepté — complété par l'ADR 0030 (moteur de situations)
 - **Date** : 2026-11-08
 - **Revue prévue** : Phase 11
 

@@ -1,6 +1,6 @@
 # ADR-0005 — Frontend SPA + PWA : choix du framework
 
-- **Statut** : Proposé
+- **Statut** : Validé (2026-11-08)
 - **Date** : 2026-11-08
 - **Revue prévue** : Avant la phase 3
 
@@ -10,7 +10,7 @@ Application privée, sans SEO, consommée surtout sur mobile, avec chat en strea
 
 ## Décision
 
-Proposé : SPA React (Vite, TanStack Router et Query, shadcn/ui sur Radix, Tailwind) en PWA, servie statiquement par Caddy ; client API généré depuis l'OpenAPI. Alternative retenue en second : SvelteKit en mode SPA.
+SPA React (Vite, TanStack Router et Query, shadcn/ui sur Radix, Tailwind) en PWA, servie statiquement par Caddy ; client API généré depuis l'OpenAPI. SvelteKit en mode SPA écarté.
 
 ## Alternatives rejetées
 

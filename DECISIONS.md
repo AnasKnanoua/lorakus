@@ -10,7 +10,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0002](docs/adr/0002-backend-fastapi.md) | Backend FastAPI + SQLAlchemy 2 + Alembic | Accepté | Phase 6 |
 | [0003](docs/adr/0003-postgresql-only.md) | PostgreSQL seul (relationnel, vecteurs, jobs, cache) | Accepté | > 10 utilisateurs ou > 1 M vecteurs |
 | [0004](docs/adr/0004-job-queue.md) | File de jobs Procrastinate derrière le port `JobQueue` | Accepté (amendé 2026-11-08) | Si la maintenance du projet faiblit |
-| [0005](docs/adr/0005-frontend.md) | Frontend SPA + PWA, framework | **Proposé** (React recommandé) | Avant la phase 3 |
+| [0005](docs/adr/0005-frontend.md) | Frontend SPA + PWA en React | Validé (2026-11-08) | — |
 | [0006](docs/adr/0006-ai-abstraction.md) | Abstraction IA maison | Accepté | Phase 15 |
 | [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08) | À chaque changement de tarif |
 | [0008](docs/adr/0008-multi-tenancy-rls.md) | Multi-tenant dans les fondations (`user_id` + RLS) | Validé | Ouverture à d'autres utilisateurs |
@@ -30,16 +30,27 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
 | [0023](docs/adr/0023-codename-lorakus.md) | Nom de code LORAKUS | Validé (2026-11-08) | Avant toute ouverture commerciale |
 | [0024](docs/adr/0024-blobstore-port.md) | Stockage de fichiers derrière le port `BlobStore` | Accepté | Passage à un hébergeur payant |
+| [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | **Proposé** (D-H) | Fin de la phase 3 |
+| [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | **Proposé** (D-H) | Fin de la phase 3 |
+| [0027](docs/adr/0027-report-confidentiality.md) | Confidentialité des rapports transmis au LLM | **Proposé** (D-I) | Après la phase 14 |
+| [0028](docs/adr/0028-preparations-approvals.md) | Préparations en arrière-plan et file d'approbation | Accepté | Phase 6 |
+| [0029](docs/adr/0029-progressive-friction.md) | Friction progressive et pactes volontaires (amende 0016) | **Proposé** (D-J) | Phase 12 |
+| [0030](docs/adr/0030-situation-engine.md) | Moteur de situations | Accepté | Phase 12 |
+| [0031](docs/adr/0031-sentinel-push-probes.md) | Veilleur par sondes qui poussent leurs données | Accepté | Phase 17 |
+| [0032](docs/adr/0032-chess-stockfish.md) | Analyste : Stockfish | Accepté | Avant toute distribution |
+| [0033](docs/adr/0033-knowledge-graph-fsrs.md) | Archiviste : graphe PostgreSQL et FSRS | Accepté | Phase 16 |
 
 ## Décisions en attente d'avis
 
 | Id | Question | Recommandation | Bloque |
 | --- | --- | --- | --- |
-| D-C | Framework frontend (ADR 0005) | React SPA (Vite, TanStack, shadcn/ui) | Phase 3 |
 | D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | Phase 3 |
 | D-E | Place du bien-être numérique | Collecte en phase 7, interventions en phase 11 | Phase 7 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
 | D-G | Adresse publique HTTPS (domaine acheté ou sous-domaine gratuit deSEC) | Sous-domaine deSEC gratuit en attendant ; choisir une fois pour toutes | Début de la phase 3 |
+| D-H | Architecture multi-agents (ADR 0025, 0026) | Profils de spécialiste sur les modules, orchestrateur dans le Core | Phase 2 |
+| D-I | Confidentialité des rapports sensibles (ADR 0027) | Marqueurs stricts par défaut | Phase 3 |
+| D-J | Friction de niveau 3 par pactes volontaires (ADR 0029) | Autoriser, uniquement par pactes préconfigurés | Phase 12 |
 
 ## Décisions prises
 
@@ -47,6 +58,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | --- | --- | --- |
 | D-A | Oracle Always Free : `OracleWorker` = production, 2e instance A1 = staging ; pas de k3s sur Oracle | 2026-11-08 |
 | D-B | Dépôt GitHub public ; aucun secret dans le dépôt, même chiffré | 2026-11-08 |
+| D-C | Frontend React / TypeScript (ADR 0005 validé) | 2026-11-08 |
 | — | Architecture clients : PWA + app Android compagnon séparée (ADR 0013) | 2026-11-08 |
 | — | Nom de code LORAKUS (ADR 0023) ; pas d'achat de domaine pour l'instant | 2026-11-08 |
 

@@ -122,3 +122,39 @@ uv run scripts/new_module.py nom_du_module   # copie lorakus_modules/_template
 - [ ] Migration rejouable (up/down/check)
 - [ ] Tests unitaires du domaine, test d'isolation RLS, test de contrat
 - [ ] Documentation du module à jour
+
+## 10. Profil de spécialiste (proposé, ADR 0026)
+
+Un module devient un spécialiste en ajoutant un `SpecialistProfile` à son manifeste :
+
+```python
+specialist=SpecialistProfile(
+    name="tresorier",
+    display_name="Le Tresorier",
+    intents=["spending_summary", "budget_status", "savings_projection"],
+    data_scopes=["fin_transactions", "fin_budgets", "fin_goals"],  # tables du module uniquement
+    reads_ports=[],
+    report_class="sensitive",
+    llm_usage="none",                 # none | formulation | analysis
+    llm_budget_usd_month=0.0,
+    answer_timeout_s=3.0,
+    preparations=["weekly_finance_review"],
+    actions=[],                       # toujours soumises à la file d'approbation
+    limits="Aucune operation bancaire, aucune resiliation, aucun conseil d'investissement.",
+)
+```
+
+Règles supplémentaires :
+
+1. Le spécialiste répond par un `SpecialistReport` typé (résumé de 1 à 3 phrases, faits avec classe, source et mention mesuré/estimé, confiance motivée, actions suggérées jamais exécutées) ; `no_data` est une réponse normale.
+2. Il ne lit que ses `data_scopes` et les ports déclarés ; il n'appelle jamais un autre spécialiste.
+3. Il ne notifie jamais : il émet des signaux ; les situations multi-domaines sont construites par le Core.
+4. Toute action externe est déclarée dans `actions` et passe par la file d'approbation.
+5. Si `llm_usage` n'est pas `none`, un budget mensuel est obligatoire ; à 100 %, le spécialiste bascule sur ses gabarits.
+
+Checklist de revue d'un spécialiste, en plus de la checklist du §9 :
+
+- [ ] Intentions uniques et documentées
+- [ ] Classe maximale des rapports correcte ; aucune valeur `sensitive` hors marqueurs (test d'interception)
+- [ ] Délai de réponse respecté sur données réelles
+- [ ] Limites rédigées et testées (refus des demandes hors périmètre)

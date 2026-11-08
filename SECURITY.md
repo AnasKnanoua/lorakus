@@ -88,3 +88,12 @@ Format de rapport (template d'issue `security-finding`) : description, preuve re
 6. **Post-mortem** : `docs/incidents/AAAA-MM-JJ-titre.md` sous 7 jours.
 
 Runbooks à rédiger en phase 6 : `restore.md`, `rotate-secrets.md`, `block-ai-provider.md`, `revoke-device.md`, `incident.md`.
+
+## 12. Agents et spécialistes (Mission 3)
+
+- **Cloisonnement** : chaque spécialiste ne lit que ses tables (`data_scopes`, vérifié en CI) et les ports déclarés ; le Majordome ne lit aucune table, il reçoit des rapports. Rôles PostgreSQL distincts par spécialiste sensible envisagés en phase 17 (défense en profondeur).
+- **LLM** : filtre de confidentialité (ADR 0027) ; test de CI qui intercepte les requêtes sortantes et échoue si une valeur `sensitive` y figure ; classes transmises tracées dans `core_agent_runs`.
+- **Actions** : file d'approbation (ADR 0028) ; actions `sensitive` approuvées uniquement dans la PWA avec ré-authentification récente ; expiration à 24 h ; aucune action financière en V1.
+- **Friction** : niveau 3 uniquement par pactes préconfigurés, bornés, journalisés, avec sortie de secours (ADR 0029).
+- **Veilleur** : sondes en lecture seule qui poussent un inventaire (clé `host:report`) ; Lorakus ne détient aucune clé SSH ni accès entrant ; aucun test intrusif ; uniquement les hôtes déclarés (ADR 0031). Distinct de l'agent Red Team.
+- **Traçabilité** : toute question, préparation, intervention et approbation laisse une trace consultable (« pourquoi m'as-tu dit ça ? »).
