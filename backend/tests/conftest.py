@@ -18,6 +18,12 @@ def reset_settings_cache() -> Iterator[None]:
 
 
 @pytest.fixture
+def anyio_backend() -> str:
+    """Les tests asynchrones (@pytest.mark.anyio) tournent sur asyncio."""
+    return "asyncio"
+
+
+@pytest.fixture
 def client() -> Iterator[TestClient]:
     """Client HTTP de test branche directement sur l'application."""
     with TestClient(create_app()) as test_client:

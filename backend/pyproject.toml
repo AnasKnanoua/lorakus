@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Lorakus : backend (Core platform et modules)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "alembic>=1.20.1",
     "fastapi>=0.162.2",
+    "psycopg[binary]>=3.3.8",
     "pydantic-settings>=2.16.2",
+    "sqlalchemy[asyncio]>=2.1.8",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -44,7 +47,8 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]   # assert est normal dans les tests
+"tests/**" = ["S101"]                 # assert est normal dans les tests
+"alembic/versions/**" = ["F401"]      # le modele importe sqlalchemy meme si une migration ne l'utilise pas
 
 # --- Pyright : vérification des types --------------------------------------
 [tool.pyright]
@@ -59,3 +63,4 @@ venv = ".venv"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = ["integration: necessite PostgreSQL (make test-all)"]

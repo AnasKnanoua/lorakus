@@ -62,5 +62,18 @@ fi
   && ok "extension pgvector installee" \
   || ko "extension pgvector installee"
 
+
+[ "$(psql_as "${APP[@]}" "select count(*) from alembic_version")" = "1" ] \
+  && ok "lorakus_app lit la version du schema" \
+  || ko "lorakus_app lit la version du schema"
+
+# Dans une transaction annulee : meme si le droit existait, rien ne serait supprime.
+if psql_as "${APP[@]}" "begin; delete from alembic_version; rollback;" >/dev/null 2>&1; then
+  ko "lorakus_app ne peut pas modifier la version du schema"
+else
+  ok "lorakus_app ne peut pas modifier la version du schema"
+fi
+
+
 echo "Resultat : $passed reussi(s), $failed echec(s)"
 [ "$failed" -eq 0 ]
