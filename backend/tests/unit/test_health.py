@@ -1,4 +1,4 @@
-"""Tests de la route de sante et de la configuration de la documentation."""
+"""Tests des routes de sante et de la configuration de la documentation."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +19,21 @@ def test_docs_available_in_development(client: TestClient) -> None:
 
 def test_docs_disabled_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LORAKUS_ENVIRONMENT", "production")
+    monkeypatch.setenv("LORAKUS_APP_DB_PASSWORD", "test-only")
     production_client = TestClient(create_app())
 
     assert production_client.get("/api/docs").status_code == 404
     assert production_client.get("/api/openapi.json").status_code == 404
+
+
+def test_ready_returns_503_without_details_when_database_is_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Port 1 : aucune base n'y ecoute, la connexion est refusee immediatement.
+    monkeypatch.setenv("LORAKUS_DB_PORT", "1")
+
+    with TestClient(create_app()) as unreachable_client:
+        response = unreachable_client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}

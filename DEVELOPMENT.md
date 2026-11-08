@@ -40,7 +40,7 @@ lorakus/
 | `make e2e` | Tests Playwright sur une pile éphémère |
 | `make lint` | Ruff, pyright strict, ESLint, import-linter |
 | `make security` | Bandit, Semgrep, pip-audit, Gitleaks |
-| `make migration MODULE=academic MSG="..."` | Nouvelle révision Alembic sur la branche du module |
+| `make migration BRANCH=core MSG="..."` | Nouvelle révision Alembic sur la branche du module (`core`, `academic`…) |
 | `make migrate` | Applique les migrations en local |
 | `make evals` | Evals Promptfoo sur `FakeProvider` |
 | `make new-module NAME=...` | Crée un module depuis le gabarit |

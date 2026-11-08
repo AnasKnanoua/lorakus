@@ -1,13 +1,15 @@
 # Raccourcis de developpement. Tapez "make" pour voir la liste.
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap dev test lint format typecheck check db-up db-down db-reset db-shell db-check
+.PHONY: help bootstrap dev test test-all lint format typecheck check \
+        db-up db-down db-reset db-shell db-check migrate migration migrate-check
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
+COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
 
 help: ## Affiche cette aide
-> @grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-12s %s\n", $$1, $$2}'
+> @grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 bootstrap: ## Installe les dependances et les hooks pre-commit
 > $(UV) sync
@@ -16,7 +18,10 @@ bootstrap: ## Installe les dependances et les hooks pre-commit
 dev: ## Lance l'API en local avec rechargement automatique
 > $(UV) run uvicorn --factory lorakus.api.app:create_app --reload --host 127.0.0.1 --port 8000
 
-test: ## Lance les tests
+test: ## Tests unitaires (sans base de donnees)
+> $(UV) run pytest -m "not integration"
+
+test-all: db-up migrate ## Tous les tests, y compris avec PostgreSQL
 > $(UV) run pytest
 
 lint: ## Verifie le style et les erreurs courantes
@@ -30,10 +35,7 @@ format: ## Formate le code et corrige ce qui peut l'etre automatiquement
 typecheck: ## Verifie les types (pyright strict)
 > $(UV) run pyright
 
-check: lint typecheck test ## Tout verifier avant d'ouvrir une PR
-
-
-COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
+check: lint typecheck test-all db-check ## Tout verifier avant d'ouvrir une PR
 
 db-up: ## Demarre PostgreSQL en local et attend qu'il soit pret
 > $(COMPOSE) up -d --wait postgres
@@ -50,3 +52,16 @@ db-shell: ## Ouvre une console SQL en tant que lorakus_app
 
 db-check: ## Verifie les roles et permissions PostgreSQL
 > ./infra/postgres/check-roles.sh
+
+migrate: ## Applique toutes les migrations (role lorakus_migrator)
+> $(UV) run alembic upgrade heads
+
+migration: ## Nouvelle migration : make migration BRANCH=core MSG="description"
+> @test -n "$(BRANCH)" -a -n "$(MSG)" || (echo 'Usage : make migration BRANCH=core MSG="description"'; exit 1)
+> $(UV) run alembic revision --autogenerate --head=$(BRANCH)@head -m "$(MSG)"
+
+migrate-check: ## Verifie que les migrations sont rejouables (montee, descente, montee)
+> $(UV) run alembic upgrade heads
+> $(UV) run alembic downgrade base
+> $(UV) run alembic upgrade heads
+> $(UV) run alembic check

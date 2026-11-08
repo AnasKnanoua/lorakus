@@ -15,7 +15,7 @@
 
 ## En cours
 
-- P1, PR n°3 : PostgreSQL 18 + pgvector en local (Compose), rôles admin / migrator / app, vérification automatique des permissions.
+- P1, PR n°4 : SQLAlchemy 2 async + psycopg 3, Alembic (branche `core`, migration 0001), `/api/health/ready`, tests anti-injection, garde-fous de requêtes.
 
 ## Décisions en attente (voir `DECISIONS.md`)
 
