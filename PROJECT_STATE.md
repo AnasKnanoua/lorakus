@@ -19,7 +19,7 @@
 
 ## En cours
 
-- P1, PR n°10 : pile complète en conteneurs (`migrate` puis `api`), conteneurs durcis (lecture seule, aucune capacité, no-new-privileges), un mot de passe par service, rotation des journaux, `make up`/`down`/`logs`.
+- P1, PR n°11 : Prometheus (rétention 15 jours / 1 Go) et Grafana (provisioning, tableau de bord API en JSON), ports liés à 127.0.0.1, configuration validée en CI par promtool.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
