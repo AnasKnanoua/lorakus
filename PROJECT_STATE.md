@@ -15,8 +15,7 @@
 
 ## En cours
 
-- P1, PR n°2 : squelette du backend (FastAPI, `/api/health`, tests, Ruff, pyright strict, Makefile).
-- Dépôt : https://github.com/AnasKnanoua/lorakus
+- P1, PR n°3 : PostgreSQL 18 + pgvector en local (Compose), rôles admin / migrator / app, vérification automatique des permissions.
 
 ## Décisions en attente (voir `DECISIONS.md`)
 

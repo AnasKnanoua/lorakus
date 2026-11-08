@@ -1,7 +1,7 @@
 # Raccourcis de developpement. Tapez "make" pour voir la liste.
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap dev test lint format typecheck check
+.PHONY: help bootstrap dev test lint format typecheck check db-up db-down db-reset db-shell db-check
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -31,3 +31,22 @@ typecheck: ## Verifie les types (pyright strict)
 > $(UV) run pyright
 
 check: lint typecheck test ## Tout verifier avant d'ouvrir une PR
+
+
+COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
+
+db-up: ## Demarre PostgreSQL en local et attend qu'il soit pret
+> $(COMPOSE) up -d --wait postgres
+
+db-down: ## Arrete PostgreSQL (les donnees sont conservees)
+> $(COMPOSE) down
+
+db-reset: ## SUPPRIME la base locale et la recree a neuf
+> $(COMPOSE) down -v
+> $(COMPOSE) up -d --wait postgres
+
+db-shell: ## Ouvre une console SQL en tant que lorakus_app
+> $(COMPOSE) exec postgres psql -U lorakus_app -d lorakus
+
+db-check: ## Verifie les roles et permissions PostgreSQL
+> ./infra/postgres/check-roles.sh

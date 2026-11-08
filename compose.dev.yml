@@ -1,0 +1,6 @@
+# Surcharges pour le developpement local uniquement.
+services:
+  postgres:
+    ports:
+      # 127.0.0.1 : accessible depuis le Dell seulement, jamais depuis le reseau.
+      - "127.0.0.1:5432:5432"
