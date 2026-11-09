@@ -1,0 +1,26 @@
+# Modele de configuration Alertmanager. Le marqueur __..__ est remplace au
+# demarrage du conteneur par la valeur de .env : aucun secret dans le depot.
+# Canal d'EXPLOITATION uniquement (ADR 0035) : jamais de notification produit ici.
+route:
+  receiver: discord-ops
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: discord-ops
+    discord_configs:
+      - webhook_url: "__DISCORD_OPS_WEBHOOK_URL__"
+        send_resolved: true
+        title: '{{ template "lorakus.title" . }}'
+        message: '{{ template "lorakus.message" . }}'
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+# Si l'API est injoignable (critique), inutile d'envoyer en plus les alertes
+# secondaires (latence, erreurs) qui en decoulent.
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']

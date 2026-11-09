@@ -19,3 +19,6 @@ OAuth Google Calendar (jetons limités tant que l'app n'est pas vérifiée) ; nt
 ## Conséquences
 
 Écriture dans le calendrier reportée.
+
+
+Amendement du 2026-11-09 : les alertes d'exploitation passent par Discord (ADR 0035) ; Telegram est réservé aux notifications du produit.

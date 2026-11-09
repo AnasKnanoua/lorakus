@@ -1,0 +1,93 @@
+# Tests unitaires des regles d'alerte (promtool) : executes par make obs-check, donc en CI.
+rule_files:
+  - ../rules/lorakus.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: API injoignable
+    interval: 1m
+    input_series:
+      - series: 'up{job="lorakus-api", instance="api:9464"}'
+        values: '1 1 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LorakusApiDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: LorakusApiDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: lorakus-api
+              instance: api:9464
+            exp_annotations:
+              summary: L'API Lorakus est injoignable
+              description: Prometheus ne parvient plus a collecter les metriques de l'API depuis 2 minutes.
+
+  - name: Taux d'erreurs eleve
+    interval: 1m
+    input_series:
+      - series: 'lorakus_http_requests_total{method="GET", route="/api/health/ready", status="200"}'
+        values: '0+60x20'
+      - series: 'lorakus_http_requests_total{method="GET", route="/api/health/ready", status="500"}'
+        values: '0+6x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: LorakusHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Plus de 5 % d'erreurs serveur sur l'API
+              description: Plus de 5 % des requetes se terminent en erreur 5xx depuis 5 minutes.
+
+  - name: Quelques erreurs isolees, pas d'alerte
+    interval: 1m
+    input_series:
+      - series: 'lorakus_http_requests_total{method="GET", route="/api/health/ready", status="200"}'
+        values: '0+600x20'
+      - series: 'lorakus_http_requests_total{method="GET", route="/api/health/ready", status="500"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: LorakusHighErrorRate
+        exp_alerts: []
+
+  - name: Latence elevee
+    interval: 1m
+    input_series:
+      - series: 'lorakus_http_request_duration_seconds_bucket{method="GET", route="/api/x", le="0.5"}'
+        values: '0+0x30'
+      - series: 'lorakus_http_request_duration_seconds_bucket{method="GET", route="/api/x", le="1"}'
+        values: '0+0x30'
+      - series: 'lorakus_http_request_duration_seconds_bucket{method="GET", route="/api/x", le="2.5"}'
+        values: '0+10x30'
+      - series: 'lorakus_http_request_duration_seconds_bucket{method="GET", route="/api/x", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LorakusHighLatency
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: L'API Lorakus est lente
+              description: Le 95e centile de la duree des requetes depasse 1 seconde depuis 10 minutes.
+
+  - name: Memoire elevee
+    interval: 1m
+    input_series:
+      - series: 'process_resident_memory_bytes{job="lorakus-api", instance="api:9464"}'
+        values: '350000000+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: LorakusApiHighMemory
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: lorakus-api
+              instance: api:9464
+            exp_annotations:
+              summary: L'API Lorakus consomme beaucoup de memoire
+              description: L'API depasse 300 Mo depuis 10 minutes (limite du conteneur 384 Mo).
