@@ -19,7 +19,7 @@ services:
       - --storage.tsdb.retention.time=15d
       - --storage.tsdb.retention.size=1GB
     volumes:
-      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
@@ -30,6 +30,7 @@ services:
       retries: 5
       start_period: 10s
     read_only: true
+    tmpfs: ["/tmp:size=16m"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
@@ -77,6 +78,47 @@ services:
         limits:
           memory: 256m
 
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN manquant dans .env}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID manquant dans .env}
+    # Alertmanager ne lit pas les variables d'environnement dans sa configuration :
+    # le fichier final est genere au demarrage, en memoire (/tmp), depuis le modele.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        sed -e "s|__TELEGRAM_BOT_TOKEN__|$${TELEGRAM_BOT_TOKEN}|"
+        -e "s|__TELEGRAM_CHAT_ID__|$${TELEGRAM_CHAT_ID}|"
+        /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        && exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
+        --storage.path=/alertmanager
+    volumes:
+      - ./infra/observability/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    tmpfs: ["/tmp:size=8m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:

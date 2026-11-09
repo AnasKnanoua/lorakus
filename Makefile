@@ -3,7 +3,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
-        image up down logs obs-up obs-check
+        image up down logs obs-up obs-check alert-test
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -82,9 +82,14 @@ down: ## Arrete tous les conteneurs, observabilite comprise (donnees conservees)
 logs: ## Affiche les journaux de l'API en direct (Ctrl+C pour quitter)
 > $(COMPOSE) logs -f api
 
-obs-up: up ## Ajoute Prometheus (9090) et Grafana (3000) a la pile
-> $(OBS) up -d --wait prometheus grafana
+obs-up: up ## Ajoute Prometheus (9090), Alertmanager (9093) et Grafana (3000)
+> $(OBS) up -d --wait prometheus alertmanager grafana
 
-obs-check: ## Valide la configuration Prometheus et les tableaux de bord Grafana
+obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et Grafana
 > python3 -m json.tool infra/observability/grafana/dashboards/lorakus-api.json > /dev/null
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
+> $(OBS) run --rm --no-deps --entrypoint promtool prometheus test rules /etc/prometheus/tests/lorakus_test.yml
+> $(OBS) run --rm --no-deps --entrypoint /bin/sh alertmanager -c 'sed -e "s|__TELEGRAM_BOT_TOKEN__|test|" -e "s|__TELEGRAM_CHAT_ID__|1|" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/am.yml && amtool check-config /tmp/am.yml'
+
+alert-test: ## Envoie une alerte de test sur Telegram (pile d'observabilite lancee)
+> $(OBS) exec alertmanager amtool alert add LorakusTest 'severity="warning"' --annotation='summary="Alerte de test Lorakus"' --alertmanager.url=http://localhost:9093

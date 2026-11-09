@@ -1,0 +1,21 @@
+# Modele de configuration Alertmanager. Les marqueurs __..__ sont remplaces au
+# demarrage du conteneur par les valeurs de .env : aucun secret dans le depot.
+route:
+  receiver: telegram
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token: "__TELEGRAM_BOT_TOKEN__"
+        chat_id: __TELEGRAM_CHAT_ID__
+        send_resolved: true
+
+# Si l'API est injoignable (critique), inutile d'envoyer en plus les alertes
+# secondaires (latence, erreurs) qui en decoulent.
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']

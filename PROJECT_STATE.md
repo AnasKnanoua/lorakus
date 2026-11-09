@@ -19,17 +19,16 @@
 
 ## En cours
 
-- P1, PR n°11 : Prometheus (rétention 15 jours / 1 Go) et Grafana (provisioning, tableau de bord API en JSON), ports liés à 127.0.0.1, configuration validée en CI par promtool.
+- P1, PR n°12 : alertes (règles Prometheus testées par promtool, Alertmanager vers Telegram, inhibition des alertes secondaires), ADR 0034 (Python seul côté serveur).
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
-1. CI GitHub Actions : `make check` avec PostgreSQL de service, vérification du titre de PR, puis règle « CI verte obligatoire » sur `main`.
-2. `dependabot.yml` et CodeQL ; corriger `compose.yml` en `pgvector/pgvector:pg18@sha256:…` (tag + empreinte).
-3. Image Docker de l'API (multi-arch, non-root) et Compose de production.
-4. Observabilité palier 1 : journaux structurés (structlog), métriques Prometheus, Grafana, alertes ; instrumentation OpenTelemetry (traces Tempo en P3).
-5. Sauvegardes chiffrées hors Oracle et test de restauration.
-6. Staging (2e instance A1, guide pas à pas) et premier déploiement sur `OracleWorker`.
+1. ~~CI, Dependabot, CodeQL, image Docker, pile en conteneurs, journaux JSON et métriques, Prometheus et Grafana~~ (faits, PR n°7 à n°11).
+2. Alertes vers Telegram (PR n°12, en cours).
+3. Sauvegardes chiffrées hors Oracle et test de restauration automatisé.
+4. Staging (2e instance A1) et premier déploiement sur `OracleWorker`.
+5. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible sur le VPS.
 
 ## Décisions en attente (voir `DECISIONS.md`)
 

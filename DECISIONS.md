@@ -39,6 +39,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0031](docs/adr/0031-sentinel-push-probes.md) | Veilleur par sondes qui poussent leurs données | Accepté | Phase 17 |
 | [0032](docs/adr/0032-chess-stockfish.md) | Analyste : Stockfish | Accepté | Avant toute distribution |
 | [0033](docs/adr/0033-knowledge-graph-fsrs.md) | Archiviste : graphe PostgreSQL et FSRS | Accepté | Phase 16 |
+| [0034](docs/adr/0034-python-only-backend.md) | Python seul côté serveur, Rust seulement sur mesure | Accepté | Si un profilage montre un goulot CPU |
 
 ## Décisions en attente d'avis
 
