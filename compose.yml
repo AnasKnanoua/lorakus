@@ -11,7 +11,7 @@ x-logging: &default-logging
     max-file: "3"
     tag: "{{.Name}}"
 
-# Durcissement des conteneurs de l'application (API et migrations).
+# Durcissement des conteneurs de l'application (API, migrations, sauvegardes).
 x-app-hardening: &app-hardening
   read_only: true
   cap_drop: [ALL]
@@ -84,6 +84,34 @@ services:
       resources:
         limits:
           memory: 384m
+
+  # Conteneur ponctuel : sauvegarde chiffree vers B2 (make backup ; minuteur en production).
+  # Il ne recoit que la cle PUBLIQUE age et une cle B2 sans droit de suppression.
+  backup:
+    <<: *app-hardening
+    image: ${LORAKUS_BACKUP_IMAGE:-lorakus-backup:dev}
+    tmpfs: ["/tmp:size=512m"]
+    restart: "no"
+    profiles: ["tools"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
+      PGUSER: lorakus_migrator
+      PGPASSWORD: ${LORAKUS_MIGRATOR_DB_PASSWORD:?manquant dans .env}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?BACKUP_AGE_RECIPIENT manquant dans .env}
+      B2_BUCKET: ${B2_BUCKET:?B2_BUCKET manquant dans .env}
+      RCLONE_CONFIG_B2_TYPE: b2
+      RCLONE_CONFIG_B2_ACCOUNT: ${B2_KEY_ID:?B2_KEY_ID manquant dans .env}
+      RCLONE_CONFIG_B2_KEY: ${B2_APP_KEY:?B2_APP_KEY manquant dans .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 networks:
   internal:

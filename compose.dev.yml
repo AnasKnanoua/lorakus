@@ -6,7 +6,10 @@ services:
       - "127.0.0.1:5432:5432"
 
   migrate:
-    # Image construite localement par "make image" : ne jamais la chercher sur Internet.
+    # Images construites localement : ne jamais les chercher sur Internet.
+    pull_policy: never
+
+  backup:
     pull_policy: never
 
   api:
