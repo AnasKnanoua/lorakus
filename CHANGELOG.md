@@ -5,6 +5,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 ## [Non publié]
 
 ### Ajouté
+- 2026-11-09 — ADR 0036 : production sur `oracleworker` (`lorakus-prod`), staging léger et sentinelle externe sur Azure for Students. Décision D-G tranchée : domaine `lorakus.app`. Questions de clarification ajoutées à la phase 4.
 - 2026-11-08 — Décisions D-H, D-I, D-J validées ; D-K (accès privé) refusée. Revue « regard neuf » : MVP allégé (filtre de confidentialité et moteur de situations en P10, file d'approbation au premier besoin), observabilité par paliers, gel de la conception jusqu'à la v0.5, règles « pas de tâche planifiée par utilisateur » et « Telegram sans contenu sensible ».
 - 2026-11-08 — Mission 3 : architecture multi-agents (Majordome et six spécialistes) proposée ; ADR 0025 à 0033 ; roadmap réordonnée (P1 à P17) ; décisions D-H, D-I, D-J ouvertes.
 - 2026-11-08 — Nom de code LORAKUS (ADR 0023) ; architecture clients PWA + app Android compagnon séparée (ADR 0013 réécrit) ; décision D-G (adresse HTTPS) ouverte.
@@ -14,6 +15,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 - 2026-11-08 — Mission 0 : dossier de conception initial (architecture, sécurité, IA, observabilité, infrastructure).
 
 ### Modifié
+- 2026-11-09 — ADR 0009 amendé par 0036 ; `DEPLOYMENT.md`, `PROJECT_STATE.md`, `ROADMAP.md`, `SECURITY.md` et `ARCHITECTURE.md` alignés sur l'état réel (alertes sur Discord, secrets générés sur le serveur, sauvegardes B2).
 - ADR 0005 validé (React) ; ADR 0014 complété par 0030 ; ADR 0016 amendé par 0029 sous réserve de la décision D-J ; module `digital_activity` renommé `focus`.
 - ADR 0004 (port `JobQueue`), 0005 (framework frontend réouvert), 0007 (embeddings locaux, contraintes de licence) amendés.
 

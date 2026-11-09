@@ -1,6 +1,6 @@
 # Roadmap
 
-Version 2.1 (Mission 3 et revue « regard neuf », 2026-11-08) : intègre l'architecture multi-agents validée (ADR 0025 à 0033) avec un MVP allégé. **Gel de la conception jusqu'à la v0.5** : toute nouvelle idée va dans la section « Idées » en fin de fichier et n'est étudiée qu'après le MVP. Durées indicatives à environ 8 h/semaine, à recaler sur la vitesse réelle. Une phase n'est close que si la suite de tests des phases précédentes reste verte et si `PROJECT_STATE.md` est à jour.
+Version 2.2 (2026-11-09 : environnements de l'ADR 0036, questions de clarification en P4). Version 2.1 (Mission 3 et revue « regard neuf », 2026-11-08) : intègre l'architecture multi-agents validée (ADR 0025 à 0033) avec un MVP allégé. **Gel de la conception jusqu'à la v0.5** : toute nouvelle idée va dans la section « Idées » en fin de fichier et n'est étudiée qu'après le MVP. Durées indicatives à environ 8 h/semaine, à recaler sur la vitesse réelle. Une phase n'est close que si la suite de tests des phases précédentes reste verte et si `PROJECT_STATE.md` est à jour.
 
 ```mermaid
 gantt
@@ -44,19 +44,24 @@ Scénarios d'acceptation :
 5. Idée envoyée au bot Telegram → boîte d'idées de `projects`.
 6. Préférence exprimée en conversation → fait proposé → confirmé → utilisé par la planification.
 7. « Pourquoi m'as-tu dit ça ? » → trace complète (spécialistes appelés, données utilisées, classes transmises au LLM).
-8. API coupée → alerte Telegram en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
+8. API coupée → alerte Discord en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
 9. Restauration automatique du dernier backup réussie.
 
-### P1 — Fondations (reste : 2 semaines)
+### P1 — Fondations (reste : le déploiement)
 
-- **Composants** : CI GitHub Actions (`make check` avec PostgreSQL, titre de PR au format Conventional Commits), `dependabot.yml` (uv, Docker, Actions), CodeQL, image Docker de l'API (multi-arch, non-root), observabilité palier 1 (journaux structurés JSON, métriques Prometheus, Grafana, alertes ; instrumentation OpenTelemetry), sauvegardes chiffrées + test de restauration, staging sur la 2e instance A1, premier déploiement sur `OracleWorker`.
-- **Tests** : CI obligatoire sur `main`, restauration, Trivy.
-- **Terminée quand** : un push déploie le staging ; une requête est visible dans Grafana (log, métrique, trace corrélés).
+- **Fait** (PR n°7 à n°14) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production.
+- **Reste, dans l'ordre** :
+  1. PR n°15, publication : images API et sauvegarde multi-architectures (arm64 et amd64 construites nativement), publiées sur GHCR, analysées par Trivy.
+  2. PR n°16, déploiement : workflow GitHub avec approbation manuelle, image désignée par son empreinte, migrations, vérification de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
+  3. PR n°17, exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, VM Azure en staging léger et sentinelle externe (ADR 0036).
+  4. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
+- **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
+- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR ; le retour arrière a été essayé ; la sauvegarde quotidienne tourne et son absence alerte ; la sentinelle alerte quand la production ne répond plus. Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
 - **Risque** : temps passé sur l'outillage.
 
 ### P2 — Core platform + registre des spécialistes (3 semaines)
 
-- **Composants** : identité, sessions, TOTP, rôles, RLS, API keys ; registre de modules, manifeste, config ; événements (outbox) ; `JobQueue` ; Tool Runtime ; audit ; **`SpecialistProfile`, registre `agents`, modèles `SpecialistRequest` / `SpecialistReport`, table `core_agent_runs`**.
+- **Composants** : identité, sessions, TOTP, rôles, RLS, API keys ; registre de modules, manifeste, config ; événements (outbox) ; `JobQueue` ; Tool Runtime ; audit ; **`SpecialistProfile`, registre `agents`, modèles `SpecialistRequest` / `SpecialistReport` (avec un champ optionnel « information manquante », utilisé à partir de la P4), table `core_agent_runs`**.
 - **Tests** : isolation RLS à deux utilisateurs ; contrat de manifeste et de profil ; un profil invalide empêche le démarrage ; import-linter.
 - **Terminée quand** : deux spécialistes factices différents s'enregistrent et répondent via l'API interne.
 - **Risque** : contrat de profil trop rigide.
@@ -64,7 +69,7 @@ Scénarios d'acceptation :
 ### P3 — Majordome, IA et mémoire (4,5 semaines)
 
 - **Composants** : `AIProvider`, `ModelRouter`, budgets ; mémoire ; conversations SSE ; frontend React (design system, login, chat, `/memory`, PWA) ; **orchestrateur (parallélisme, délais, cache, disjoncteur), routage à trois paliers** ; observabilité palier 2 (traces Tempo). Le filtre de confidentialité n'est pas nécessaire ici : aucun spécialiste sensible avant P10.
-- **Dépend de** : D-D (budget IA), D-G (adresse HTTPS).
+- **Dépend de** : D-D (budget IA). Adresse : `app.lorakus.app` (D-G tranchée).
 - **Tests** : evals Promptfoo sur `FakeProvider` ; orchestrateur (délais, disjoncteur, cache) ; trace complète d'une question.
 - **Terminée quand** : une question multi-spécialistes (factices) obtient une réponse en moins de 5 s avec trace complète ; utilisé 5 jours de suite.
 - **Risque** : qualité perçue des réponses.
@@ -72,8 +77,9 @@ Scénarios d'acceptation :
 ### P4 — Planning, academic, projects, Sergent v0 (4 semaines)
 
 - **Composants** : `planning` (tâches, agenda, planificateur), `calendars` (ICS), `academic`, `projects`, Today, **module `focus` avec le profil Sergent (échéances, retards, découpage de tâches proposé)**.
+- **Questions de clarification** : un spécialiste signale une information manquante dans son `SpecialistReport` ; le Majordome ne pose la question que si la réponse change le résultat, une seule à la fois, en proposant une réponse par défaut tirée de l'historique ; la réponse est mémorisée comme un fait confirmé. Exemple : la durée estimée d'un devoir annoncé sans durée.
 - **Dépend de** : D-F.
-- **Tests** : règles de retard et de planification ; découpage jamais appliqué sans validation ; synchro ICS sur fichiers réels anonymisés.
+- **Tests** : règles de retard et de planification ; découpage jamais appliqué sans validation ; synchro ICS sur fichiers réels anonymisés ; aucune question posée quand la réponse ne change rien, jamais deux questions à la suite, la réponse par défaut s'applique sans réponse de l'utilisateur.
 - **Terminée quand** : scénarios 1, 2 et 6.
 - **Risque** : récurrences ICS et fuseaux horaires.
 
@@ -116,3 +122,7 @@ Usage réel, ZAP baseline, exercice d'incident, runbooks, gel des fonctionnalit�
 ## Idées (étudiées après la v0.5)
 
 - **Offre commerciale modulaire** : formules regroupant des modules au choix (par exemple Strava sans les échecs), définies à partir de sondages auprès d'utilisateurs potentiels. Déjà compatible avec l'activation des modules par utilisateur (phase 2) ; ajouter des « droits » par formule le moment venu.
+- **Authentification et facturation au moment de vendre** : réévaluer Clerk pour l'authentification ; Stripe pour la facturation (25 $ de crédit étudiant) ; Testmail pour tester l'envoi d'e-mails si Lorakus en envoie un jour.
+- **Heures de prière** : calcul local déterministe (ou Mawaqit si un accès autorisé existe), créneaux ajoutés à l'agenda, situation « heure de prière et réseaux sociaux » traitée par un pacte volontaire (notification plein écran, Ne pas déranger, blocage par l'extension sur PC). Fermer une application Android de force exigerait le service d'accessibilité, écarté par l'ADR 0016. Donnée religieuse, donc catégorie sensible du RGPD : module désactivé par défaut, classé `sensitive`, jamais transmis à un LLM, consentement explicite en cas de vente.
+- **Montre connectée** : déjà prévue avec le Préparateur (P10), via Mi Fitness puis Health Connect.
+- **Alertes d'exploitation** : lien vers le runbook et le tableau de bord dans chaque alerte (P6).

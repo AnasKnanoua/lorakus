@@ -37,7 +37,7 @@ Contraintes de licence (par ligne) : `no_ai` (aucun LLM ni entraînement — ex.
 
 ## 5. Secrets
 
-- **Aucun secret dans le dépôt, même chiffré** (dépôt public, ADR 0022) : secrets dans les environnements GitHub (`staging`, `production` avec approbation), et sur les serveurs dans des fichiers `.env` 600 appartenant à l'utilisateur `deploy`.
+- **Aucun secret dans le dépôt, même chiffré** (dépôt public, ADR 0022) : les secrets d'exécution sont générés **sur le serveur** par un script, dans `/opt/lorakus/.env` (600, utilisateur `deploy`), et n'en sortent pas ; GitHub ne détient que la clé SSH de déploiement, dans l'environnement `production` soumis à approbation.
 - Gitleaks en pre-commit et en CI ; protection des secrets au push GitHub et CodeQL activés.
 - Rotation trimestrielle (clés IA, Telegram, base), annuelle pour la clé de chiffrement des champs (re-chiffrement par job).
 - `structlog` masque `authorization`, `cookie`, `api_key`, `token`, IBAN, numéros de carte.
