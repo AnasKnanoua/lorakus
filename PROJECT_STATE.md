@@ -25,9 +25,9 @@
 
 ## Reste à faire en P1 (dans l'ordre)
 
-1. PR n°15, publication : images API et sauvegarde multi-architectures sur GHCR, vérifiées sur ARM, analysées par Trivy.
-2. PR n°16, déploiement : workflow avec approbation manuelle, image désignée par son empreinte, migrations, test de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
-3. PR n°17, exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
+1. PR Publication : images API et sauvegarde multi-architectures sur GHCR, vérifiées sur ARM, analysées par Trivy.
+2. PR Déploiement : workflow avec approbation manuelle, image désignée par son empreinte, migrations, test de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
+3. PR Exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
 4. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
 
 Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
@@ -52,7 +52,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 | Hypothèse | Avant |
 | --- | --- |
-| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | PR n°17 |
+| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | PR Exploitation |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |
@@ -68,7 +68,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 - `httpx` déprécié par Starlette au profit de `httpx2` : à prendre en compte pour le client HTTP des connecteurs.
 - Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
 - Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
-- La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production : `make down` après les tests, jusqu'à l'ajout du label d'environnement (PR n°17).
+- La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production : `make down` après les tests, jusqu'à l'ajout du label d'environnement (PR Exploitation).
 - FastAPI 0.162 n'aplatit plus `include_router` : le modèle de route des métriques est reconstitué à partir de `scope["route"]` (fait et testé) ; à surveiller lors des montées de version.
 - Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare.
 

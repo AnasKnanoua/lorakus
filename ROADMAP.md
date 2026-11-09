@@ -51,9 +51,9 @@ Scénarios d'acceptation :
 
 - **Fait** (PR n°7 à n°14) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production.
 - **Reste, dans l'ordre** :
-  1. PR n°15, publication : images API et sauvegarde multi-architectures (arm64 et amd64 construites nativement), publiées sur GHCR, analysées par Trivy.
-  2. PR n°16, déploiement : workflow GitHub avec approbation manuelle, image désignée par son empreinte, migrations, vérification de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
-  3. PR n°17, exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, VM Azure en staging léger et sentinelle externe (ADR 0036).
+  1. PR Publication : images API et sauvegarde multi-architectures (arm64 et amd64 construites nativement), publiées sur GHCR, analysées par Trivy.
+  2. PR Déploiement : workflow GitHub avec approbation manuelle, image désignée par son empreinte, migrations, vérification de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
+  3. PR Exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, VM Azure en staging léger et sentinelle externe (ADR 0036).
   4. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
 - **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
 - **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR ; le retour arrière a été essayé ; la sauvegarde quotidienne tourne et son absence alerte ; la sentinelle alerte quand la production ne répond plus. Les traces corrélées arrivent avec l'observabilité palier 2 (P3).

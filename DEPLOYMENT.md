@@ -1,6 +1,6 @@
 # Déploiement
 
-État au 2026-11-09 : l'hôte de production est préparé, rien n'y est encore déployé. Les sections marquées « PR n°16 » ou « PR n°17 » décrivent la cible ; elles seront complétées par ces PR.
+État au 2026-11-09 : l'hôte de production est préparé, rien n'y est encore déployé. Les sections marquées « PR Déploiement » ou « PR Exploitation » décrivent la cible ; elles seront complétées par ces PR.
 
 ## 1. Environnements
 
@@ -9,8 +9,8 @@ Décision : [ADR 0036](docs/adr/0036-environments.md).
 | Environnement | Hôte | Contenu | Données |
 | --- | --- | --- | --- |
 | Développement | Dell (Ubuntu) | `compose.yml`, `compose.dev.yml`, `compose.observability.yml` | Synthétiques |
-| Staging | VM ARM Azure for Students (PR n°17) | Pile réduite, dimensionnée à la création de la VM | Synthétiques |
-| Sentinelle externe | Même VM Azure (PR n°17) | Vérifie de l'extérieur que la production répond | Aucune |
+| Staging | VM ARM Azure for Students (PR Exploitation) | Pile réduite, dimensionnée à la création de la VM | Synthétiques |
+| Sentinelle externe | Même VM Azure (PR Exploitation) | Vérifie de l'extérieur que la production répond | Aucune |
 | Production | `oracleworker` (Oracle Always Free, ARM, 1 OCPU, 6 Go, Oracle Linux 9), alias SSH `lorakus-prod`, dédié à Lorakus | API, PostgreSQL, pile d'observabilité, sauvegardes | Réelles |
 | Red Team | À redimensionner en phase 17 | ZAP, Promptfoo | Aucune donnée de production |
 
@@ -43,7 +43,7 @@ Trois mécanismes peuvent réécrire le nom d'hôte au démarrage. Le troisième
 
 Avec la valeur `2`, Oracle ne met plus `/etc/hosts` à jour : y corriger l'alias à la main, puis `hostnamectl set-hostname <nom>` et redémarrer. Vérification : `hostnamectl --static` après le redémarrage, et la ligne « Skip updating hostname » dans `journalctl -b`.
 
-## 3. Premier déploiement (PR n°16)
+## 3. Premier déploiement (PR Déploiement)
 
 1. Générer les secrets **sur le serveur**, par un script, dans `/opt/lorakus/.env` (600). GitHub ne connaît que la clé SSH de déploiement.
 2. Récupérer les images publiées sur GHCR, désignées par leur empreinte.
@@ -55,8 +55,8 @@ Avec la valeur `2`, Oracle ne met plus `/etc/hosts` à jour : y corriger l'alias
 
 | Environnement | Déclencheur | Séquence |
 | --- | --- | --- |
-| Production (PR n°16) | Workflow GitHub, approbation manuelle de l'environnement `production` | Connexion SSH en tant que `deploy` avec vérification de l'empreinte de l'hôte → image désignée par son empreinte → migrations → démarrage → test de `/api/health/ready` |
-| Staging (PR n°17) | À définir avec la VM Azure | Même séquence, sans approbation |
+| Production (PR Déploiement) | Workflow GitHub, approbation manuelle de l'environnement `production` | Connexion SSH en tant que `deploy` avec vérification de l'empreinte de l'hôte → image désignée par son empreinte → migrations → démarrage → test de `/api/health/ready` |
+| Staging (PR Exploitation) | À définir avec la VM Azure | Même séquence, sans approbation |
 
 Jamais d'image `latest` : une image est toujours désignée par son empreinte (`@sha256:`). Aucune mise à jour automatique non contrôlée en production.
 
@@ -66,7 +66,7 @@ Jamais d'image `latest` : une image est toujours désignée par son empreinte (`
 - Expand/contract (ADR 0011) : la version N fonctionne avec le schéma N+1 ; la contraction arrive à la version suivante, après une semaine sans incident.
 - Une migration irréversible exige une sauvegarde vérifiée juste avant.
 
-## 6. Retour arrière (PR n°16)
+## 6. Retour arrière (PR Déploiement)
 
 Une seule commande redéploie l'empreinte de l'image précédente ; le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée : `alembic downgrade <révision>` puis redéploiement de l'image précédente, à documenter dans le runbook de restauration.
 
@@ -74,7 +74,7 @@ Une seule commande redéploie l'empreinte de l'image précédente ; le schéma r
 
 | Élément | Méthode | Fréquence | Destination | Rétention |
 | --- | --- | --- | --- | --- |
-| PostgreSQL | `pg_dump` chiffré avec `age` (`infra/backup/lorakus-backup.sh`) | Quotidienne par minuteur systemd (PR n°17) et avant chaque migration | Backblaze B2, dossier `daily/` | Règles de cycle de vie du bucket |
+| PostgreSQL | `pg_dump` chiffré avec `age` (`infra/backup/lorakus-backup.sh`) | Quotidienne par minuteur systemd (PR Exploitation) et avant chaque migration | Backblaze B2, dossier `daily/` | Règles de cycle de vie du bucket |
 | Fichiers utilisateur | À définir avec le port `BlobStore` (ADR 0024) | — | — | — |
 | Configuration | Dépôt Git ; secrets uniquement sur le serveur | À chaque changement | GitHub | — |
 
