@@ -3,13 +3,15 @@
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
-        image up down logs obs-up obs-check alert-test
+        image up down logs obs-up obs-check alert-test \
+        backup-image backup restore-test
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
 COMPOSE := docker compose -f compose.yml -f compose.dev.yml --env-file .env
 OBS := $(COMPOSE) -f compose.observability.yml
 IMAGE := lorakus-api:dev
+BACKUP_IMAGE := lorakus-backup:dev
 
 help: ## Affiche cette aide
 > @grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -90,5 +92,15 @@ obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus test rules /etc/prometheus/tests/lorakus_test.yml
 > $(OBS) run --rm --no-deps --entrypoint /bin/sh alertmanager -c 'sed -e "s|__DISCORD_OPS_WEBHOOK_URL__|https://discord.com/api/webhooks/1/test|" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/am.yml && amtool check-config /tmp/am.yml'
-alert-test: ## Envoie une alerte de test sur Telegram (pile d'observabilite lancee)
+
+alert-test: ## Envoie une alerte de test sur Discord (pile d'observabilite lancee)
 > $(OBS) exec alertmanager amtool alert add LorakusTest 'severity="warning"' --annotation='summary="Alerte de test Lorakus"' --alertmanager.url=http://localhost:9093
+
+backup-image: ## Construit l'image de sauvegarde (pg_dump, age, rclone)
+> docker build -t $(BACKUP_IMAGE) infra/backup
+
+backup: backup-image db-up ## Sauvegarde chiffree de la base vers B2
+> $(COMPOSE) run --rm backup
+
+restore-test: backup-image ## Restaure la derniere sauvegarde dans une base jetable et la verifie
+> ./infra/backup/restore-test.sh

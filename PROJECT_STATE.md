@@ -19,7 +19,8 @@
 
 ## En cours
 
-- P1, PR n°12 : alertes (règles Prometheus testées par promtool, Alertmanager vers Discord `#lorakus-ops` avec messages en couleur, inhibition des alertes secondaires), ADR 0034 (Python seul) et 0035 (canaux de notification).- **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
+- P1, PR n°13 : sauvegardes chiffrées (pg_dump chiffré à la volée par age, clé publique seule sur le serveur, envoi B2 par une clé sans droit de suppression, rotation par règles du bucket), test de restauration dans une base jetable sans réseau.
+- **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
@@ -66,6 +67,7 @@
 - Quota Oracle Always Free réduit en juin 2026 ; aucune marge pour un 3e serveur gratuit.
 - `httpx` déprécié par Starlette au profit de `httpx2` : à prendre en compte pour le client HTTP des connecteurs.
 - Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
+- Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 vers un serveur de l'université (certificat `*.cc.metu.edu.tr`, refusé par rclone) : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
 
 ## Dette technique acceptée
 
