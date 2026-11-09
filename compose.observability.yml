@@ -117,6 +117,30 @@ services:
           memory: 64m
 
 
+
+  # Metriques de la machine (disque, memoire, CPU) et resultats des sauvegardes.
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.textfile.directory=/textfile
+    volumes:
+      # Tout en lecture seule : node_exporter observe la machine sans rien pouvoir y modifier.
+      - /:/host:ro,rslave
+      - backup-metrics:/textfile:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
 volumes:
   prometheus-data:
   grafana-data:

@@ -10,7 +10,7 @@ Lorakus envoie deux natures de messages : des alertes d'exploitation (API injoig
 
 ## Décision
 
-- **Exploitation** : Alertmanager vers un webhook Discord (salon `#lorakus-ops`), messages encadrés en couleur (rouge déclenchée, vert résolue), modèle versionné dans `infra/observability/alertmanager/templates/`.
+- **Exploitation** : Alertmanager vers un webhook Discord (salon `#lorakus-infra`), messages encadrés en couleur (rouge déclenchée, vert résolue), modèle versionné dans `infra/observability/alertmanager/templates/`.
 - **Produit** : bot Telegram, utilisé par l'API à partir de la phase 5 via l'`InterventionPolicy` (ADR 0014, 0019).
 - Secrets distincts : l'URL du webhook n'est connue que d'Alertmanager, le jeton du bot que de l'API.
 

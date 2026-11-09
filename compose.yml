@@ -103,6 +103,9 @@ services:
       RCLONE_CONFIG_B2_TYPE: b2
       RCLONE_CONFIG_B2_ACCOUNT: ${B2_KEY_ID:?B2_KEY_ID manquant dans .env}
       RCLONE_CONFIG_B2_KEY: ${B2_APP_KEY:?B2_APP_KEY manquant dans .env}
+    volumes:
+      # Resultat de chaque sauvegarde, lu par node_exporter (alertes BackupFailed / BackupMissing).
+      - backup-metrics:/metrics
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,3 +121,4 @@ networks:
 
 volumes:
   postgres-data:
+  backup-metrics:

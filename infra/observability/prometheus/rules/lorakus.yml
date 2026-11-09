@@ -1,5 +1,7 @@
 # Regles d'alerte de Lorakus, evaluees par Prometheus.
 # Chaque regle est couverte par un test : infra/observability/prometheus/tests.
+# Le label "component" sert a l'inhibition : une alerte critique d'un composant
+# masque les avertissements de ce meme composant (pas ceux des autres).
 groups:
   - name: lorakus-api
     rules:
@@ -8,6 +10,7 @@ groups:
         for: 2m
         labels:
           severity: critical
+          component: api
         annotations:
           summary: L'API Lorakus est injoignable
           description: Prometheus ne parvient plus a collecter les metriques de l'API depuis 2 minutes.
@@ -22,6 +25,7 @@ groups:
         for: 5m
         labels:
           severity: warning
+          component: api
         annotations:
           summary: Plus de 5 % d'erreurs serveur sur l'API
           description: Plus de 5 % des requetes se terminent en erreur 5xx depuis 5 minutes.
@@ -32,6 +36,7 @@ groups:
         for: 10m
         labels:
           severity: warning
+          component: api
         annotations:
           summary: L'API Lorakus est lente
           description: Le 95e centile de la duree des requetes depasse 1 seconde depuis 10 minutes.
@@ -41,6 +46,85 @@ groups:
         for: 10m
         labels:
           severity: warning
+          component: api
         annotations:
           summary: L'API Lorakus consomme beaucoup de memoire
           description: L'API depasse 300 Mo depuis 10 minutes (limite du conteneur 384 Mo).
+
+  - name: lorakus-backup
+    rules:
+      - alert: LorakusBackupFailed
+        expr: lorakus_backup_last_success == 0
+        for: 1m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: La derniere sauvegarde a echoue
+          description: La derniere tentative de sauvegarde vers B2 s'est terminee en erreur. Voir les journaux du conteneur backup.
+
+      - alert: LorakusBackupMissing
+        expr: time() - lorakus_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 10m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: Aucune sauvegarde reussie depuis plus de 26 heures
+          description: La derniere sauvegarde reussie date de plus de 26 heures. Les donnees recentes ne sont pas protegees.
+
+      - alert: LorakusBackupNeverRecorded
+        expr: absent(lorakus_backup_last_attempt_timestamp_seconds)
+        for: 26h
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: Aucune tentative de sauvegarde enregistree depuis 26 heures
+          description: Le minuteur de sauvegarde ne s'execute plus, ou ses metriques ne sont plus lues.
+
+  - name: lorakus-host
+    rules:
+      - alert: LorakusDiskSpaceLow
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay"}
+          / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: Moins de 15 % d'espace disque libre
+          description: Le disque principal du serveur a moins de 15 % d'espace libre depuis 10 minutes.
+
+      - alert: LorakusDiskSpaceCritical
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay"}
+          / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} < 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: host
+        annotations:
+          summary: Moins de 5 % d'espace disque libre
+          description: Le disque principal est presque plein. PostgreSQL risque de s'arreter.
+
+      - alert: LorakusHostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: Moins de 10 % de memoire disponible sur le serveur
+          description: La memoire disponible du serveur est inferieure a 10 % depuis 10 minutes.
+
+      - alert: LorakusNodeExporterDown
+        expr: up{job="node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: Les metriques du serveur ne sont plus collectees
+          description: node_exporter est injoignable depuis 5 minutes (disque, memoire et sauvegardes non surveilles).

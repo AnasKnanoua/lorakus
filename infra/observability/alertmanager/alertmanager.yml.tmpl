@@ -19,8 +19,9 @@ receivers:
 templates:
   - /etc/alertmanager/templates/*.tmpl
 
-# Si l'API est injoignable (critique), inutile d'envoyer en plus les alertes
-# secondaires (latence, erreurs) qui en decoulent.
+# Une alerte critique masque les avertissements du MEME composant (api, backup, host) :
+# un disque plein ne doit pas faire taire un echec de sauvegarde.
 inhibit_rules:
   - source_matchers: ['severity="critical"']
     target_matchers: ['severity="warning"']
+    equal: [component]

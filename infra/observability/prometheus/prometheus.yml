@@ -17,6 +17,11 @@ scrape_configs:
     static_configs:
       - targets: ["api:9464"]
 
+  # Machine (disque, memoire, CPU) et resultats des sauvegardes.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
   # Prometheus et Alertmanager se surveillent aussi.
   - job_name: prometheus
     static_configs:

@@ -13,12 +13,20 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends age ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+# gosu sert au demarrage du serveur PostgreSQL, jamais a la sauvegarde :
+# on le retire pour reduire la surface d'attaque (il portait une faille Go connue).
+RUN rm -f /usr/local/bin/gosu
+
 COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 COPY --chmod=0755 lorakus-backup.sh /usr/local/bin/lorakus-backup
 
-# Systeme de fichiers en lecture seule : seul /tmp (en memoire) est inscriptible.
+# Dossier des metriques, partage avec node_exporter (qui ne peut que le lire).
+RUN mkdir -p /metrics && chown postgres:postgres /metrics
+
+# Systeme de fichiers en lecture seule : seuls /tmp (en memoire) et /metrics sont inscriptibles.
 ENV HOME=/tmp \
-    XDG_CACHE_HOME=/tmp/.cache
+    XDG_CACHE_HOME=/tmp/.cache \
+    BACKUP_METRICS_DIR=/metrics
 
 USER postgres
 ENTRYPOINT ["/usr/local/bin/lorakus-backup"]
