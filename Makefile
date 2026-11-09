@@ -84,8 +84,8 @@ down: ## Arrete tous les conteneurs, observabilite comprise (donnees conservees)
 logs: ## Affiche les journaux de l'API en direct (Ctrl+C pour quitter)
 > $(COMPOSE) logs -f api
 
-obs-up: up ## Ajoute Prometheus (9090), Alertmanager (9093) et Grafana (3000)
-> $(OBS) up -d --wait prometheus alertmanager grafana
+obs-up: up ## Ajoute Prometheus (9090), Alertmanager (9093), Grafana (3000) et node_exporter
+> $(OBS) up -d --wait prometheus alertmanager grafana node-exporter
 
 obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et Grafana
 > python3 -m json.tool infra/observability/grafana/dashboards/lorakus-api.json > /dev/null

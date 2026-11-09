@@ -5,6 +5,7 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  # ------------------------------------------------------------------ API
   - name: API injoignable
     interval: 1m
     input_series:
@@ -19,6 +20,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: critical
+              component: api
               job: lorakus-api
               instance: api:9464
             exp_annotations:
@@ -38,6 +40,7 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              component: api
             exp_annotations:
               summary: Plus de 5 % d'erreurs serveur sur l'API
               description: Plus de 5 % des requetes se terminent en erreur 5xx depuis 5 minutes.
@@ -71,11 +74,12 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              component: api
             exp_annotations:
               summary: L'API Lorakus est lente
               description: Le 95e centile de la duree des requetes depasse 1 seconde depuis 10 minutes.
 
-  - name: Memoire elevee
+  - name: Memoire de l'API elevee
     interval: 1m
     input_series:
       - series: 'process_resident_memory_bytes{job="lorakus-api", instance="api:9464"}'
@@ -86,8 +90,171 @@ tests:
         exp_alerts:
           - exp_labels:
               severity: warning
+              component: api
               job: lorakus-api
               instance: api:9464
             exp_annotations:
               summary: L'API Lorakus consomme beaucoup de memoire
               description: L'API depasse 300 Mo depuis 10 minutes (limite du conteneur 384 Mo).
+
+  # ------------------------------------------------------------------ Sauvegardes
+  - name: Sauvegarde en echec
+    interval: 1m
+    input_series:
+      - series: 'lorakus_backup_last_success{job="node", instance="node-exporter:9100"}'
+        values: '1 1 0 0 0'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusBackupFailed
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: LorakusBackupFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: backup
+              job: node
+              instance: node-exporter:9100
+            exp_annotations:
+              summary: La derniere sauvegarde a echoue
+              description: La derniere tentative de sauvegarde vers B2 s'est terminee en erreur. Voir les journaux du conteneur backup.
+
+  - name: Derniere sauvegarde reussie trop ancienne
+    interval: 1m
+    input_series:
+      # Derniere reussite a t = 0, plus jamais renouvelee.
+      - series: 'lorakus_backup_last_success_timestamp_seconds{job="node", instance="node-exporter:9100"}'
+        values: '0+0x1700'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: LorakusBackupMissing
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: LorakusBackupMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: backup
+              job: node
+              instance: node-exporter:9100
+            exp_annotations:
+              summary: Aucune sauvegarde reussie depuis plus de 26 heures
+              description: La derniere sauvegarde reussie date de plus de 26 heures. Les donnees recentes ne sont pas protegees.
+
+  - name: Sauvegardes regulieres, pas d'alerte
+    interval: 1m
+    input_series:
+      # La date de derniere reussite suit le temps : sauvegarde toujours recente.
+      - series: 'lorakus_backup_last_success_timestamp_seconds{job="node", instance="node-exporter:9100"}'
+        values: '0+60x1700'
+    alert_rule_test:
+      - eval_time: 27h
+        alertname: LorakusBackupMissing
+        exp_alerts: []
+
+  - name: Aucune tentative de sauvegarde enregistree
+    interval: 1m
+    input_series:
+      - series: 'up{job="node", instance="node-exporter:9100"}'
+        values: '1+0x1700'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: LorakusBackupNeverRecorded
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: LorakusBackupNeverRecorded
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: backup
+            exp_annotations:
+              summary: Aucune tentative de sauvegarde enregistree depuis 26 heures
+              description: Le minuteur de sauvegarde ne s'execute plus, ou ses metriques ne sont plus lues.
+
+  # ------------------------------------------------------------------ Serveur
+  - name: Disque presque plein
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{job="node", instance="node-exporter:9100", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '10+0x30'
+      - series: 'node_filesystem_size_bytes{job="node", instance="node-exporter:9100", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '100+0x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LorakusDiskSpaceLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: host
+              job: node
+              instance: node-exporter:9100
+              device: /dev/sda1
+              fstype: ext4
+              mountpoint: /
+            exp_annotations:
+              summary: Moins de 15 % d'espace disque libre
+              description: Le disque principal du serveur a moins de 15 % d'espace libre depuis 10 minutes.
+      - eval_time: 20m
+        alertname: LorakusDiskSpaceCritical
+        exp_alerts: []
+
+  - name: Disque plein
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{job="node", instance="node-exporter:9100", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '3+0x30'
+      - series: 'node_filesystem_size_bytes{job="node", instance="node-exporter:9100", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '100+0x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LorakusDiskSpaceCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: host
+              job: node
+              instance: node-exporter:9100
+              device: /dev/sda1
+              fstype: ext4
+              mountpoint: /
+            exp_annotations:
+              summary: Moins de 5 % d'espace disque libre
+              description: Le disque principal est presque plein. PostgreSQL risque de s'arreter.
+
+  - name: Memoire du serveur basse
+    interval: 1m
+    input_series:
+      - series: 'node_memory_MemAvailable_bytes{job="node", instance="node-exporter:9100"}'
+        values: '5+0x30'
+      - series: 'node_memory_MemTotal_bytes{job="node", instance="node-exporter:9100"}'
+        values: '100+0x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: LorakusHostMemoryLow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: host
+              job: node
+              instance: node-exporter:9100
+            exp_annotations:
+              summary: Moins de 10 % de memoire disponible sur le serveur
+              description: La memoire disponible du serveur est inferieure a 10 % depuis 10 minutes.
+
+  - name: node_exporter injoignable
+    interval: 1m
+    input_series:
+      - series: 'up{job="node", instance="node-exporter:9100"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: LorakusNodeExporterDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: host
+              job: node
+              instance: node-exporter:9100
+            exp_annotations:
+              summary: Les metriques du serveur ne sont plus collectees
+              description: node_exporter est injoignable depuis 5 minutes (disque, memoire et sauvegardes non surveilles).
