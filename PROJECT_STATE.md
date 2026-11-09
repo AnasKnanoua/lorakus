@@ -19,8 +19,7 @@
 
 ## En cours
 
-- P1, PR n°12 : alertes (règles Prometheus testées par promtool, Alertmanager vers Telegram, inhibition des alertes secondaires), ADR 0034 (Python seul côté serveur).
-- **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
+- P1, PR n°12 : alertes (règles Prometheus testées par promtool, Alertmanager vers Discord `#lorakus-ops` avec messages en couleur, inhibition des alertes secondaires), ADR 0034 (Python seul) et 0035 (canaux de notification).- **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 

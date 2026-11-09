@@ -1,0 +1,16 @@
+{{/* Titre du message : etat et gravite d'un coup d'oeil. */}}
+{{ define "lorakus.title" -}}
+{{ if eq .Status "resolved" }}✅ Résolu{{ else if eq .CommonLabels.severity "critical" }}🔴 Critique{{ else }}🟠 Avertissement{{ end }} — {{ .CommonLabels.alertname }}{{ if gt (len .Alerts) 1 }} ({{ len .Alerts }}){{ end }}
+{{- end }}
+
+{{/* Corps du message : quoi, depuis quand, et ou regarder. */}}
+{{ define "lorakus.message" -}}
+{{ range .Alerts -}}
+**{{ .Annotations.summary }}**
+{{ with .Annotations.description }}{{ . }}
+{{ end -}}
+Depuis : {{ .StartsAt.Format "02/01 15:04 MST" }}{{ if eq .Status "resolved" }} · résolu : {{ .EndsAt.Format "15:04 MST" }}{{ end }}
+{{ with .GeneratorURL }}[Voir dans Prometheus]({{ . }}){{ end }}
+
+{{ end -}}
+{{- end }}
