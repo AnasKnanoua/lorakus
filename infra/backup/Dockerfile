@@ -13,6 +13,10 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends age ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+# gosu sert au demarrage du serveur PostgreSQL, jamais a la sauvegarde :
+# on le retire pour reduire la surface d'attaque (il portait une faille Go connue).
+RUN rm -f /usr/local/bin/gosu
+
 COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 COPY --chmod=0755 lorakus-backup.sh /usr/local/bin/lorakus-backup
 
