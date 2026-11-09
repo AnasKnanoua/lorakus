@@ -14,7 +14,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0006](docs/adr/0006-ai-abstraction.md) | Abstraction IA maison | Accepté | Phase 15 |
 | [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08) | À chaque changement de tarif |
 | [0008](docs/adr/0008-multi-tenancy-rls.md) | Multi-tenant dans les fondations (`user_id` + RLS) | Validé | Ouverture à d'autres utilisateurs |
-| [0009](docs/adr/0009-compose-before-k3s.md) | Docker Compose avant k3s ; hébergement Always Free (prod + staging) | Validé (D-A, 2026-11-08) | Changement d'hébergeur |
+| [0009](docs/adr/0009-compose-before-k3s.md) | Docker Compose avant k3s ; hébergement Always Free | Validé (D-A, 2026-11-08), hébergement amendé par 0036 | Changement d'hébergeur |
 | [0010](docs/adr/0010-observability.md) | OpenTelemetry → Grafana LGTM self-hosted | Validé (exigence) / Accepté (outils) | Phase 6 (mesure RAM) |
 | [0011](docs/adr/0011-migrations.md) | Migrations expand/contract, backup obligatoire | Validé (exigence) / Accepté (méthode) | — |
 | [0012](docs/adr/0012-untrusted-content.md) | Contenu externe non fiable, outils à permissions | Accepté | Après chaque campagne red team |
@@ -41,6 +41,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0033](docs/adr/0033-knowledge-graph-fsrs.md) | Archiviste : graphe PostgreSQL et FSRS | Accepté | Phase 16 |
 | [0034](docs/adr/0034-python-only-backend.md) | Python seul côté serveur, Rust seulement sur mesure | Accepté | Si un profilage montre un goulot CPU |
 | [0035](docs/adr/0035-notification-channels.md) | Canaux de notification : exploitation sur Discord, produit sur Telegram | Accepté | Ouverture à d'autres utilisateurs |
+| [0036](docs/adr/0036-environments.md) | Environnements : production sur Oracle, staging et sentinelle sur Azure (amende 0009) | Validé (2026-11-09) | Expiration du crédit Azure |
 
 ## Décisions en attente d'avis
 
@@ -49,13 +50,12 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | Phase 3 |
 | D-E | Place du bien-être numérique | Collecte en phase 8, interventions en phase 12 | Phase 8 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
-| D-G | Adresse publique HTTPS (domaine acheté ou sous-domaine gratuit deSEC) | Sous-domaine deSEC gratuit en attendant ; choisir une fois pour toutes | Début de la phase 3 |
 
 ## Décisions prises
 
 | Id | Décision | Date |
 | --- | --- | --- |
-| D-A | Oracle Always Free : `OracleWorker` = production, 2e instance A1 = staging ; pas de k3s sur Oracle | 2026-11-08 |
+| D-A | Oracle Always Free : `oracleworker` = production ; pas de k3s sur Oracle (staging : voir ADR 0036) | 2026-11-08 |
 | D-B | Dépôt GitHub public ; aucun secret dans le dépôt, même chiffré | 2026-11-08 |
 | D-C | Frontend React / TypeScript (ADR 0005 validé) | 2026-11-08 |
 | D-H | Architecture multi-agents : profils de spécialiste sur les modules, orchestrateur au Core (ADR 0025, 0026) | 2026-11-08 |
@@ -63,6 +63,9 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | D-J | Friction de niveau 3 uniquement par pactes préconfigurés (ADR 0029) | 2026-11-08 |
 | D-K | Accès privé par réseau chiffré **non retenu** : l'API reste exposée publiquement, en vue d'une éventuelle commercialisation | 2026-11-08 |
 | — | Architecture clients : PWA + app Android compagnon séparée (ADR 0013) | 2026-11-08 |
-| — | Nom de code LORAKUS (ADR 0023) ; pas d'achat de domaine pour l'instant | 2026-11-08 |
+| — | Nom de code LORAKUS (ADR 0023) | 2026-11-08 |
+| D-G | Domaine `lorakus.app` (Name.com) : `app.lorakus.app` (PWA et API à la même origine) et `staging.lorakus.app`, à partir de la phase 3. Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare | 2026-11-09 |
+| — | Environnements : production sur `oracleworker`, staging et sentinelle sur Azure for Students, pas de second compte Oracle (ADR 0036) | 2026-11-09 |
+| — | Alertes d'exploitation sur Discord, notifications produit sur Telegram (ADR 0035) | 2026-11-09 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

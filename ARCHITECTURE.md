@@ -125,7 +125,7 @@ Les règles de couplage et le contrat de manifeste sont dans [`MODULE_SYSTEM.md`
 | Client | Rôle | Authentification |
 | --- | --- | --- |
 | PWA | Unique interface utilisateur, sur PC et dans le navigateur Android : chat, Today, pages des modules, réglages, partage Android (Web Share Target) | Cookie de session HttpOnly + CSRF |
-| Bot Telegram | Notifications, alertes d'exploitation, capture rapide d'idées et de liens | Webhook avec secret, compte Telegram lié à l'utilisateur |
+| Bot Telegram | Notifications produit, capture rapide d'idées et de liens (les alertes d'exploitation passent par Discord, ADR 0035) | Webhook avec secret, compte Telegram lié à l'utilisateur |
 | Lorakus Sensors (app Android séparée, Kotlin) | Collecte UsageStats et Health Connect, sessionisation locale, tampon chiffré, lots HTTPS toutes les 15 min (pas de WebSocket), tuiles « pause » et « concentration », notifications locales pendant une session de concentration ; aucune interface métier (ADR 0013) | Clé d'appareil (Android Keystore), portées `usage:write`, `health:write` |
 | Extension navigateur (MV3) | Sessions sur domaines suivis, catégorie de page sans URL complète | Clé d'appareil, portée `usage:write` |
 
@@ -159,11 +159,11 @@ Détails dans [`SECURITY.md`](SECURITY.md).
 
 ## 10. Observabilité
 
-`structlog` (JSON, masquage des secrets et des données sensibles), OpenTelemetry (traces et métriques, attributs `gen_ai.*` pour les appels IA), Alloy comme collecteur, Loki (7 jours), Prometheus (15 jours), Tempo (3 jours, 20 % d'échantillonnage hors erreurs), Grafana (tableaux Plateforme, IA, Notifications, Appareils), Uptime Kuma pour la disponibilité externe, alertes vers Telegram. Page `/admin` côté produit.
+`structlog` (JSON, masquage des secrets et des données sensibles), OpenTelemetry (traces et métriques, attributs `gen_ai.*` pour les appels IA), Alloy comme collecteur, Loki (7 jours), Prometheus (15 jours), Tempo (3 jours, 20 % d'échantillonnage hors erreurs), Grafana (tableaux Plateforme, IA, Notifications, Appareils), sentinelle externe pour la disponibilité (ADR 0036), alertes d'exploitation vers Discord (ADR 0035). Page `/admin` côté produit.
 
 ## 11. Déploiement
 
-Deux hôtes Oracle Ampere A1 (prod et staging, sous réserve de la décision D-A), Docker Compose, images multi-architectures publiées sur GHCR, déploiement staging automatique et prod sur tag approuvé, sauvegardes chiffrées hors Oracle. Voir [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Production sur une instance Oracle Ampere A1, staging léger et sentinelle externe sur Azure (ADR 0036), Docker Compose, images multi-architectures publiées sur GHCR, déploiement en production après approbation, sauvegardes chiffrées hors Oracle. Voir [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## 12. Glossaire
 

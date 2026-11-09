@@ -3,32 +3,34 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : aucune (pré-v0.1.0)
-- **Phase** : P1 — Fondations techniques (en cours)
-- **Dernière mise à jour** : 2026-11-08
-- **Déploiement** : rien de déployé. Production prévue sur `OracleWorker` ; staging sur une 2e instance A1.
+- **Phase** : P1 — Fondations techniques : code terminé, déploiement en cours
+- **Dernière mise à jour** : 2026-11-09
+- **Déploiement** : rien de déployé. Hôte de production `oracleworker` (alias SSH `lorakus-prod`) préparé. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
 
-- Missions 0, 1, 2 : conception, extension sport / motivation / bien-être, référence consolidée.
-- Mission 3 : architecture multi-agents (Majordome + six spécialistes) **validée**, ADR 0025 à 0033, roadmap 2.1 (P1 à P17), revue « regard neuf » (MVP allégé, observabilité par paliers).
-- P0 : environnement, dépôt public protégé (ruleset, secret scanning, Dependabot), hooks pre-commit (Gitleaks, Ruff).
-- P1, PR n°2 : backend FastAPI, `/api/health`, Ruff, pyright strict, Makefile.
-- P1, PR n°3 : PostgreSQL 18 + pgvector local, image épinglée, rôles admin / migrator / app, `make db-check`.
-- P1, PR n°4 : SQLAlchemy 2 async + psycopg 3, Alembic (branche `core`, migration 0001), `/api/health/ready`, tests anti-injection.
+- Missions 0 à 3 : conception, architecture multi-agents validée (ADR 0025 à 0033), roadmap P1 à P17, MVP allégé.
+- P0 : environnement, dépôt public protégé, hooks pre-commit.
+- P1, PR n°2 à n°4 : backend FastAPI, PostgreSQL 18 avec rôles à moindre privilège, SQLAlchemy 2 async, Alembic, `/api/health/ready`.
+- P1, PR n°7 à n°10 : CI obligatoire (checks, secrets, titre de PR, image), CodeQL, Dependabot (délai de 14 jours), Gitleaks et Trivy épinglés, image API non-root multi-étapes, pile Compose durcie (lecture seule, `cap_drop: ALL`, `no-new-privileges`, un secret par service), journaux JSON avec `request_id`, métriques Prometheus.
+- P1, PR n°11 à n°14 : Prometheus, Grafana, Alertmanager vers Discord (ADR 0035), node_exporter, 11 règles d'alerte testées (13 tests promtool), sauvegardes chiffrées `age` vers Backblaze B2 (clé sans droit de suppression), `make restore-test`, métriques de sauvegarde.
+- Hôte de production préparé : mises à jour de sécurité automatiques, Docker, utilisateur `deploy`, SSH par clé uniquement, pare-feu limité à SSH, liste de sécurité Oracle nettoyée, nom d'hôte persistant (`DEPLOYMENT.md` §2.1).
+- Domaine `lorakus.app` enregistré (D-G).
 
 ## En cours
 
-- P1, PR n°14 : node_exporter (disque, mémoire, CPU) et métriques des sauvegardes (collecteur textfile), 7 nouvelles alertes testées (13 tests promtool), inhibition par composant, scan Trivy de l'image de sauvegarde.
+- PR de documentation : ADR 0036, D-G, mise à jour de `DEPLOYMENT.md`, `ROADMAP.md` et de ce fichier.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
-1. ~~CI, Dependabot, CodeQL, image Docker, pile en conteneurs, journaux JSON et métriques, Prometheus et Grafana~~ (faits, PR n°7 à n°11).
-2. Alertes vers Telegram (PR n°12, en cours).
-3. Sauvegardes chiffrées hors Oracle et test de restauration automatisé.
-4. Staging (2e instance A1) et premier déploiement sur `OracleWorker`.
-5. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible sur le VPS.
+1. PR Publication : images API et sauvegarde multi-architectures sur GHCR, vérifiées sur ARM, analysées par Trivy.
+2. PR Déploiement : workflow avec approbation manuelle, image désignée par son empreinte, migrations, test de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
+3. PR Exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
+4. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
+
+Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 ## Décisions en attente (voir `DECISIONS.md`)
 
@@ -37,23 +39,20 @@
 | D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | P3 |
 | D-E | Place du bien-être numérique | Collecte en P8, interventions en P12 | P8 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | P4 |
-| D-G | Adresse HTTPS publique (l'API reste publique, D-K refusée) | Sous-domaine deSEC gratuit en attendant | Début P3 |
 
 ## Décisions prises récemment
 
-- 2026-11-08 — D-H, D-I, D-J validées (architecture multi-agents, marqueurs de confidentialité, pactes).
-- 2026-11-08 — D-K : accès privé par réseau chiffré **non retenu** ; l'API restera publique (commercialisation possible).
-- 2026-11-08 — MVP allégé à environ 17,5 semaines : filtre de confidentialité et moteur de situations en P10, file d'approbation au premier besoin.
-- 2026-11-08 — Frontend React / TypeScript (ADR 0005 validé).
-- 2026-11-08 — Veilleur placé en premier après le MVP ; sondes en lecture seule, aucun accès SSH par Lorakus (ADR 0031).
-- 2026-11-08 — Module `digital_activity` renommé `focus` (porte le Sergent).
-- 2026-11-08 — D-A : Oracle Always Free ; D-B : dépôt public sans secret ; nom de code LORAKUS ; PWA + app Android compagnon.
+- 2026-11-09 — ADR 0036 : production sur `oracleworker`, staging léger et sentinelle externe sur Azure for Students (non critique, usage non commercial, alerte de budget à 5 $) ; pas de second compte Oracle.
+- 2026-11-09 — D-G : domaine `lorakus.app` ; `app.lorakus.app` et `staging.lorakus.app` à partir de la phase 3 ; aucune exposition publique avant.
+- 2026-11-09 — ADR 0035 : alertes d'exploitation sur Discord, notifications produit sur Telegram.
+- 2026-11-09 — Questions de clarification ajoutées à la phase 4.
+- 2026-11-08 — D-H, D-I, D-J validées ; D-K (accès privé) non retenue ; MVP allégé ; frontend React / TypeScript ; D-A, D-B ; nom de code LORAKUS ; PWA et app Android compagnon.
 
 ## Hypothèses à vérifier
 
 | Hypothèse | Avant |
 | --- | --- |
-| Instance A1 existante en plus d'`OracleWorker` (ex. `anime-notif-worker`) : réutiliser ou supprimer | Fin de P1 |
+| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | PR Exploitation |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |
@@ -61,14 +60,17 @@
 | Mi Fitness et Strava écrivent-ils les séances dans Health Connect ? API Strava gratuite ? | P10 |
 | Temps d'analyse Stockfish acceptable sur 1 OCPU | P13 |
 | Licence GPL de `python-chess` et Stockfish compatible avec une éventuelle distribution | Avant toute distribution |
+| Azure for Students : usage non commercial, à quitter avant toute vente | Avant toute ouverture commerciale |
 
 ## Problèmes connus
 
-- Quota Oracle Always Free réduit en juin 2026 ; aucune marge pour un 3e serveur gratuit.
+- Quota Oracle Always Free réduit en juin 2026 ; aucune marge pour un serveur gratuit supplémentaire.
 - `httpx` déprécié par Starlette au profit de `httpx2` : à prendre en compte pour le client HTTP des connecteurs.
 - Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
-- Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 vers un serveur de l'université (certificat `*.cc.metu.edu.tr`, refusé par rclone) : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
-- La pile d'observabilité lancée sur le Dell envoie ses alertes dans le même salon Discord que la production : penser à `make down` après les tests. Un label d'environnement distinguera les deux au moment du déploiement.
+- Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
+- La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production : `make down` après les tests, jusqu'à l'ajout du label d'environnement (PR Exploitation).
+- FastAPI 0.162 n'aplatit plus `include_router` : le modèle de route des métriques est reconstitué à partir de `scope["route"]` (fait et testé) ; à surveiller lors des montées de version.
+- Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare.
 
 ## Dette technique acceptée
 
