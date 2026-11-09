@@ -1,0 +1,157 @@
+# Publication des images Docker (API et sauvegarde) sur GHCR, pour amd64 et arm64.
+#   - Sur une PR : les images sont construites, testees et analysees, mais RIEN n'est publie.
+#   - Sur main : elles sont en plus publiees, puis reunies sous une seule adresse multi-architecture.
+# Chaque architecture est construite sur une vraie machine de cette architecture (pas d'emulation).
+name: Publish
+
+on:
+  pull_request:
+    paths:
+      - backend/**
+      - infra/backup/**
+      - infra/ci/smoke-image.sh
+      - .github/workflows/publish.yml
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - infra/backup/**
+      - infra/ci/smoke-image.sh
+      - .github/workflows/publish.yml
+  workflow_dispatch:
+
+# Droits minimaux par defaut ; le droit de publier n'est donne qu'aux jobs qui en ont besoin.
+permissions:
+  contents: read
+
+# Deux publications ne se chevauchent jamais ; une publication commencee va jusqu'au bout.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TRIVY_VERSION: "0.76.1"
+
+jobs:
+  build:
+    name: build (${{ matrix.image }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, backup]
+        arch: [amd64, arm64]
+        include:
+          - image: api
+            context: backend
+          - image: backup
+            context: infra/backup
+          - arch: amd64
+            runner: ubuntu-24.04
+            trivy_asset: Linux-64bit
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            trivy_asset: Linux-ARM64
+    env:
+      IMAGE_KIND: ${{ matrix.image }}
+      ARCH: ${{ matrix.arch }}
+      CONTEXT: ${{ matrix.context }}
+      TRIVY_ASSET: ${{ matrix.trivy_asset }}
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Calculer l'adresse de l'image
+        run: |
+          # GHCR exige un nom en minuscules : ${VAR,,} convertit en minuscules.
+          echo "REF=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lorakus-${IMAGE_KIND}:sha-${GITHUB_SHA}-${ARCH}" >> "$GITHUB_ENV"
+
+      - name: Construire l'image
+        run: |
+          docker buildx build --load --provenance=false \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "$REF" "$CONTEXT"
+
+      - name: Verifier l'image sur cette architecture
+        run: ./infra/ci/smoke-image.sh "$IMAGE_KIND" "$REF" "$ARCH"
+
+      - name: Installer Trivy (version figee, empreinte verifiee)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${TRIVY_VERSION}" --repo aquasecurity/trivy \
+            --pattern "trivy_${TRIVY_VERSION}_${TRIVY_ASSET}.tar.gz" \
+            --pattern "trivy_${TRIVY_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "trivy_${TRIVY_VERSION}_checksums.txt"
+          tar -xzf "trivy_${TRIVY_VERSION}_${TRIVY_ASSET}.tar.gz" trivy
+
+      - name: Vulnerabilites critiques corrigeables (bloquant)
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress "$REF"
+
+      - name: Vulnerabilites hautes (rapport, non bloquant)
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress "$REF"
+
+      - name: Publier l'image de cette architecture (main uniquement)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$REF"
+
+  manifest:
+    name: manifest (${{ matrix.image }})
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        image: [api, backup]
+    env:
+      IMAGE_KIND: ${{ matrix.image }}
+    steps:
+      - name: Se connecter a GHCR
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Reunir amd64 et arm64 sous une seule adresse
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lorakus-${IMAGE_KIND}"
+          tag="sha-${GITHUB_SHA}"
+          docker buildx imagetools create --tag "${image}:${tag}" \
+            "${image}:${tag}-amd64" "${image}:${tag}-arm64"
+          echo "IMAGE=${image}" >> "$GITHUB_ENV"
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+
+      - name: Verifier les deux architectures et afficher l'empreinte
+        run: |
+          raw=$(docker buildx imagetools inspect --raw "${IMAGE}:${TAG}")
+          archs=$(echo "$raw" | jq -r '[.manifests[].platform.architecture] | sort | join(",")')
+          if [ "$archs" != "amd64,arm64" ]; then
+            echo "Architectures inattendues : $archs" >&2
+            exit 1
+          fi
+          # L'empreinte (sha256 du manifeste) designe ce contenu exact : le deploiement l'utilisera.
+          digest=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest}}' | jq -r '.digest')
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "Empreinte illisible : $digest" >&2; exit 1 ;;
+          esac
+          {
+            echo "### lorakus-${IMAGE_KIND}"
+            echo "Architectures : ${archs}"
+            echo
+            echo "${IMAGE}@${digest}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "${IMAGE}@${digest}"
