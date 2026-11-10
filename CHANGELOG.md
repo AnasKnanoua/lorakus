@@ -5,6 +5,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 ## [Non publié]
 
 ### Ajouté
+- 2026-11-09 — Déploiement en production : workflow `deploy.yml` (approbation manuelle, empreinte SSH vérifiée, clé limitée à `deploy.sh`), `infra/deploy/deploy.sh` (sauvegarde avant migration, test de santé, retour automatique, `rollback`), `infra/deploy/init-env.sh` (secrets générés sur le serveur), `compose.prod.yml`.
+- 2026-11-09 — Publication des images API et sauvegarde multi-architectures sur GHCR (`publish.yml`, `infra/ci/smoke-image.sh`).
 - 2026-11-09 — ADR 0036 : production sur `oracleworker` (`lorakus-prod`), staging léger et sentinelle externe sur Azure for Students. Décision D-G tranchée : domaine `lorakus.app`. Questions de clarification ajoutées à la phase 4.
 - 2026-11-08 — Décisions D-H, D-I, D-J validées ; D-K (accès privé) refusée. Revue « regard neuf » : MVP allégé (filtre de confidentialité et moteur de situations en P10, file d'approbation au premier besoin), observabilité par paliers, gel de la conception jusqu'à la v0.5, règles « pas de tâche planifiée par utilisateur » et « Telegram sans contenu sensible ».
 - 2026-11-08 — Mission 3 : architecture multi-agents (Majordome et six spécialistes) proposée ; ADR 0025 à 0033 ; roadmap réordonnée (P1 à P17) ; décisions D-H, D-I, D-J ouvertes.

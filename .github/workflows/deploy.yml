@@ -1,0 +1,108 @@
+# Deploiement en production, lance a la main : gh workflow run deploy.yml
+# Il attend l'approbation de l'environnement GitHub "production" avant de pouvoir agir.
+# GitHub ne detient qu'une cle SSH limitee a infra/deploy/deploy.sh : aucun secret applicatif.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: deploy, rollback ou status
+        type: choice
+        options: [deploy, rollback, status]
+        default: deploy
+
+permissions:
+  contents: read
+
+# Un seul deploiement a la fois, jamais interrompu en cours de route.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    name: production (${{ inputs.action }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Les secrets de cet environnement ne sont fournis qu'apres approbation, et seulement pour main.
+    environment: production
+    env:
+      ACTION: ${{ inputs.action }}
+    steps:
+      - name: Refuser toute autre branche que main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Le deploiement ne part que de main." >&2
+          exit 1
+
+      - name: Recuperer le code (historique complet)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Trouver les images publiees pour ce commit
+        if: inputs.action == 'deploy'
+        run: |
+          # Les images ne sont republiees que si leur code change : on prend le dernier commit
+          # qui a declenche le workflow Publish (memes chemins que dans publish.yml).
+          image_commit=$(git log -1 --format=%H -- backend infra/backup infra/ci/smoke-image.sh .github/workflows/publish.yml)
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          digest_of() {
+            docker buildx imagetools inspect "ghcr.io/${owner}/$1:sha-${image_commit}" \
+              --format '{{json .Manifest}}' | jq -r '.digest'
+          }
+          api=$(digest_of lorakus-api)
+          backup=$(digest_of lorakus-backup)
+          for d in "$api" "$backup"; do
+            if [[ ! "$d" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Image introuvable pour le commit ${image_commit} : le workflow Publish a-t-il reussi ?" >&2
+              exit 1
+            fi
+          done
+          {
+            echo "API_DIGEST=$api"
+            echo "BACKUP_DIGEST=$backup"
+          } >> "$GITHUB_ENV"
+          {
+            echo "### Version deployee"
+            echo "Configuration : ${GITHUB_SHA}"
+            echo "Images : ${image_commit}"
+            echo
+            echo "lorakus-api@${api}"
+            echo
+            echo "lorakus-backup@${backup}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preparer la connexion SSH (empreinte du serveur verifiee)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
+
+      - name: Executer l'action sur le serveur
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          case "$ACTION" in
+            deploy) remote="deploy ${GITHUB_SHA} ${API_DIGEST} ${BACKUP_DIGEST}" ;;
+            rollback) remote="rollback" ;;
+            status) remote="status" ;;
+            *) echo "Action inconnue : $ACTION" >&2; exit 1 ;;
+          esac
+          # StrictHostKeyChecking=yes : connexion refusee si l'empreinte du serveur a change.
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o ServerAliveInterval=30 -o ConnectTimeout=15 \
+            "deploy@${DEPLOY_HOST}" "$remote"
+
+      - name: Effacer la cle
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

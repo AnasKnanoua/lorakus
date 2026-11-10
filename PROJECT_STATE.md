@@ -3,9 +3,9 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : aucune (pré-v0.1.0)
-- **Phase** : P1 — Fondations techniques : code terminé, déploiement en cours
+- **Phase** : P1 — Fondations techniques : publication faite, déploiement en cours
 - **Dernière mise à jour** : 2026-11-09
-- **Déploiement** : rien de déployé. Hôte de production `oracleworker` (alias SSH `lorakus-prod`) préparé. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
+- **Déploiement** : outillé (`deploy.yml`, `infra/deploy/`), premier déploiement à faire. Hôte de production `oracleworker` (alias SSH `lorakus-prod`) préparé ; images arm64 vérifiées dessus. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
@@ -17,18 +17,19 @@
 - P1, PR n°11 à n°14 : Prometheus, Grafana, Alertmanager vers Discord (ADR 0035), node_exporter, 11 règles d'alerte testées (13 tests promtool), sauvegardes chiffrées `age` vers Backblaze B2 (clé sans droit de suppression), `make restore-test`, métriques de sauvegarde.
 - Hôte de production préparé : mises à jour de sécurité automatiques, Docker, utilisateur `deploy`, SSH par clé uniquement, pare-feu limité à SSH, liste de sécurité Oracle nettoyée, nom d'hôte persistant (`DEPLOYMENT.md` §2.1).
 - Domaine `lorakus.app` enregistré (D-G).
+- PR n°15 : ADR 0036 (environnements), documentation alignée.
+- PR n°16 : images API et sauvegarde multi-architectures, construites nativement, testées et analysées, publiées publiquement sur GHCR (`publish.yml`).
 
 ## En cours
 
-- PR de documentation : ADR 0036, D-G, mise à jour de `DEPLOYMENT.md`, `ROADMAP.md` et de ce fichier.
+- PR Déploiement : `deploy.yml` (approbation manuelle), `infra/deploy/deploy.sh` (sauvegarde, migrations, test de santé, retour automatique), `infra/deploy/init-env.sh` (secrets générés sur le serveur), `compose.prod.yml`.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
-1. PR Publication : images API et sauvegarde multi-architectures sur GHCR, vérifiées sur ARM, analysées par Trivy.
-2. PR Déploiement : workflow avec approbation manuelle, image désignée par son empreinte, migrations, test de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
-3. PR Exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
-4. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
+1. PR Déploiement : en cours (voir ci-dessus), puis premier déploiement et essai du retour arrière.
+2. PR Exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
+3. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
 
 Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
