@@ -4,7 +4,7 @@
 
 Plateforme d'assistant personnel intelligent, modulaire et auto-hébergée : un assistant qui connaît votre situation (tâches, cours, agenda, mémoire), agit avec votre accord et prend l'initiative sans vous inonder de notifications.
 
-> **Statut : conception terminée, phase 0 (préparation).** Aucune ligne de code n'est encore écrite. Voir [`PROJECT_STATE.md`](PROJECT_STATE.md).
+> **Statut : phase 1 (fondations techniques), en production depuis le 2026-11-10.** Voir [`PROJECT_STATE.md`](PROJECT_STATE.md).
 
 ## Principes
 
@@ -47,6 +47,7 @@ make lint           # Ruff, pyright, ESLint, import-linter
 | [`ROADMAP.md`](ROADMAP.md) | Phases détaillées, MVP, critères de fin de phase |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Installation, conventions, tests, migrations |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Environnements, déploiement, rollback, sauvegardes, changement d'hébergeur |
+| [`docs/runbooks/`](docs/runbooks/README.md) | Que faire quand une alerte tombe : pannes, sauvegardes, restauration, pièges connus |
 | [`DECISIONS.md`](DECISIONS.md) | Index des ADR et décisions en attente |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions |
 | [`PROJECT_STATE.md`](PROJECT_STATE.md) | Où en est le projet, à reprendre en premier |

@@ -1,6 +1,6 @@
 # Déploiement
 
-État au 2026-11-09 : images publiées sur GHCR, déploiement outillé. Les sections marquées « PR Exploitation » décrivent la cible.
+État au 2026-11-10 : en production sur `lorakus-prod`, sauvegarde quotidienne active, retour arrière essayé. Le staging et la sentinelle externe (VM Azure) restent à créer. En cas d'incident : [`docs/runbooks/`](docs/runbooks/README.md).
 
 ## 1. Environnements
 
@@ -9,8 +9,8 @@ Décision : [ADR 0036](docs/adr/0036-environments.md).
 | Environnement | Hôte | Contenu | Données |
 | --- | --- | --- | --- |
 | Développement | Dell (Ubuntu) | `compose.yml`, `compose.dev.yml`, `compose.observability.yml` | Synthétiques |
-| Staging | VM ARM Azure for Students (PR Exploitation) | Pile réduite, dimensionnée à la création de la VM | Synthétiques |
-| Sentinelle externe | Même VM Azure (PR Exploitation) | Vérifie de l'extérieur que la production répond | Aucune |
+| Staging | VM ARM Azure for Students (à créer) | Pile réduite, dimensionnée à la création de la VM | Synthétiques |
+| Sentinelle externe | Même VM Azure (à créer) | Vérifie de l'extérieur que la production répond | Aucune |
 | Production | `oracleworker` (Oracle Always Free, ARM, 1 OCPU, 6 Go, Oracle Linux 9), alias SSH `lorakus-prod`, dédié à Lorakus | API, PostgreSQL, pile d'observabilité, sauvegardes | Réelles |
 | Red Team | À redimensionner en phase 17 | ZAP, Promptfoo | Aucune donnée de production |
 
@@ -65,6 +65,8 @@ Fichiers sur le serveur, dans `/opt/lorakus` : `.env` (secrets, 600, créé par 
 
 Jamais d'image `latest`. Aucune mise à jour automatique non contrôlée en production.
 
+Mesuré le 2026-11-10 : déploiement complet en 26 secondes. En cas d'échec : [runbook](docs/runbooks/deploy-failed.md).
+
 ### 4.1 Mise en place (une fois)
 
 Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus/app`, puis `infra/deploy/init-env.sh`. Les mots de passe internes sont tirés au hasard sur place ; le webhook Discord, la clé B2 et la clé publique `age` sont saisis au clavier ; une valeur existante n'est jamais modifiée.
@@ -79,7 +81,9 @@ Côté GitHub, environnement `production` : approbation obligatoire, branche `ma
 
 ## 6. Retour arrière
 
-`gh workflow run deploy.yml -f action=rollback` remet en service la version précédente (configuration et images), sans rejouer de migration : le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée : `alembic downgrade <révision>` puis retour arrière, à documenter dans le runbook de restauration.
+`gh workflow run deploy.yml -f action=rollback` remet en service la version précédente (configuration et images), sans rejouer de migration : le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée, la voie sûre est la [restauration](docs/runbooks/restore.md) de la sauvegarde faite juste avant le déploiement.
+
+Essayé en production le 2026-11-10 : retour arrière en 10 secondes. Après un retour arrière, les deux versions sont échangées : un second `rollback` ramène la version défectueuse.
 
 ## 7. Sauvegardes et restauration
 
@@ -90,10 +94,11 @@ Côté GitHub, environnement `production` : approbation obligatoire, branche `ma
 | Configuration | Dépôt Git ; secrets uniquement sur le serveur | À chaque changement | GitHub | — |
 
 - Le serveur ne détient que la clé **publique** `age` : il peut chiffrer, jamais déchiffrer. La clé privée reste dans le gestionnaire de mots de passe.
-- La clé B2 du serveur n'a pas le droit de suppression : une machine compromise ne peut pas effacer les sauvegardes. La rotation est faite par le bucket.
+- Aucune clé B2 n'a le droit de suppression : une machine compromise ne peut pas effacer les sauvegardes. La rotation est faite par le bucket. Chaque machine a sa propre clé (section 7.2).
 - `make restore-test` restaure la dernière sauvegarde dans une base jetable sans réseau et la vérifie.
 - Métriques écrites pour node_exporter (collecteur textfile) ; alertes `LorakusBackupFailed`, `LorakusBackupMissing` (aucune réussite depuis 26 h) et `LorakusBackupNeverRecorded`.
 - Sauvegarde à la main : `/opt/lorakus/app/infra/deploy/deploy.sh backup` (en tant que `deploy`). Elle attend la fin d'un déploiement en cours, 30 minutes au plus.
+- Sauvegarde en échec : [runbook](docs/runbooks/backup-failed.md). Restauration en production : [runbook](docs/runbooks/restore.md).
 
 ### 7.1 Installer le minuteur (une fois, puis à chaque changement de `infra/systemd/`)
 
@@ -106,6 +111,27 @@ systemctl list-timers lorakus-backup.timer
 ```
 
 Journal d'une exécution : `journalctl -u lorakus-backup.service -n 50`.
+
+### 7.2 Une clé B2 par machine
+
+Décision du 2026-11-10 : la clé partagée entre le Dell et le serveur est remplacée par une clé par machine, limitée au bucket des sauvegardes et à ce que la machine fait réellement.
+
+| Machine | Nom de la clé | Droits | Usage |
+| --- | --- | --- | --- |
+| `lorakus-prod` | `lorakus-prod-backup` | `listBuckets`, `listFiles`, `readFiles`, `writeFiles` | Envoyer les sauvegardes, copie mensuelle |
+| Dell | `lorakus-dell-restore` | `listBuckets`, `listFiles`, `readFiles` | `make restore-test`, restauration |
+
+- Une clé volée se révoque sans toucher à l'autre machine, et le journal de Backblaze dit quelle machine a fait quoi.
+- Le Dell n'écrit plus dans le bucket de production : une sauvegarde de développement ne peut plus passer pour la dernière sauvegarde de production. `make backup` sur le Dell demande donc un bucket d'essai distinct (`B2_BUCKET` et une clé à lui dans le `.env` local).
+- Le serveur garde `readFiles` : la copie mensuelle se fait de fichier à fichier côté Backblaze. Le retirer n'apporterait rien, le serveur détient déjà les données en clair et les sauvegardes sont chiffrées avec une clé qu'il n'a pas.
+- Le site de Backblaze ne sait pas créer une clé « lecture et écriture sans suppression » : passer par la CLI `b2` (v4), depuis une machine autorisée avec la clé maîtresse.
+
+```bash
+b2 key create --bucket <bucket> lorakus-prod-backup listBuckets,listFiles,readFiles,writeFiles
+b2 key create --bucket <bucket> lorakus-dell-restore listBuckets,listFiles,readFiles
+```
+
+Mise en place sur le serveur : [runbook, « Remplacer la clé B2 du serveur »](docs/runbooks/backup-failed.md). Sur le Dell : remplacer `B2_KEY_ID` et `B2_APP_KEY` dans `.env`, puis `make restore-test`. Supprimer l'ancienne clé partagée une fois les deux vérifications réussies.
 
 ## 8. Accès d'administration
 
@@ -126,6 +152,6 @@ Durée cible : une soirée.
 
 - [ ] `/api/health/ready` vert, empreinte de l'image attendue
 - [ ] Aucune erreur 5xx dans les 10 minutes
-- [ ] Une alerte de test reçue sur Discord, avec `[production]` dans le titre
+- [ ] Alerte de test reçue sur Discord avec `[production]` dans le titre et un lien vers le runbook : `/opt/lorakus/app/infra/deploy/deploy.sh alert-test` sur le serveur. Ne pas utiliser `amtool alert add` directement : une alerte injectée dans Alertmanager ne passe pas par Prometheus et ne reçoit pas le label `environment`
 - [ ] Sauvegarde du jour présente, métriques à jour
 - [ ] `PROJECT_STATE.md` et `CHANGELOG.md` à jour

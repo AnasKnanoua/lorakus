@@ -84,7 +84,7 @@ Format de rapport (template d'issue `security-finding`) : description, preuve re
 2. **Contenir** : révoquer sessions et clés, couper l'egress IA (`AI_KILL_SWITCH=1`), mettre en maintenance.
 3. **Diagnostiquer** : traces, logs, audit.
 4. **Corriger** : correctif via PR, revue, déploiement.
-5. **Restaurer** : sauvegarde si nécessaire (`docs/runbooks/restore.md`).
+5. **Restaurer** : sauvegarde si nécessaire ([`docs/runbooks/restore.md`](docs/runbooks/restore.md)).
 6. **Post-mortem** : `docs/incidents/AAAA-MM-JJ-titre.md` sous 7 jours.
 
 Runbooks à rédiger en phase 6 : `restore.md`, `rotate-secrets.md`, `block-ai-provider.md`, `revoke-device.md`, `incident.md`.

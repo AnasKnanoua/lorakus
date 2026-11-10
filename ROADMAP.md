@@ -47,15 +47,17 @@ Scénarios d'acceptation :
 8. API coupée → alerte Discord en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
 9. Restauration automatique du dernier backup réussie.
 
-### P1 — Fondations (reste : l'exploitation)
+### P1 — Fondations (reste : staging et sentinelle externe)
 
-- **Fait** (PR n°7 à n°17, en production depuis le 2026-11-10) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), déploiement approuvé avec retour automatique (PR n°17), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production.
+- **Fait** (PR n°7 à n°18 et PR Runbooks, en production depuis le 2026-11-10) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), déploiement approuvé avec retour automatique (PR n°17), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production, sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, runbooks liés aux alertes. Essayés en production le 2026-11-10 : retour arrière (10 s), redéploiement (26 s), alerte d'API coupée (2 min 21 s).
 - **Reste, dans l'ordre** :
-  1. PR Exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes.
-  2. VM Azure en staging léger et sentinelle externe (ADR 0036).
-  3. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
+  1. Clés B2 par machine.
+  2. VM Azure (ADR 0036) : création, durcissement, mesure de la mémoire.
+  3. Sentinelle externe par signal de vie poussé depuis la production, runbook « production disparue ».
+  4. Staging léger sur la même VM, par le même `deploy.sh`.
+  5. Centralisation des journaux (Loki) : décision en dernier, P1 ou report en P3.
 - **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
-- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR ; le retour arrière a été essayé ; la sauvegarde quotidienne tourne et son absence alerte ; la sentinelle alerte quand la production ne répond plus. Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
+- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (reste). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
 - **Risque** : temps passé sur l'outillage.
 
 ### P2 — Core platform + registre des spécialistes (3 semaines)
@@ -91,7 +93,7 @@ Scénarios d'acceptation :
 
 ### P6 — Stabilisation et v0.5 (1,5 semaine)
 
-Usage réel, ZAP baseline, exercice d'incident, runbooks, gel des fonctionnalités. Terminée quand les neuf scénarios passent.
+Usage réel, ZAP baseline, exercice d'incident, relecture des runbooks (créés en P1), gel des fonctionnalités. Terminée quand les neuf scénarios passent.
 
 ## Après le MVP : un spécialiste à la fois
 
@@ -124,4 +126,4 @@ Usage réel, ZAP baseline, exercice d'incident, runbooks, gel des fonctionnalit�
 - **Authentification et facturation au moment de vendre** : réévaluer Clerk pour l'authentification ; Stripe pour la facturation (25 $ de crédit étudiant) ; Testmail pour tester l'envoi d'e-mails si Lorakus en envoie un jour.
 - **Heures de prière** : calcul local déterministe (ou Mawaqit si un accès autorisé existe), créneaux ajoutés à l'agenda, situation « heure de prière et réseaux sociaux » traitée par un pacte volontaire (notification plein écran, Ne pas déranger, blocage par l'extension sur PC). Fermer une application Android de force exigerait le service d'accessibilité, écarté par l'ADR 0016. Donnée religieuse, donc catégorie sensible du RGPD : module désactivé par défaut, classé `sensitive`, jamais transmis à un LLM, consentement explicite en cas de vente.
 - **Montre connectée** : déjà prévue avec le Préparateur (P10), via Mi Fitness puis Health Connect.
-- **Alertes d'exploitation** : lien vers le runbook et le tableau de bord dans chaque alerte (P6).
+- **Alertes d'exploitation** : lien vers le tableau de bord Grafana dans chaque alerte (P6, quand Grafana aura une adresse) ; le lien vers le runbook est fait (P1).
