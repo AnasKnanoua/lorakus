@@ -1,0 +1,8 @@
+# Surcharges pour la production uniquement.
+# S'ajoute a compose.yml et compose.observability.yml (voir infra/deploy/deploy.sh).
+services:
+  api:
+    ports:
+      # 127.0.0.1 : joignable depuis le serveur seulement (test de sante du deploiement,
+      # acces par tunnel SSH). Rien n'est expose a Internet avant la phase 3.
+      - "127.0.0.1:8001:8000"

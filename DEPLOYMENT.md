@@ -1,6 +1,6 @@
 # Déploiement
 
-État au 2026-11-09 : l'hôte de production est préparé, rien n'y est encore déployé. Les sections marquées « PR Déploiement » ou « PR Exploitation » décrivent la cible ; elles seront complétées par ces PR.
+État au 2026-11-09 : images publiées sur GHCR, déploiement outillé. Les sections marquées « PR Exploitation » décrivent la cible.
 
 ## 1. Environnements
 
@@ -43,22 +43,33 @@ Trois mécanismes peuvent réécrire le nom d'hôte au démarrage. Le troisième
 
 Avec la valeur `2`, Oracle ne met plus `/etc/hosts` à jour : y corriger l'alias à la main, puis `hostnamectl set-hostname <nom>` et redémarrer. Vérification : `hostnamectl --static` après le redémarrage, et la ligne « Skip updating hostname » dans `journalctl -b`.
 
-## 3. Premier déploiement (PR Déploiement)
+## 3. Images publiées
 
-1. Générer les secrets **sur le serveur**, par un script, dans `/opt/lorakus/.env` (600). GitHub ne connaît que la clé SSH de déploiement.
-2. Récupérer les images publiées sur GHCR, désignées par leur empreinte.
-3. Appliquer les migrations, puis démarrer la pile en attendant que les conteneurs soient sains.
-4. Vérifier `/api/health/ready`, le tableau Grafana (par tunnel SSH) et la réception d'une alerte de test sur Discord.
-5. Lancer une sauvegarde puis le test de restauration.
+Le workflow `publish.yml` construit les images API et sauvegarde sur une machine de chaque architecture (amd64 et arm64), les teste (`infra/ci/smoke-image.sh`), les analyse avec Trivy, puis, sur `main` uniquement, les publie sur GHCR et les réunit sous l'étiquette `sha-<commit>`. L'empreinte (`@sha256:…`) de chaque image figure dans le résumé de l'exécution.
 
-## 4. Mise à jour
+- Les deux paquets GHCR sont **publics** (réglage irréversible) : le serveur les télécharge sans identifiant.
+- Une image n'est republiée que si son code change ; le déploiement prend le dernier commit de `main` qui a touché ces chemins.
+- Première publication d'une **nouvelle** image : les jobs amd64 et arm64 peuvent créer le paquet en même temps et l'un est refusé (`denied`). Relancer le job échoué (`gh run rerun <id> --failed`) suffit.
 
-| Environnement | Déclencheur | Séquence |
-| --- | --- | --- |
-| Production (PR Déploiement) | Workflow GitHub, approbation manuelle de l'environnement `production` | Connexion SSH en tant que `deploy` avec vérification de l'empreinte de l'hôte → image désignée par son empreinte → migrations → démarrage → test de `/api/health/ready` |
-| Staging (PR Exploitation) | À définir avec la VM Azure | Même séquence, sans approbation |
+## 4. Déploiement
 
-Jamais d'image `latest` : une image est toujours désignée par son empreinte (`@sha256:`). Aucune mise à jour automatique non contrôlée en production.
+Le workflow `deploy.yml`, lancé à la main, attend l'approbation de l'environnement GitHub `production`. Il se connecte au serveur en vérifiant son empreinte SSH, avec une clé qui ne peut exécuter que `infra/deploy/deploy.sh` (option `command=` de `authorized_keys`).
+
+```bash
+gh workflow run deploy.yml -f action=deploy     # ou rollback, status
+```
+
+`deploy.sh` désigne la configuration par un commit de `main` (copie du dépôt dans `/opt/lorakus/app`) et le code par l'empreinte des images. Séquence : vérification que le commit appartient à `main` → téléchargement des images → sauvegarde de la base (sauf au premier déploiement) → migrations → démarrage de tous les services → test de `/api/health/ready`. Si une étape échoue après le téléchargement, la version précédente est remise en service automatiquement.
+
+Fichiers sur le serveur, dans `/opt/lorakus` : `.env` (secrets, 600, créé par `infra/deploy/init-env.sh`), `release.env` (version en service), `release.previous.env` (version précédente), `app/` (copie du dépôt).
+
+Jamais d'image `latest`. Aucune mise à jour automatique non contrôlée en production.
+
+### 4.1 Mise en place (une fois)
+
+Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus/app`, puis `infra/deploy/init-env.sh`. Les mots de passe internes sont tirés au hasard sur place ; le webhook Discord, la clé B2 et la clé publique `age` sont saisis au clavier ; une valeur existante n'est jamais modifiée.
+
+Côté GitHub, environnement `production` : approbation obligatoire, branche `main` seule ; secrets `DEPLOY_SSH_KEY` et `DEPLOY_HOST` ; variable `DEPLOY_KNOWN_HOSTS` (empreinte publique du serveur, vérifiée contre `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
 
 ## 5. Migrations en production
 
@@ -66,9 +77,9 @@ Jamais d'image `latest` : une image est toujours désignée par son empreinte (`
 - Expand/contract (ADR 0011) : la version N fonctionne avec le schéma N+1 ; la contraction arrive à la version suivante, après une semaine sans incident.
 - Une migration irréversible exige une sauvegarde vérifiée juste avant.
 
-## 6. Retour arrière (PR Déploiement)
+## 6. Retour arrière
 
-Une seule commande redéploie l'empreinte de l'image précédente ; le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée : `alembic downgrade <révision>` puis redéploiement de l'image précédente, à documenter dans le runbook de restauration.
+`gh workflow run deploy.yml -f action=rollback` remet en service la version précédente (configuration et images), sans rejouer de migration : le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée : `alembic downgrade <révision>` puis retour arrière, à documenter dans le runbook de restauration.
 
 ## 7. Sauvegardes et restauration
 
