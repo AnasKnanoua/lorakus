@@ -4,6 +4,7 @@
 #   deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE   met en service une version
 #   deploy.sh rollback                                           revient a la version precedente
 #   deploy.sh status                                             affiche la version en service
+#   deploy.sh backup                                             sauvegarde (minuteur systemd quotidien)
 #   deploy.sh ssh                                                point d'entree de la cle de GitHub
 #
 # COMMIT : commit de la branche main (40 caracteres). Il fixe la CONFIGURATION (fichiers Compose,
@@ -45,13 +46,20 @@ compose() {
     --env-file "$ENV_FILE" --env-file "$release_file" "$@"
 }
 
-# Un seul deploiement a la fois. Le verrou reste tenu quand le script se relance lui-meme.
+# Une seule operation a la fois (deploiement, retour arriere, sauvegarde).
+# Le verrou reste tenu quand le script se relance lui-meme.
+# $1 (facultatif) : secondes d'attente si le verrou est pris ; sans valeur, refus immediat.
 take_lock() {
+  local wait="${1:-}"
   if [ "${LORAKUS_DEPLOY_LOCKED:-}" = "1" ]; then
     return 0
   fi
   exec 9>"$LOCK"
-  flock -n 9 || fail "un autre deploiement est deja en cours"
+  if [ -n "$wait" ]; then
+    flock -w "$wait" 9 || fail "verrou toujours pris apres $wait s (deploiement bloque ?)"
+  else
+    flock -n 9 || fail "un autre deploiement est deja en cours"
+  fi
   export LORAKUS_DEPLOY_LOCKED=1
 }
 
@@ -100,6 +108,17 @@ wait_ready() {
   return 1
 }
 
+# Les services d'observabilite lisent leur configuration (fichiers du depot montes en lecture
+# seule) au demarrage seulement : docker compose ne les recree pas quand seuls ces fichiers
+# changent. On les recree donc a chaque mise en service (leurs donnees restent dans les volumes).
+OBSERVABILITY_SERVICES=(prometheus alertmanager grafana)
+
+start_services() {
+  local release_file="$1"
+  compose "$release_file" up -d --wait --remove-orphans || return 1
+  compose "$release_file" up -d --wait --no-deps --force-recreate "${OBSERVABILITY_SERVICES[@]}" || return 1
+}
+
 # Met une version en service. Renvoie 1 a la premiere etape en echec (rien n'est masque).
 activate() {
   local mode="$1" release_file="$2"
@@ -107,10 +126,10 @@ activate() {
     say "Demarrage de PostgreSQL"
     compose "$release_file" up -d --wait postgres || return 1
     say "Migrations"
-    compose "$release_file" run --rm migrate || return 1
+    compose "$release_file" run --rm -T migrate </dev/null || return 1
   fi
   say "Demarrage des services"
-  compose "$release_file" up -d --wait --remove-orphans || return 1
+  start_services "$release_file" || return 1
   say "Test de $READY_URL"
   wait_ready || return 1
 }
@@ -120,7 +139,7 @@ restore_current() {
   local commit
   commit=$(release_value "$RELEASE" LORAKUS_RELEASE_COMMIT)
   git -C "$APP" checkout --quiet --force --detach "$commit" || return 1
-  compose "$RELEASE" up -d --wait --remove-orphans || return 1
+  start_services "$RELEASE" || return 1
   wait_ready || return 1
 }
 
@@ -170,7 +189,7 @@ cmd_apply() {
   # Elle n'a pas lieu au premier deploiement (la base n'existe pas encore).
   if [ "$mode" = "deploy" ] && [ -f "$RELEASE" ] && [ "${LORAKUS_DEPLOY_SKIP_BACKUP:-}" != "1" ]; then
     say "Sauvegarde avant migration"
-    if ! compose "$RELEASE" run --rm backup; then
+    if ! compose "$RELEASE" run --rm -T backup </dev/null; then
       rm -f "$NEXT"
       fail "sauvegarde impossible : deploiement annule (rien n'a ete modifie)"
     fi
@@ -197,6 +216,17 @@ cmd_apply() {
   fi
   say "Version en service :"
   cat "$RELEASE"
+}
+
+# Sauvegarde de la version en service. Lancee chaque nuit par le minuteur lorakus-backup.timer.
+# Si un deploiement est en cours, elle attend qu'il se termine (30 minutes au plus).
+cmd_backup() {
+  [ -f "$RELEASE" ] || fail "aucune version deployee : rien a sauvegarder"
+  [ -f "$ENV_FILE" ] || fail "$ENV_FILE absent"
+  take_lock 1800
+  say "Sauvegarde de la version en service"
+  # -T et </dev/null : docker compose run ne doit jamais lire l'entree standard.
+  compose "$RELEASE" run --rm -T backup </dev/null
 }
 
 cmd_status() {
@@ -244,8 +274,9 @@ main() {
     rollback) cmd_rollback ;;
     apply) cmd_apply "$@" ;;
     status) cmd_status ;;
+    backup) cmd_backup ;;
     ssh) cmd_ssh ;;
-    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status" ;;
+    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup" ;;
   esac
 }
 

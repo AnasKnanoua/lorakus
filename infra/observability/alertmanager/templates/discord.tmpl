@@ -1,6 +1,6 @@
-{{/* Titre du message : etat et gravite d'un coup d'oeil. */}}
+{{/* Titre du message : environnement, etat et gravite d'un coup d'oeil. */}}
 {{ define "lorakus.title" -}}
-{{ if eq .Status "resolved" }}✅ Résolu{{ else if eq .CommonLabels.severity "critical" }}🔴 Critique{{ else }}🟠 Avertissement{{ end }} — {{ .CommonLabels.alertname }}{{ if gt (len .Alerts) 1 }} ({{ len .Alerts }}){{ end }}
+{{ with .CommonLabels.environment }}[{{ . }}] {{ end }}{{ if eq .Status "resolved" }}✅ Résolu{{ else if eq .CommonLabels.severity "critical" }}🔴 Critique{{ else }}🟠 Avertissement{{ end }} — {{ .CommonLabels.alertname }}{{ if gt (len .Alerts) 1 }} ({{ len .Alerts }}){{ end }}
 {{- end }}
 
 {{/* Corps du message : quoi, depuis quand, et ou regarder. */}}

@@ -5,6 +5,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 ## [Non publié]
 
 ### Ajouté
+- 2026-11-10 — Sauvegarde quotidienne de la production : `lorakus-backup.timer` et commande `deploy.sh backup` (attend la fin d'un déploiement). Label `environment` sur toutes les alertes, affiché dans le titre Discord.
 - 2026-11-09 — Déploiement en production : workflow `deploy.yml` (approbation manuelle, empreinte SSH vérifiée, clé limitée à `deploy.sh`), `infra/deploy/deploy.sh` (sauvegarde avant migration, test de santé, retour automatique, `rollback`), `infra/deploy/init-env.sh` (secrets générés sur le serveur), `compose.prod.yml`.
 - 2026-11-09 — Publication des images API et sauvegarde multi-architectures sur GHCR (`publish.yml`, `infra/ci/smoke-image.sh`).
 - 2026-11-09 — ADR 0036 : production sur `oracleworker` (`lorakus-prod`), staging léger et sentinelle externe sur Azure for Students. Décision D-G tranchée : domaine `lorakus.app`. Questions de clarification ajoutées à la phase 4.
@@ -17,6 +18,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 - 2026-11-08 — Mission 0 : dossier de conception initial (architecture, sécurité, IA, observabilité, infrastructure).
 
 ### Modifié
+- 2026-11-10 — `deploy.sh` : `docker compose run` en `-T` sans entrée standard (migrations et sauvegardes), pour ne jamais consommer l'entrée d'un script appelant.
+- 2026-11-10 — `deploy.sh` : Prometheus, Alertmanager et Grafana sont recréés à chaque mise en service, pour relire leur configuration même quand seuls leurs fichiers ont changé.
 - 2026-11-09 — ADR 0009 amendé par 0036 ; `DEPLOYMENT.md`, `PROJECT_STATE.md`, `ROADMAP.md`, `SECURITY.md` et `ARCHITECTURE.md` alignés sur l'état réel (alertes sur Discord, secrets générés sur le serveur, sauvegardes B2).
 - ADR 0005 validé (React) ; ADR 0014 complété par 0030 ; ADR 0016 amendé par 0029 sous réserve de la décision D-J ; module `digital_activity` renommé `focus`.
 - ADR 0004 (port `JobQueue`), 0005 (framework frontend réouvert), 0007 (embeddings locaux, contraintes de licence) amendés.

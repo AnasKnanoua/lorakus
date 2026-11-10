@@ -19,6 +19,9 @@ services:
       - --storage.tsdb.retention.time=15d
       - --storage.tsdb.retention.size=1GB
       - --web.external-url=http://localhost:9090
+    environment:
+      # Etiquette "environment" de toutes les alertes (prometheus.yml, external_labels).
+      LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
     volumes:
       - ./infra/observability/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus

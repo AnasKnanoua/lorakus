@@ -47,12 +47,12 @@ Scénarios d'acceptation :
 8. API coupée → alerte Discord en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
 9. Restauration automatique du dernier backup réussie.
 
-### P1 — Fondations (reste : le déploiement)
+### P1 — Fondations (reste : l'exploitation)
 
-- **Fait** (PR n°7 à n°16) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production.
+- **Fait** (PR n°7 à n°17, en production depuis le 2026-11-10) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), déploiement approuvé avec retour automatique (PR n°17), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production.
 - **Reste, dans l'ordre** :
-  1. PR Déploiement : workflow GitHub avec approbation manuelle, image désignée par son empreinte, migrations, vérification de `/api/health/ready`, retour arrière en une commande ; secrets générés sur le serveur.
-  2. PR Exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, VM Azure en staging léger et sentinelle externe (ADR 0036).
+  1. PR Exploitation : sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes.
+  2. VM Azure en staging léger et sentinelle externe (ADR 0036).
   3. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
 - **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
 - **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR ; le retour arrière a été essayé ; la sauvegarde quotidienne tourne et son absence alerte ; la sentinelle alerte quand la production ne répond plus. Les traces corrélées arrivent avec l'observabilité palier 2 (P3).

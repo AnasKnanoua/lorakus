@@ -2,6 +2,10 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  # Ajoute a chaque alerte envoyee : distingue production, staging et developpement dans Discord.
+  # Prometheus remplace ${...} par la variable d'environnement du conteneur (compose.observability.yml).
+  external_labels:
+    environment: ${LORAKUS_ENVIRONMENT}
 
 rule_files:
   - /etc/prometheus/rules/*.yml

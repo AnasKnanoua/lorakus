@@ -1,0 +1,13 @@
+# Declenche lorakus-backup.service chaque nuit.
+[Unit]
+Description=Lorakus : sauvegarde quotidienne
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+# Decalage aleatoire : evite de tomber toujours a la meme seconde que d'autres taches.
+RandomizedDelaySec=20min
+# Si le serveur etait eteint a l'heure prevue, la sauvegarde part au demarrage suivant.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
