@@ -85,7 +85,7 @@ Côté GitHub, environnement `production` : approbation obligatoire, branche `ma
 
 | Élément | Méthode | Fréquence | Destination | Rétention |
 | --- | --- | --- | --- | --- |
-| PostgreSQL | `pg_dump` chiffré avec `age` (`infra/backup/lorakus-backup.sh`) | Quotidienne par minuteur systemd (PR Exploitation) et avant chaque migration | Backblaze B2, dossier `daily/` | Règles de cycle de vie du bucket |
+| PostgreSQL | `pg_dump` chiffré avec `age` (`infra/backup/lorakus-backup.sh`) | Quotidienne vers 03:30 UTC (minuteur `lorakus-backup.timer`) et avant chaque migration | Backblaze B2, dossier `daily/` | Règles de cycle de vie du bucket |
 | Fichiers utilisateur | À définir avec le port `BlobStore` (ADR 0024) | — | — | — |
 | Configuration | Dépôt Git ; secrets uniquement sur le serveur | À chaque changement | GitHub | — |
 
@@ -93,6 +93,19 @@ Côté GitHub, environnement `production` : approbation obligatoire, branche `ma
 - La clé B2 du serveur n'a pas le droit de suppression : une machine compromise ne peut pas effacer les sauvegardes. La rotation est faite par le bucket.
 - `make restore-test` restaure la dernière sauvegarde dans une base jetable sans réseau et la vérifie.
 - Métriques écrites pour node_exporter (collecteur textfile) ; alertes `LorakusBackupFailed`, `LorakusBackupMissing` (aucune réussite depuis 26 h) et `LorakusBackupNeverRecorded`.
+- Sauvegarde à la main : `/opt/lorakus/app/infra/deploy/deploy.sh backup` (en tant que `deploy`). Elle attend la fin d'un déploiement en cours, 30 minutes au plus.
+
+### 7.1 Installer le minuteur (une fois, puis à chaque changement de `infra/systemd/`)
+
+Les unités sont **copiées** dans `/etc/systemd/system` (et non liées) : une modification du dépôt ne change pas ce que systemd exécute sans une réinstallation volontaire.
+
+```bash
+sudo install -m 644 /opt/lorakus/app/infra/systemd/lorakus-backup.service /opt/lorakus/app/infra/systemd/lorakus-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now lorakus-backup.timer
+systemctl list-timers lorakus-backup.timer
+```
+
+Journal d'une exécution : `journalctl -u lorakus-backup.service -n 50`.
 
 ## 8. Accès d'administration
 
@@ -113,6 +126,6 @@ Durée cible : une soirée.
 
 - [ ] `/api/health/ready` vert, empreinte de l'image attendue
 - [ ] Aucune erreur 5xx dans les 10 minutes
-- [ ] Une alerte de test reçue sur Discord
+- [ ] Une alerte de test reçue sur Discord, avec `[production]` dans le titre
 - [ ] Sauvegarde du jour présente, métriques à jour
 - [ ] `PROJECT_STATE.md` et `CHANGELOG.md` à jour

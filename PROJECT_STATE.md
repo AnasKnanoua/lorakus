@@ -3,9 +3,9 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : aucune (pré-v0.1.0)
-- **Phase** : P1 — Fondations techniques : publication faite, déploiement en cours
-- **Dernière mise à jour** : 2026-11-09
-- **Déploiement** : outillé (`deploy.yml`, `infra/deploy/`), premier déploiement à faire. Hôte de production `oracleworker` (alias SSH `lorakus-prod`) préparé ; images arm64 vérifiées dessus. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
+- **Phase** : P1 — Fondations techniques : en production, exploitation en cours
+- **Dernière mise à jour** : 2026-11-10
+- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; 6 services sains, 4 cibles Prometheus actives, première sauvegarde de production envoyée sur B2. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
@@ -19,16 +19,17 @@
 - Domaine `lorakus.app` enregistré (D-G).
 - PR n°15 : ADR 0036 (environnements), documentation alignée.
 - PR n°16 : images API et sauvegarde multi-architectures, construites nativement, testées et analysées, publiées publiquement sur GHCR (`publish.yml`).
+- PR n°17 : déploiement (`deploy.yml` avec approbation, `deploy.sh` avec retour automatique, secrets générés sur le serveur, clé GitHub limitée à `deploy.sh`). Premier déploiement le 2026-11-10.
 
 ## En cours
 
-- PR Déploiement : `deploy.yml` (approbation manuelle), `infra/deploy/deploy.sh` (sauvegarde, migrations, test de santé, retour automatique), `infra/deploy/init-env.sh` (secrets générés sur le serveur), `compose.prod.yml`.
+- PR Exploitation : sauvegarde quotidienne (`lorakus-backup.timer`, `deploy.sh backup`), label `environment` dans toutes les alertes.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
-1. PR Déploiement : en cours (voir ci-dessus), puis premier déploiement et essai du retour arrière.
-2. PR Exploitation : minuteur systemd de sauvegarde quotidienne, label d'environnement dans les alertes, VM Azure en staging et sentinelle.
+1. PR Exploitation : en cours (voir ci-dessus) ; son déploiement servira d'essai au retour arrière.
+2. VM Azure : staging léger et sentinelle externe (ADR 0036), guide pas à pas.
 3. Centralisation des journaux (Loki) : en dernier, ou reportée en P3 selon la mémoire disponible.
 
 Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
@@ -43,6 +44,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 ## Décisions prises récemment
 
+- 2026-11-10 — Images de production épinglées par empreinte ; mémoire de l'hôte : environ 1,3 Go utilisés sur 5,6 Go, Loki envisageable en P1.
 - 2026-11-09 — ADR 0036 : production sur `oracleworker`, staging léger et sentinelle externe sur Azure for Students (non critique, usage non commercial, alerte de budget à 5 $) ; pas de second compte Oracle.
 - 2026-11-09 — D-G : domaine `lorakus.app` ; `app.lorakus.app` et `staging.lorakus.app` à partir de la phase 3 ; aucune exposition publique avant.
 - 2026-11-09 — ADR 0035 : alertes d'exploitation sur Discord, notifications produit sur Telegram.
@@ -53,7 +55,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 | Hypothèse | Avant |
 | --- | --- |
-| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | PR Exploitation |
+| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | Création de la VM Azure |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |
@@ -69,7 +71,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 - `httpx` déprécié par Starlette au profit de `httpx2` : à prendre en compte pour le client HTTP des connecteurs.
 - Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
 - Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
-- La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production : `make down` après les tests, jusqu'à l'ajout du label d'environnement (PR Exploitation).
+- La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production ; ses alertes portent `[development]` dans le titre. `make down` après les tests reste conseillé.
 - FastAPI 0.162 n'aplatit plus `include_router` : le modèle de route des métriques est reconstitué à partir de `scope["route"]` (fait et testé) ; à surveiller lors des montées de version.
 - Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare.
 
