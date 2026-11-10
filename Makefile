@@ -91,10 +91,11 @@ obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et
 > python3 -m json.tool infra/observability/grafana/dashboards/lorakus-api.json > /dev/null
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus test rules /etc/prometheus/tests/lorakus_test.yml
+> ./infra/observability/check-runbooks.sh
 > $(OBS) run --rm --no-deps --entrypoint /bin/sh alertmanager -c 'sed -e "s|__DISCORD_OPS_WEBHOOK_URL__|https://discord.com/api/webhooks/1/test|" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/am.yml && amtool check-config /tmp/am.yml'
 
 alert-test: ## Envoie une alerte de test sur Discord (pile d'observabilite lancee)
-> $(OBS) exec alertmanager amtool alert add LorakusTest 'severity="warning"' --annotation='summary="Alerte de test Lorakus"' --alertmanager.url=http://localhost:9093
+> ./infra/observability/alert-test.sh $(OBS)
 
 backup-image: ## Construit l'image de sauvegarde (pg_dump, age, rclone)
 > docker build -t $(BACKUP_IMAGE) infra/backup

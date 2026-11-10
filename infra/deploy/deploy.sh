@@ -5,6 +5,7 @@
 #   deploy.sh rollback                                           revient a la version precedente
 #   deploy.sh status                                             affiche la version en service
 #   deploy.sh backup                                             sauvegarde (minuteur systemd quotidien)
+#   deploy.sh alert-test                                         alerte de test vers Discord
 #   deploy.sh ssh                                                point d'entree de la cle de GitHub
 #
 # COMMIT : commit de la branche main (40 caracteres). Il fixe la CONFIGURATION (fichiers Compose,
@@ -38,12 +39,19 @@ fail() {
 }
 
 # docker compose avec tous les fichiers de la production. $1 = fichier de version a utiliser.
+# La commande est aussi disponible sous forme de tableau (COMPOSE_CMD), pour la passer a un
+# autre script.
+compose_command() {
+  COMPOSE_CMD=(docker compose --project-directory "$APP"
+    -f "$APP/compose.yml" -f "$APP/compose.observability.yml" -f "$APP/compose.prod.yml"
+    --env-file "$ENV_FILE" --env-file "$1")
+}
+
 compose() {
-  local release_file="$1"
+  local -a COMPOSE_CMD
+  compose_command "$1"
   shift
-  docker compose --project-directory "$APP" \
-    -f "$APP/compose.yml" -f "$APP/compose.observability.yml" -f "$APP/compose.prod.yml" \
-    --env-file "$ENV_FILE" --env-file "$release_file" "$@"
+  "${COMPOSE_CMD[@]}" "$@"
 }
 
 # Une seule operation a la fois (deploiement, retour arriere, sauvegarde).
@@ -229,6 +237,14 @@ cmd_backup() {
   compose "$RELEASE" run --rm -T backup </dev/null
 }
 
+# Alerte de test : verifie la chaine Alertmanager -> Discord et le label d'environnement.
+cmd_alert_test() {
+  [ -f "$RELEASE" ] || fail "aucune version deployee"
+  local -a COMPOSE_CMD
+  compose_command "$RELEASE"
+  "$APP/infra/observability/alert-test.sh" "${COMPOSE_CMD[@]}"
+}
+
 cmd_status() {
   if [ -f "$RELEASE" ]; then
     echo "--- en service"
@@ -275,8 +291,9 @@ main() {
     apply) cmd_apply "$@" ;;
     status) cmd_status ;;
     backup) cmd_backup ;;
+    alert-test) cmd_alert_test ;;
     ssh) cmd_ssh ;;
-    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup" ;;
+    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup | alert-test" ;;
   esac
 }
 
