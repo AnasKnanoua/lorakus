@@ -4,7 +4,7 @@ Un module est un package Python autonome qui apporte un domaine métier à LORAK
 
 ## 1. Règles non négociables
 
-1. Un module **n'importe jamais** un autre module ni `lorakus.ai.providers` (vérifié par `import-linter`).
+1. Un module **n'importe jamais** un autre module ni `lorakus.ai.providers` (vérifié par `import-linter` ; la règle sur `lorakus.ai.providers` est ajoutée avec ce package, en P3). Le Core n'importe **jamais** un module : il les découvre par leurs entry points.
 2. Un module **ne lit ni n'écrit** les tables d'un autre ; il possède ses tables, préfixées.
 3. Un module **n'envoie jamais de notification** : il émet des signaux (`Signals.emit`), l'`InterventionPolicy` décide.
 4. Un module **n'appelle jamais un SDK d'IA** : il passe par `ModelRouter` avec une tâche et une classe de données.

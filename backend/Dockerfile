@@ -26,6 +26,7 @@ RUN uv sync --locked --no-dev --no-install-project
 
 # Code de l'application, installe comme un paquet (non editable).
 COPY lorakus ./lorakus
+COPY lorakus_modules ./lorakus_modules
 RUN uv sync --locked --no-dev --no-editable
 
 # ---------------------------------------------------------------- runtime
