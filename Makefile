@@ -113,7 +113,7 @@ LAST_DEPLOY_RUN = gh run list --workflow deploy.yml --limit 1 --json databaseId 
 
 pr: ## Applique un patch et ouvre la PR : make pr PATCH=chemin BRANCH=nom TITLE="type: titre"
 > @test -n "$(PATCH)" -a -n "$(BRANCH)" -a -n "$(TITLE)" || { echo 'Usage : make pr PATCH=chemin BRANCH=nom TITLE="type: titre"'; exit 2; }
-> git switch main && git pull --ff-only && git switch -c "$(BRANCH)" && git apply --index "$(PATCH)" && git commit -m "$(TITLE)" && git push -u origin HEAD && gh pr create --fill && gh pr checks --watch
+> git switch main && git pull --ff-only && git switch -c "$(BRANCH)" && git apply --index "$(PATCH)" && git commit -m "$(TITLE)" && git push -u origin HEAD && gh pr create --fill && echo "Attente du demarrage des verifications..." && sleep 20 && gh pr checks --watch
 
 merge: ## Fusionne la PR de la branche courante dans main, puis revient sur main a jour
 > gh pr merge --squash --delete-branch && git switch main && git pull --ff-only

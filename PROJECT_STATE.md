@@ -2,10 +2,10 @@
 
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
-- **Version** : aucune (pré-v0.1.0)
-- **Phase** : P1 — Fondations techniques : en production et exploitée ; reste à vérifier la sentinelle et le staging en conditions réelles
+- **Version** : v0.1.0 (2026-11-11)
+- **Phase** : P1 terminée le 2026-11-11 ; prochaine : P2 — Core platform
 - **Dernière mise à jour** : 2026-11-11
-- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; commit `5b248ec` en service, `f08b8f9` en version précédente ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR Runbooks (n°19) déployée le 2026-11-10, alerte de test « [production] » reçue avec son lien de runbook. Staging éphémère dans la CI et sentinelle healthchecks.io (ADR 0037).
+- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
@@ -22,20 +22,18 @@
 - PR n°17 : déploiement (`deploy.yml` avec approbation, `deploy.sh` avec retour automatique, secrets générés sur le serveur, clé GitHub limitée à `deploy.sh`). Premier déploiement le 2026-11-10.
 - PR n°18 (Exploitation), déployée le 2026-11-10 : sauvegarde quotidienne (`lorakus-backup.timer` installé et vérifié sur `lorakus-prod`, `deploy.sh backup`), label `environment` dans toutes les alertes.
 - Essais en production le 2026-11-10 : retour arrière en 10 secondes, puis redéploiement complet en 26 secondes ; API coupée → alerte Discord « [production] Critique — LorakusApiDown » en 2 min 21 s, puis résolution.
-- PR Runbooks : `docs/runbooks/` (API, sauvegarde, disque, serveur, déploiement, restauration, pièges connus), lien vers le runbook dans chaque alerte Discord (vérifié en CI), `deploy.sh alert-test`, décision d'une clé B2 par machine.
+- PR n°19 (Runbooks) : `docs/runbooks/` (API, sauvegarde, disque, serveur, déploiement, restauration, pièges connus), lien vers le runbook dans chaque alerte Discord (vérifié en CI), `deploy.sh alert-test`, décision d'une clé B2 par machine.
+- PR n°20 (Staging et sentinelle, ADR 0037), déployée le 2026-11-11 : premier passage réel du staging vert sur runner ARM (mise à jour, retour arrière, sauvegarde, restauration complète sur PostgreSQL 18) ; disparition simulée (Alertmanager arrêté) → message healthchecks.io « DOWN » sur Discord en 8 minutes ; raccourcis `make pr`, `make merge`, `make deploy`.
+- **Phase 1 close le 2026-11-11, version v0.1.0.**
 
 ## En cours
-
-- PR Staging et sentinelle (ADR 0037) : staging éphémère avant chaque déploiement, signal de vie vers healthchecks.io, runbook « production disparue », raccourcis `make pr`, `make merge`, `make deploy`.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
-## Reste à faire en P1 (dans l'ordre)
+## Prochaine étape
 
-1. Clés B2 par machine (`DEPLOYMENT.md` §7.2) : créer les deux clés, les installer, supprimer la clé partagée.
-2. Déployer la PR Staging et sentinelle : premier passage réel du staging, adresse healthchecks.io saisie sur le serveur, disparition simulée (`docs/runbooks/production-down.md`) et message reçu sur Discord.
-3. Clôture de la P1 et tag `v0.1.0`.
+P2 — Core platform : identité et authentification, isolation par utilisateur (RLS), système de modules, registre des spécialistes (`ROADMAP.md`).
 
-Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
+À faire quand c'est pratique, hors phase : clés B2 par machine (`DEPLOYMENT.md` §7.2).
 
 ## Décisions en attente (voir `DECISIONS.md`)
 
@@ -47,6 +45,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 ## Décisions prises récemment
 
+- 2026-11-11 — P1 close, v0.1.0 ; vérifié : staging réel vert (restauration PostgreSQL 18 comprise), sentinelle en 8 minutes.
 - 2026-11-11 — ADR 0037 : pas de VM Azure (tailles gratuites bloquées dans les régions autorisées) ; staging éphémère dans la CI avant chaque déploiement ; sentinelle healthchecks.io alimentée par une alerte toujours active ; crédit Azure (90 $, jusqu'au 09/11/2027) conservé.
 - 2026-11-11 — Loki reporté en P3, avec Tempo (amendement de l'ADR 0010).
 - 2026-11-10 — Une clé B2 par machine : écriture sans suppression pour le serveur, lecture seule pour le Dell (`DEPLOYMENT.md` §7.2).
@@ -62,9 +61,6 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 | Hypothèse | Avant |
 | --- | --- |
-| Restauration complète sur PostgreSQL 18 avec les conteneurs réels (étape SQL vérifiée sur PostgreSQL 16 seulement) | Premier passage du staging |
-| Le staging (simulé avec un faux Docker) passe sur un vrai runner ARM | Premier `make deploy` après la PR |
-| Alerte de healthchecks.io en moins de 10 minutes après une disparition | Disparition simulée en production |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |
@@ -88,7 +84,7 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 ## Dette technique acceptée
 
-- Aucune.
+- `CHANGELOG.md` est tenu à la main : `release-please` (prévu par `DEVELOPMENT.md`) n'est pas encore installé. À mettre en place en P2, avant la v0.2.0.
 
 ## Pour reprendre
 

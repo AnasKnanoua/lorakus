@@ -47,16 +47,14 @@ Scénarios d'acceptation :
 8. API coupée → alerte Discord en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
 9. Restauration automatique du dernier backup réussie.
 
-### P1 — Fondations (reste : vérifier la sentinelle en production)
+### P1 — Fondations (terminée le 2026-11-11, v0.1.0)
 
 - **Fait** (PR n°7 à n°18 et PR Runbooks, en production depuis le 2026-11-10) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), déploiement approuvé avec retour automatique (PR n°17), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production, sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, runbooks liés aux alertes. Essayés en production le 2026-11-10 : retour arrière (10 s), redéploiement (26 s), alerte d'API coupée (2 min 21 s).
-- **Reste, dans l'ordre** :
-  1. Clés B2 par machine.
-  2. PR Staging et sentinelle (ADR 0037) : premier passage réel du staging dans la CI, sentinelle healthchecks.io installée, disparition simulée et alerte reçue.
-  3. Clôture de la P1 et tag `v0.1.0`.
+- **Fait aussi** (PR n°20) : staging éphémère avant chaque déploiement, vert en conditions réelles ; sentinelle healthchecks.io, disparition détectée en 8 minutes.
+- **Reporté hors phase** : clés B2 par machine (`DEPLOYMENT.md` §7.2).
 - **Décidé** : pas de VM Azure (ADR 0037) ; Loki reporté en P3 (ADR 0010).
 - **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
-- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (reste) ; le staging a validé un déploiement réel (reste). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
+- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (fait, 8 min) ; le staging a validé un déploiement réel (fait). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
 - **Risque** : temps passé sur l'outillage.
 
 ### P2 — Core platform + registre des spécialistes (3 semaines)
