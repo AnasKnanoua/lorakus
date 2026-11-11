@@ -9,6 +9,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Disque plein](disk-full.md) | `LorakusDiskSpaceLow`, `LorakusDiskSpaceCritical` |
 | [Mémoire basse, métriques du serveur absentes](host.md) | `LorakusHostMemoryLow`, `LorakusNodeExporterDown` |
 | [Production disparue](production-down.md) | Message healthchecks.io « DOWN », `LorakusHeartbeatFailing` |
+| [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |
 | [Pièges déjà rencontrés](pitfalls.md) | — |

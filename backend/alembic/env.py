@@ -9,7 +9,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
-from lorakus.core.identity import models as _identity_models  # noqa: F401 (tables enregistrees)
+from lorakus.core.events import models as _event_models  # noqa: F401 (tables enregistrees)
+from lorakus.core.identity import models as _identity_models  # noqa: F401
 from lorakus.core.modules import models as _module_models  # noqa: F401
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.db.base import SCHEMA, Base
@@ -32,7 +33,8 @@ def include_name(name: str | None, type_: str, parent_names: object) -> bool:
     """Limite la comparaison automatique au seul schema de Lorakus."""
     if type_ == "schema":
         return name == SCHEMA
-    return True
+    # Tables de la file de jobs : gerees par Procrastinate (migration 0005), pas par nos modeles.
+    return not (type_ == "table" and name is not None and name.startswith("procrastinate_"))
 
 
 def do_run_migrations(connection: Connection) -> None:

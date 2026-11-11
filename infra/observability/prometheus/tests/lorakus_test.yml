@@ -319,3 +319,85 @@ tests:
       - eval_time: 12m
         alertname: LorakusHeartbeatFailing
         exp_alerts: []
+
+  # ------------------------------------------------------------------ Worker
+  - name: Worker injoignable
+    interval: 1m
+    input_series:
+      - series: 'up{job="lorakus-worker", instance="worker:9464"}'
+        values: '1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: LorakusWorkerDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: LorakusWorkerDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: worker
+              job: lorakus-worker
+              instance: worker:9464
+            exp_annotations:
+              summary: Le worker Lorakus est injoignable
+              description: Prometheus ne collecte plus les metriques du worker depuis 2 minutes ; jobs et evenements ne sont plus traites.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+  - name: Worker bloque (battement de coeur fige)
+    interval: 1m
+    input_series:
+      # Battement fige a t=0 alors que le temps avance.
+      - series: 'lorakus_worker_heartbeat_timestamp_seconds{job="lorakus-worker", instance="worker:9464"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: LorakusWorkerStalled
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: LorakusWorkerStalled
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: worker
+              job: lorakus-worker
+              instance: worker:9464
+            exp_annotations:
+              summary: Le worker Lorakus est bloque
+              description: Son battement de coeur n'a pas avance depuis plus de 2 minutes.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+  - name: Evenements en retard et abandonnes
+    interval: 1m
+    input_series:
+      - series: 'lorakus_outbox_oldest_pending_seconds{job="lorakus-worker", instance="worker:9464"}'
+        values: '0 400 460 520 580 640 700 760'
+      - series: 'lorakus_outbox_dead{job="lorakus-worker", instance="worker:9464"}'
+        values: '0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LorakusOutboxBacklog
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: LorakusOutboxBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: worker
+              job: lorakus-worker
+              instance: worker:9464
+            exp_annotations:
+              summary: Des evenements attendent depuis plus de 5 minutes
+              description: L'evenement en attente le plus ancien a plus de 5 minutes ; un handler echoue ou le worker est sature.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+      - eval_time: 4m
+        alertname: LorakusOutboxDeadEvents
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: worker
+              job: lorakus-worker
+              instance: worker:9464
+            exp_annotations:
+              summary: Des evenements ont ete abandonnes
+              description: Au moins un evenement a echoue 8 fois et n'est plus retente ; voir last_error dans core_outbox.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md

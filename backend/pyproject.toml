@@ -9,6 +9,7 @@ dependencies = [
     "cryptography>=50.0.2",
     "fastapi>=0.162.2",
     "packaging>=26.3",
+    "procrastinate>=3.10.0,<3.11",
     "prometheus-client>=0.26.0",
     "psycopg[binary]>=3.3.8",
     "pydantic-settings>=2.16.2",
@@ -80,7 +81,7 @@ markers = ["integration: necessite PostgreSQL (make test-all)"]
 # Les dependances ne vont que dans un sens : modules -> Core -> infrastructure.
 [tool.importlinter]
 root_packages = ["lorakus", "lorakus_modules"]
-include_external_packages = false
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Le Core n'importe jamais un module"
@@ -94,10 +95,22 @@ type = "independence"
 modules = ["lorakus_modules.*"]
 
 [[tool.importlinter.contracts]]
-name = "Couches du Core : api, cli -> core -> infrastructure -> reglages"
+name = "Les modules ne touchent ni a Procrastinate ni au relais d'evenements (ADR 0004)"
+type = "forbidden"
+source_modules = ["lorakus_modules"]
+forbidden_modules = ["procrastinate", "lorakus.core.jobs.procrastinate_queue", "lorakus.core.events.relay"]
+
+[[tool.importlinter.contracts]]
+name = "Seul l'adaptateur du Core importe Procrastinate"
+type = "forbidden"
+source_modules = ["lorakus.api", "lorakus.cli", "lorakus.core.events", "lorakus.core.identity", "lorakus.core.modules", "lorakus.db"]
+forbidden_modules = ["procrastinate"]
+
+[[tool.importlinter.contracts]]
+name = "Couches du Core : api, cli, worker -> core -> infrastructure -> reglages"
 type = "layers"
 layers = [
-    "lorakus.api | lorakus.cli",
+    "lorakus.api | lorakus.cli | lorakus.worker",
     "lorakus.core",
     "lorakus.db | lorakus.observability",
     "lorakus.settings",

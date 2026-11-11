@@ -76,7 +76,7 @@ fi
 
 # --- Isolation par utilisateur (RLS), ADR 0008 et PR 23 ---
 unprotected=$(psql_as "${APP[@]}" "select coalesce(string_agg(relname, ' '), '') from pg_class
-  where relnamespace = 'lorakus'::regnamespace and relkind = 'r' and relname <> 'alembic_version'
+  where relnamespace = 'lorakus'::regnamespace and relkind = 'r' and relname <> 'alembic_version' and relname not like 'procrastinate\\_%'
   and not (relrowsecurity and relforcerowsecurity)")
 [ -z "$unprotected" ] \
   && ok "RLS activee et forcee sur toutes les tables" \
