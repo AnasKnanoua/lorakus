@@ -3,7 +3,7 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : v0.1.0 (2026-11-11)
-- **Phase** : P2 — Core platform (en cours depuis le 2026-11-11)
+- **Phase** : P2 terminée le 2026-11-12 (v0.2.0) ; prochaine : P3 — Majordome, IA et mémoire (premier usage visible : discuter avec Lorakus)
 - **Dernière mise à jour** : 2026-11-11
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
@@ -31,7 +31,8 @@
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 - Découpage en PR 22 à 29 et critères de fin validés le 2026-11-11 (`ROADMAP.md`, P2).
 
-- PR 29 — Événements et jobs : outbox avec livraison au moins une fois (handlers non rejoués), port `JobQueue` avec Procrastinate (seul l'adaptateur l'importe), service `worker` (limite 256 Mo, test de santé par battement de cœur), 5 alertes et un runbook.
+- PR 30 — Outils et spécialistes (PR 30 et 31 regroupées, décision du 2026-11-12) : `ToolSpec` (read, write, sensitive), `ToolRuntime` (validation, confirmation à usage unique de 10 minutes, ré-authentification pour une action sensible, audit), `SpecialistProfile` et contrat `SpecialistRequest`/`SpecialistReport` (ADR 0026), service `agents` avec délai et trace `core_agent_runs` en ajout seul ; trois spécialistes factices en test ; limite mémoire de Grafana portée à 384 Mo (247 Mo mesurés sur 256).
+- PR 29 (déployée) — Événements et jobs : outbox avec livraison au moins une fois (handlers non rejoués), port `JobQueue` avec Procrastinate (seul l'adaptateur l'importe), service `worker` (limite 256 Mo, test de santé par battement de cœur), 5 alertes et un runbook.
 - Correctif (PR 28, déployé) : la clé de chiffrement allait au service `postgres` au lieu de `api` ; le staging a refusé les PR 25 et 26 (production restée sur la PR 24, sans dommage). Garde-fou sur la répartition des secrets, journaux de la version refusée affichés par `deploy.sh`.
 - PR 26 (fusionnée sous le n°27) — Système de modules : manifeste validé, registre (découverte par entry points, compatibilité, dépendances), activation et configuration par utilisateur, routes des modules protégées, santé, gabarit et `make new-module`, garde-fou RLS générique.
 - PR 25 (fusionnée ; déployée avec le correctif) — Double authentification, clés d'API, audit : TOTP chiffré et anti-rejeu, codes de secours, ré-authentification pour les actions sensibles, clés d'API à portée et expiration, journal d'audit en ajout seul, commande `recover-second-factor` ; `deploy.sh` ajoute seul les nouveaux secrets internes (`init-env.sh --generated-only`).
@@ -51,6 +52,9 @@
 
 ## Décisions prises récemment
 
+- 2026-11-12 — Mémoire mesurée sur `lorakus-prod` avec le worker : 1,7 Go utilisés sur 5,6 Go, worker 64 Mo (limite 256), Grafana 247 Mo (limite portée de 256 à 384).
+- 2026-11-12 — PR 30 et 31 regroupées pour clore la P2 plus vite ; la P3 commence par l'écran de conversation.
+
 - 2026-11-11 — P2 : pas d'inscription publique (propriétaire créé par une commande sur le serveur), pas d'interface (API et tests seulement) ; critères de sécurité par PR dans `ROADMAP.md`.
 - 2026-11-11 — `release-please` lancé depuis le poste avec le compte `gh` (aucun jeton d'écriture en CI) ; version lue dans `backend/lorakus/__init__.py` pour que `uv.lock` ne change pas à chaque version.
 - 2026-11-11 — P1 close, v0.1.0 ; vérifié : staging réel vert (restauration PostgreSQL 18 comprise), sentinelle en 8 minutes.
@@ -69,7 +73,6 @@
 
 | Hypothèse | Avant |
 | --- | --- |
-| Marge mémoire de `lorakus-prod` avec le `worker` (limite 256 Mo ; 86 Mo mesurés hors conteneur, sur x86) | Premier déploiement de la PR 29 (`docker stats`) |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |

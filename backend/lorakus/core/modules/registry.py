@@ -45,6 +45,7 @@ class ModuleRegistry:
                 raise ModuleRegistryError(
                     f"module '{manifest.id}' depend de module(s) absent(s) : {', '.join(missing)}"
                 )
+        _check_tools_and_specialists(by_id)
         self._ordered = _topological_order(by_id)
         self._by_id = by_id
 
@@ -98,3 +99,28 @@ def _topological_order(by_id: dict[str, ModuleManifest]) -> list[ModuleManifest]
     for module_id in sorted(by_id):
         visit(module_id, [])
     return ordered
+
+
+def _check_tools_and_specialists(by_id: dict[str, ModuleManifest]) -> None:
+    # Imports locaux : outils et specialistes s'appuient sur le manifeste (pas de cycle).
+    from lorakus.core.agents.contract import SpecialistProfile
+    from lorakus.core.tools.spec import ToolSpec
+
+    intents: dict[str, str] = {}
+    for manifest in by_id.values():
+        for tool in manifest.tools:
+            if not isinstance(tool, ToolSpec):
+                raise ModuleRegistryError(
+                    f"module '{manifest.id}' : outil qui n'est pas un ToolSpec"
+                )
+        spec = manifest.specialist
+        if spec is None:
+            continue
+        if not isinstance(spec, SpecialistProfile):
+            raise ModuleRegistryError(f"module '{manifest.id}' : specialiste invalide")
+        for intent in spec.intents:
+            if intent in intents:
+                raise ModuleRegistryError(
+                    f"intention '{intent}' revendiquee par '{intents[intent]}' et '{manifest.id}'"
+                )
+            intents[intent] = manifest.id

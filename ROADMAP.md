@@ -57,7 +57,7 @@ Scénarios d'acceptation :
 - **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (fait, 8 min) ; le staging a validé un déploiement réel (fait). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
 - **Risque** : temps passé sur l'outillage.
 
-### P2 — Core platform + registre des spécialistes (3 semaines)
+### P2 — Core platform + registre des spécialistes (3 semaines) — terminée le 2026-11-12 (v0.2.0)
 
 - **Composants** : identité, sessions, TOTP, rôles, RLS, API keys ; registre de modules, manifeste, config ; événements (outbox) ; `JobQueue` ; Tool Runtime ; audit ; **`SpecialistProfile`, registre `agents`, modèles `SpecialistRequest` / `SpecialistReport` (avec un champ optionnel « information manquante », utilisé à partir de la P4), table `core_agent_runs`**.
 - **Tests** : isolation RLS à deux utilisateurs ; contrat de manifeste et de profil ; un profil invalide empêche le démarrage ; import-linter.
@@ -70,9 +70,9 @@ Scénarios d'acceptation :
   - **PR 25 — TOTP, clés d'API, audit** : secrets TOTP chiffrés en base (clé dans le `.env` du serveur) ; codes de secours hachés et à usage unique ; code TOTP non rejouable dans sa fenêtre ; clés d'API affichées une seule fois, stockées hachées, avec préfixe visible, portée et expiration ; journal d'audit en ajout seul (`UPDATE` et `DELETE` retirés à `lorakus_app`), vérifié par `make db-check`.
   - **PR 26 — Système de modules** : manifeste, découverte, dépendances, activation par utilisateur, configuration, `make new-module`.
   - **PR 27 — Événements et jobs** : outbox, port `JobQueue` (Procrastinate), service `worker` ; marge mémoire de `lorakus-prod` mesurée avec le `worker`, limite mémoire et alerte comme pour l'API.
-  - **PR 28 — Outils** : `@tool`, niveaux de risque, confirmation, audit.
-  - **PR 29 — Spécialistes** : profils, registre, contrat, `core_agent_runs`, deux spécialistes factices.
-  - **PR 30 — Clôture** : v0.2.0 par `make release-pr VERSION=0.2.0`.
+  - **PR 30 — Outils** (regroupée avec les spécialistes) : `@tool`, niveaux de risque, confirmation, audit.
+  - **PR 30 — Spécialistes** : profils, registre, contrat, `core_agent_runs`, deux spécialistes factices.
+  - **Clôture** : v0.2.0 par `make release-pr VERSION=0.2.0`.
 
 ### P3 — Majordome, IA et mémoire (4,5 semaines)
 
@@ -132,6 +132,7 @@ Usage réel, ZAP baseline, exercice d'incident, relecture des runbooks (créés 
 - **Offre commerciale modulaire** : formules regroupant des modules au choix (par exemple Strava sans les échecs), définies à partir de sondages auprès d'utilisateurs potentiels. Déjà compatible avec l'activation des modules par utilisateur (phase 2) ; ajouter des « droits » par formule le moment venu.
 - **Authentification et facturation au moment de vendre** : réévaluer Clerk pour l'authentification ; Stripe pour la facturation (25 $ de crédit étudiant) ; Testmail pour tester l'envoi d'e-mails si Lorakus en envoie un jour.
 - **Heures de prière** : calcul local déterministe (ou Mawaqit si un accès autorisé existe), créneaux ajoutés à l'agenda, situation « heure de prière et réseaux sociaux » traitée par un pacte volontaire (notification plein écran, Ne pas déranger, blocage par l'extension sur PC). Fermer une application Android de force exigerait le service d'accessibilité, écarté par l'ADR 0016. Donnée religieuse, donc catégorie sensible du RGPD : module désactivé par défaut, classé `sensitive`, jamais transmis à un LLM, consentement explicite en cas de vente.
+- **Contrôle du téléphone** (proposé le 2026-11-12, usage personnel seulement) : ouvrir ou fermer une application, naviguer, lire l'écran, via le service d'accessibilité d'Android dans l'application compagnon (LORAKUS Sensors). Chaque action passe par un outil `sensitive` (confirmation, ré-authentification, audit) et jamais depuis un contenu externe (injection de prompt). Hors de toute offre commerciale : Google Play restreint fortement cet usage.
 - **Aide à l'apprentissage** (proposé le 2026-11-10) : révision orale d'un cours en répétition espacée (« Anas, c'est quoi un réseau de neurones ? »), lancée environ une semaine avant un quiz ou un examen. S'appuie sur l'Archiviste (cartes de révision, P9), le module académique (échéances, P4) et la voix (P16).
 - **Mémorisation de sourates** (usage personnel, jamais vendu) : texte découpé en parties, proposées sur les créneaux libres de l'agenda. Même moteur de répétition espacée ; même régime que les heures de prière (module désactivé par défaut, `sensitive`, jamais transmis à un LLM).
 - **Emploi du temps** : déjà lu par lien ICS en lecture seule (ADR 0020, Google Agenda en fournit un) ; un accès complet à Google Agenda reste à étudier.
