@@ -200,11 +200,13 @@ cmd_apply() {
     fail "telechargement des images impossible (rien n'a ete modifie)"
   fi
 
-  # Avant de toucher a la base : une sauvegarde, faite avec la version en service.
+  # Avant de toucher a la base : une sauvegarde, faite avec l'image de sauvegarde de la
+  # NOUVELLE version. Celle en service peut etre plus ancienne que le schema (apres un
+  # retour arriere) et ne plus savoir le lire : ex. pg_dump sans --enable-row-security.
   # Elle n'a pas lieu au premier deploiement (la base n'existe pas encore).
   if [ "$mode" = "deploy" ] && [ -f "$RELEASE" ] && [ "${LORAKUS_DEPLOY_SKIP_BACKUP:-}" != "1" ]; then
     say "Sauvegarde avant migration"
-    if ! compose "$RELEASE" run --rm -T backup </dev/null; then
+    if ! compose "$NEXT" run --rm -T backup </dev/null; then
       rm -f "$NEXT"
       fail "sauvegarde impossible : deploiement annule (rien n'a ete modifie)"
     fi

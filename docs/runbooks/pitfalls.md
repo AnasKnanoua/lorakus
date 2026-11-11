@@ -20,7 +20,7 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** : `pg_dump: error: query would be affected by row-level security policy for table …`, sauvegarde en échec.
 - **Cause** : `pg_dump` désactive la RLS par défaut et s'arrête si elle s'appliquerait quand même. Avec `FORCE ROW LEVEL SECURITY`, elle s'applique aussi au propriétaire des tables.
 - **Correction** : `pg_dump --enable-row-security` (déjà dans `infra/backup/lorakus-backup.sh`). La politique de `lorakus_migrator` lui laisse tout lire : la sauvegarde est complète. Trouvé en test avant la mise en production de la PR 23.
-- **Attention au retour arrière** : revenir à une version antérieure à la PR 23 garde le schéma (RLS forcée) mais remet l'ancienne image de sauvegarde, sans l'option : les sauvegardes échouent jusqu'au redéploiement d'une version récente.
+- **Retour arrière** : revenir à une version antérieure à la PR 23 garde le schéma (RLS forcée) mais remet l'ancienne image de sauvegarde, sans l'option : la sauvegarde quotidienne échoue jusqu'au redéploiement suivant. Le redéploiement lui-même fonctionne : depuis le 2026-11-11, la sauvegarde avant migration utilise l'image de la **nouvelle** version (trouvé par le staging, qui rejoue justement ce retour arrière).
 
 ## `docker compose run` avale l'entrée standard
 
