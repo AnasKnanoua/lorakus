@@ -48,6 +48,11 @@ Contraintes de licence (par ligne) : `no_ai` (aucun LLM ni entraînement — ex.
 | Création du propriétaire | `python -m lorakus.cli create-owner` sur le serveur ; mot de passe lu par `getpass`, jamais en argument ; un seul propriétaire |
 | Vérifications | Tests d'isolation exécutés en `lorakus_app` (`tests/isolation/`), `make db-check` (RLS forcée partout, droits des fonctions) |
 | Adresse IP | Celle de la connexion TCP ; aucun en-tête `X-Forwarded-For` n'est cru avant l'arrivée du proxy (P3) |
+| Double authentification (PR 25) | TOTP (RFC 6238, compatible avec les applications courantes) ; secret chiffré en AES-256-GCM avec une clé hors base (`LORAKUS_FIELD_ENCRYPTION_KEY`), lié à l'utilisateur ; un pas de 30 s déjà utilisé est refusé (anti-rejeu, y compris pour deux requêtes simultanées) ; 10 codes de secours de 64 bits, hachés, à usage unique ; un code faux compte comme un échec de connexion |
+| Actions sensibles | Preuve d'identité de moins de 10 minutes (connexion ou `POST /api/v1/auth/reauth`) pour activer ou désactiver la double authentification, régénérer les codes, créer ou révoquer une clé d'API |
+| Clés d'API | `lk_<8 caractères visibles>_<secret de 256 bits>` ; affichées une seule fois, empreinte SHA-256 en base, comparaison en temps constant ; portées fermées (`inbox:write`, `usage:write`, `health:write`), expiration obligatoire (365 jours au plus), révocation définitive |
+| Journal d'audit | `core_audit_events` : connexions (réussies, échouées, refusées), déconnexions, changements de mot de passe, double authentification, clés d'API. `lorakus_app` n'y écrit que par `audit_record()` et n'a ni `INSERT` direct, ni `UPDATE`, ni `DELETE`, ni `TRUNCATE` (`make db-check`) ; chacun ne lit que ses événements ; aucun secret dans les détails |
+| Secours | `python -m lorakus.cli recover-second-factor` sur le serveur : désactive la double authentification d'un compte et ferme ses sessions (téléphone et codes perdus) |
 
 ## 5. Secrets
 

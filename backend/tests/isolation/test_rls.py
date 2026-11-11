@@ -154,13 +154,16 @@ async def test_auth_functions_are_narrow_security_definers(database: Database) -
                 text(
                     "SELECT proname, prosecdef, pg_get_userbyid(proowner), proconfig, "
                     "has_function_privilege('public', oid, 'EXECUTE') FROM pg_proc "
-                    "WHERE pronamespace = 'lorakus'::regnamespace AND proname LIKE 'auth_%' "
+                    "WHERE pronamespace = 'lorakus'::regnamespace "
+                    "AND (proname LIKE 'auth\\_%' OR proname LIKE 'audit\\_%') "
                     "ORDER BY proname"
                 )
             )
         ).all()
     assert [r[0] for r in rows] == [
+        "audit_record",
         "auth_failures",
+        "auth_find_api_key",
         "auth_find_login",
         "auth_find_session",
         "auth_owner_exists",

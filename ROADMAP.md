@@ -66,12 +66,13 @@ Scénarios d'acceptation :
 - **Découpage et critères de fin (validés le 2026-11-11)** :
   - **PR 22 — Squelette du Core, versions** : `release-please` ; `lorakus/core/` ; import-linter : le Core (`lorakus`) n'importe jamais `lorakus_modules`, les modules sont indépendants entre eux, couches `api → core → db | observability → settings`.
   - **PR 23 — Identité et RLS** : utilisateur courant positionné par `set_config(…, true)` (portée transaction) au début de chaque transaction, jamais par un `SET` de session ; `FORCE ROW LEVEL SECURITY` sur chaque table ; tests d'isolation exécutés en `lorakus_app`, jamais en superutilisateur ; jeton de session haché en base ; cookie `__Host-` avec `HttpOnly`, `Secure`, `SameSite=Strict` ; expiration par inactivité et durée maximale ; toutes les sessions révoquées au changement de mot de passe ; même message d'erreur et même temps de réponse que le compte existe ou non ; limitation des tentatives par compte et par IP, stockée dans PostgreSQL ; Argon2id au moins aux paramètres OWASP, re-hachage automatique à la connexion si les paramètres sont durcis ; création du propriétaire avec mot de passe lu par `getpass`, jamais en argument.
-  - **PR 24 — TOTP, clés d'API, audit** : secrets TOTP chiffrés en base (clé dans le `.env` du serveur) ; codes de secours hachés et à usage unique ; code TOTP non rejouable dans sa fenêtre ; clés d'API affichées une seule fois, stockées hachées, avec préfixe visible, portée et expiration ; journal d'audit en ajout seul (`UPDATE` et `DELETE` retirés à `lorakus_app`), vérifié par `make db-check`.
-  - **PR 25 — Système de modules** : manifeste, découverte, dépendances, activation par utilisateur, configuration, `make new-module`.
-  - **PR 26 — Événements et jobs** : outbox, port `JobQueue` (Procrastinate), service `worker` ; marge mémoire de `lorakus-prod` mesurée avec le `worker`, limite mémoire et alerte comme pour l'API.
-  - **PR 27 — Outils** : `@tool`, niveaux de risque, confirmation, audit.
-  - **PR 28 — Spécialistes** : profils, registre, contrat, `core_agent_runs`, deux spécialistes factices.
-  - **PR 29 — Clôture** : v0.2.0 par `make release-pr VERSION=0.2.0`.
+  - **PR 24 — Correctif** (ajouté) : sauvegarde avant migration avec l'image de la nouvelle version.
+  - **PR 25 — TOTP, clés d'API, audit** : secrets TOTP chiffrés en base (clé dans le `.env` du serveur) ; codes de secours hachés et à usage unique ; code TOTP non rejouable dans sa fenêtre ; clés d'API affichées une seule fois, stockées hachées, avec préfixe visible, portée et expiration ; journal d'audit en ajout seul (`UPDATE` et `DELETE` retirés à `lorakus_app`), vérifié par `make db-check`.
+  - **PR 26 — Système de modules** : manifeste, découverte, dépendances, activation par utilisateur, configuration, `make new-module`.
+  - **PR 27 — Événements et jobs** : outbox, port `JobQueue` (Procrastinate), service `worker` ; marge mémoire de `lorakus-prod` mesurée avec le `worker`, limite mémoire et alerte comme pour l'API.
+  - **PR 28 — Outils** : `@tool`, niveaux de risque, confirmation, audit.
+  - **PR 29 — Spécialistes** : profils, registre, contrat, `core_agent_runs`, deux spécialistes factices.
+  - **PR 30 — Clôture** : v0.2.0 par `make release-pr VERSION=0.2.0`.
 
 ### P3 — Majordome, IA et mémoire (4,5 semaines)
 

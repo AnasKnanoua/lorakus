@@ -192,6 +192,11 @@ cmd_apply() {
   [ "${LORAKUS_DEPLOY_LOCKED:-}" = "1" ] || fail "apply est une etape interne : utiliser deploy ou rollback"
   [ "$mode" = "deploy" ] || [ "$mode" = "rollback" ] || fail "mode inconnu : $mode"
 
+  # Nouveaux secrets internes de cette version, avant tout demarrage. Lance depuis le
+  # commit deploye : une nouvelle version apporte elle-meme ses secrets (jamais une valeur
+  # existante n'est modifiee).
+  "$APP/infra/deploy/init-env.sh" --generated-only "$ENV_FILE"
+
   write_release "$NEXT" "$commit" "$api" "$backup"
 
   say "Telechargement des images"

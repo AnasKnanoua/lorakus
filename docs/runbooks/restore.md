@@ -73,7 +73,7 @@ Les migrations ramènent le schéma restauré au niveau attendu par la version e
 
 ### Volume PostgreSQL perdu ou serveur neuf
 
-Même procédure. `dc up -d --wait postgres` recrée d'abord une base vide avec les rôles (mots de passe de `/opt/lorakus/.env`), puis l'étape 3 s'applique telle quelle. Sur un serveur neuf, suivre avant cela `DEPLOYMENT.md` §2 et §4.1.
+Même procédure. `dc up -d --wait postgres` recrée d'abord une base vide avec les rôles (mots de passe de `/opt/lorakus/.env`), puis l'étape 3 s'applique telle quelle. Sur un serveur neuf, suivre avant cela `DEPLOYMENT.md` §2 et §4.1. Remettre aussi `LORAKUS_FIELD_ENCRYPTION_KEY` (gestionnaire de mots de passe) dans `/opt/lorakus/.env` **avant** le premier déploiement : sinon une nouvelle clé est générée et les secrets de double authentification restaurés sont illisibles (`DEPLOYMENT.md` §4.3).
 
 ## Retour arrière
 
