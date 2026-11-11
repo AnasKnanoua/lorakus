@@ -35,6 +35,20 @@ Contraintes de licence (par ligne) : `no_ai` (aucun LLM ni entraînement — ex.
 - Clés API et clés d'appareil : hachées en base, affichées une fois, à portée (`inbox:write`, `usage:write`, `health:write`), révocables.
 - Rôles `owner` et `admin` ; permissions `module:action` déclarées dans les manifestes, vérifiées par l'API et le Tool Runtime.
 
+### 4.1 Mise en œuvre (PR 23, 2026-11-11)
+
+| Point | Choix |
+| --- | --- |
+| Mots de passe | Argon2id, paramètres par défaut d'argon2-cffi (temps 3, mémoire 64 Mio, parallélisme 4), au-dessus du minimum OWASP (2, 19 Mio, 1) ; re-hachage automatique à la connexion si les paramètres changent ; 12 à 1024 caractères, sans règle de composition (NIST) |
+| Sessions | Jeton aléatoire de 256 bits ; seule son empreinte SHA-256 est en base ; expiration après 7 jours sans activité et 30 jours au plus ; toutes révoquées au changement de mot de passe |
+| Cookie | `__Host-lorakus_session`, `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, sans `Domain` |
+| Connexion | Même message et même chemin (un hachage vérifié, éventuellement factice) que le compte existe ou non ; limitation dans PostgreSQL : 5 échecs par compte et 20 par adresse IP sur 15 minutes ; tentatives conservées 24 heures |
+| Isolation | Utilisateur courant posé par `set_config('lorakus.user_id', …, true)` en début de transaction (jamais de `SET` de session : le pool réutilise les connexions) ; RLS activée et **forcée** sur chaque table ; politiques explicites par rôle (`lorakus_app` : ses lignes seulement ; `lorakus_migrator`, propriétaire : tout) |
+| Avant authentification | Fonctions `auth_*` en `SECURITY DEFINER`, appartenant à `lorakus_migrator`, au `search_path` figé, fermées à `PUBLIC` ; `lorakus_app` n'a aucun accès direct aux tentatives de connexion et ne peut pas modifier le rôle d'un compte |
+| Création du propriétaire | `python -m lorakus.cli create-owner` sur le serveur ; mot de passe lu par `getpass`, jamais en argument ; un seul propriétaire |
+| Vérifications | Tests d'isolation exécutés en `lorakus_app` (`tests/isolation/`), `make db-check` (RLS forcée partout, droits des fonctions) |
+| Adresse IP | Celle de la connexion TCP ; aucun en-tête `X-Forwarded-For` n'est cru avant l'arrivée du proxy (P3) |
+
 ## 5. Secrets
 
 - **Aucun secret dans le dépôt, même chiffré** (dépôt public, ADR 0022) : les secrets d'exécution sont générés **sur le serveur** par un script, dans `/opt/lorakus/.env` (600, utilisateur `deploy`), et n'en sortent pas ; GitHub ne détient que la clé SSH de déploiement, dans l'environnement `production` soumis à approbation.

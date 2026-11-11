@@ -30,7 +30,7 @@ Le message d'erreur dit à quelle étape le déploiement s'est arrêté, et donc
 
 | Message | Cause | État de la production |
 | --- | --- | --- |
-| `Image introuvable pour le commit …` | Le workflow `Publish` a échoué ou n'est pas terminé | Inchangé |
+| `Image introuvable pour le commit …` ou `not found` dans le job `staging` | Le workflow `Publish` a échoué ou n'était pas terminé. `make deploy` l'attend désormais (`infra/deploy/wait-publish.sh`) ; le cas ne se produit plus qu'avec `gh workflow run` lancé à la main | Inchangé |
 | `denied` dans `Publish`, à la première publication d'une nouvelle image | Les jobs amd64 et arm64 créent le paquet GHCR en même temps ([pièges](pitfalls.md)) | Inchangé |
 | `Host key verification failed` | L'empreinte SSH du serveur a changé, ou la variable `DEPLOY_KNOWN_HOSTS` est fausse | Inchangé |
 | `Permission denied (publickey)` | Secret `DEPLOY_SSH_KEY` ou ligne `authorized_keys` de `deploy` modifiés | Inchangé |

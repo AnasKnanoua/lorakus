@@ -35,6 +35,7 @@ La première commande donne le nom de la dernière sauvegarde présente sur B2 (
 | `cap exceeded`, `storage cap`, `403` | Plafond du compte B2 atteint |
 | `dial tcp`, `no such host`, `timeout` | Réseau du serveur ou panne de Backblaze |
 | `pg_dump: error` | PostgreSQL arrêté ou mot de passe du rôle `lorakus_migrator` incohérent |
+| `query would be affected by row-level security` | Option `--enable-row-security` absente de `pg_dump` ([pièges](pitfalls.md)) |
 | `No space left on device` | `/tmp` du conteneur (512 Mo) trop petit pour le dump : la base a grossi |
 | Aucune ligne récente dans le journal | Minuteur désactivé ou non réinstallé (`DEPLOYMENT.md` §7.1) |
 | Le journal dit « Sauvegarde envoyee » mais l'alerte persiste | `node-exporter` arrêté ou métriques non lues : [host](host.md) |

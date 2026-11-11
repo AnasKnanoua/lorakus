@@ -53,7 +53,7 @@ Le workflow `publish.yml` construit les images API et sauvegarde sur une machine
 
 ## 4. Déploiement
 
-Le workflow `deploy.yml`, lancé à la main, rejoue d'abord le déploiement sur un staging jetable (section 4.2), puis attend l'approbation de l'environnement GitHub `production`. Il se connecte au serveur en vérifiant son empreinte SSH, avec une clé qui ne peut exécuter que `infra/deploy/deploy.sh` (option `command=` de `authorized_keys`).
+Le workflow `deploy.yml`, lancé à la main, rejoue d'abord le déploiement sur un staging jetable (section 4.3), puis attend l'approbation de l'environnement GitHub `production`. Il se connecte au serveur en vérifiant son empreinte SSH, avec une clé qui ne peut exécuter que `infra/deploy/deploy.sh` (option `command=` de `authorized_keys`).
 
 ```bash
 make deploy          # ou make rollback, make prod-status (gh workflow run deploy.yml -f action=...)
@@ -73,7 +73,17 @@ Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus
 
 Côté GitHub, environnement `production` : approbation obligatoire, branche `main` seule ; secrets `DEPLOY_SSH_KEY` et `DEPLOY_HOST` ; variable `DEPLOY_KNOWN_HOSTS` (empreinte publique du serveur, vérifiée contre `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
 
-### 4.2 Staging éphémère
+### 4.2 Compte propriétaire (une fois)
+
+Pas d'inscription publique : le compte propriétaire est créé sur le serveur, après le déploiement qui apporte l'identité. La commande demande l'adresse puis le mot de passe deux fois, sans l'afficher.
+
+```bash
+ssh -t lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh compose run --rm --no-deps api python -m lorakus.cli create-owner'
+```
+
+Un second appel est refusé : il n'y a qu'un propriétaire.
+
+### 4.3 Staging éphémère
 
 Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la production) installe la version en production, y écrit une donnée témoin, déploie la nouvelle version par-dessus avec le vrai `deploy.sh`, essaie le retour arrière, redéploie, lance une sauvegarde et une alerte de test, puis restaure la dernière sauvegarde en suivant le [runbook](docs/runbooks/restore.md) et vérifie la donnée témoin. S'il échoue, la production n'est pas touchée.
 
@@ -81,7 +91,7 @@ Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la p
 - B2 est remplacé par un dossier local grâce à `compose.host.yml` (copie de `infra/staging/compose.staging.yml`). Ce fichier n'existe pas en production.
 - Urgence absolue seulement : `make deploy-skip-staging`, à consigner dans une note d'incident.
 
-### 4.3 Sentinelle externe (une fois)
+### 4.4 Sentinelle externe (une fois)
 
 1. Sur healthchecks.io : une vérification `lorakus-prod`, période 2 minutes, tolérance 5 minutes ; intégration Discord vers `#lorakus-infra`.
 2. Sur le serveur, en tant que `deploy` : `/opt/lorakus/app/infra/deploy/init-env.sh` demande l'adresse de ping (`HEALTHCHECKS_PING_URL`), puis `make deploy` depuis le Dell (ou `deploy.sh compose up -d --force-recreate alertmanager`).

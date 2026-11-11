@@ -74,6 +74,33 @@ else
   ok "lorakus_app ne peut pas modifier la version du schema"
 fi
 
+# --- Isolation par utilisateur (RLS), ADR 0008 et PR 23 ---
+unprotected=$(psql_as "${APP[@]}" "select coalesce(string_agg(relname, ' '), '') from pg_class
+  where relnamespace = 'lorakus'::regnamespace and relkind = 'r' and relname <> 'alembic_version'
+  and not (relrowsecurity and relforcerowsecurity)")
+[ -z "$unprotected" ] \
+  && ok "RLS activee et forcee sur toutes les tables" \
+  || ko "RLS activee et forcee sur toutes les tables (manque : $unprotected)"
+
+[ "$(psql_as "${APP[@]}" "select count(*) from core_users")" = "0" ] \
+  && ok "sans utilisateur courant, lorakus_app ne voit aucun compte" \
+  || ko "sans utilisateur courant, lorakus_app ne voit aucun compte"
+
+if psql_as "${APP[@]}" "select 1 from core_login_attempts limit 1" >/dev/null 2>&1; then
+  ko "lorakus_app ne lit pas les tentatives de connexion"
+else
+  ok "lorakus_app ne lit pas les tentatives de connexion"
+fi
+
+[ "$(psql_as "${APP[@]}" "select has_column_privilege('core_users', 'role', 'UPDATE')")" = "f" ] \
+  && ok "lorakus_app ne peut pas modifier le role d'un compte" \
+  || ko "lorakus_app ne peut pas modifier le role d'un compte"
+
+[ "$(psql_as "${APP[@]}" "select count(*) from pg_proc where pronamespace = 'lorakus'::regnamespace
+  and proname like 'auth_%' and (not prosecdef or proconfig is null
+  or has_function_privilege('public', oid, 'EXECUTE'))")" = "0" ] \
+  && ok "fonctions auth_* : SECURITY DEFINER, search_path fige, fermees a PUBLIC" \
+  || ko "fonctions auth_* : SECURITY DEFINER, search_path fige, fermees a PUBLIC"
 
 echo "Resultat : $passed reussi(s), $failed echec(s)"
 [ "$failed" -eq 0 ]
