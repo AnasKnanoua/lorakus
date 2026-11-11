@@ -187,3 +187,27 @@ def test_no_session_level_set_in_code() -> None:
         str(path) for path in root.rglob("*.py") if pattern.search(path.read_text("utf-8"))
     ]
     assert offenders == []
+
+
+async def test_every_table_with_user_id_is_filtered_by_the_current_user(
+    database: Database,
+) -> None:
+    """Garde-fou generique, valable pour les tables de tous les modules a venir."""
+    async with database.transaction() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT c.table_name, "
+                    "  bool_or(p.qual LIKE '%user_id = lorakus.current_user_id()%' "
+                    "          OR p.qual LIKE '%user_id = current_user_id()%') "
+                    "FROM information_schema.columns c "
+                    "LEFT JOIN pg_policies p ON p.schemaname = c.table_schema "
+                    "  AND p.tablename = c.table_name AND 'lorakus_app' = ANY (p.roles) "
+                    "WHERE c.table_schema = 'lorakus' AND c.column_name = 'user_id' "
+                    "GROUP BY c.table_name ORDER BY c.table_name"
+                )
+            )
+        ).all()
+    assert rows
+    unfiltered = [table for table, filtered in rows if not filtered]
+    assert unfiltered == []
