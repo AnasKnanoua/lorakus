@@ -2,6 +2,24 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement : [SemVer](https://semver.org/lang/fr/). Depuis la v0.1.0, les nouvelles versions sont écrites par `release-please` à partir des titres de PR (Conventional Commits) : `make release-pr` puis `make release` (`DEVELOPMENT.md`). Les entrées antérieures ont été tenues à la main.
 
+## [0.2.0](https://github.com/AnasKnanoua/lorakus/compare/v0.1.0...v0.2.0) (2026-11-11)
+
+
+### Ajouté
+
+* **core:** core skeleton, architecture contracts and release-please ([#22](https://github.com/AnasKnanoua/lorakus/issues/22)) ([18deed2](https://github.com/AnasKnanoua/lorakus/commit/18deed2cc99c625deee8de71777e945ca170c8cb))
+* **core:** events outbox, job queue and worker ([#29](https://github.com/AnasKnanoua/lorakus/issues/29)) ([4088c60](https://github.com/AnasKnanoua/lorakus/commit/4088c60f1b2a86f1888f0077cc0424b7db7c07ab))
+* **core:** identity, sessions and row level security ([#23](https://github.com/AnasKnanoua/lorakus/issues/23)) ([5bc93d7](https://github.com/AnasKnanoua/lorakus/commit/5bc93d7cc043128372b0813baa7f9569149ac3f2))
+* **core:** module system ([#27](https://github.com/AnasKnanoua/lorakus/issues/27)) ([f5cdf4a](https://github.com/AnasKnanoua/lorakus/commit/f5cdf4ac44315f04eaaf09dfd725ccb6bb7a7de7))
+* **core:** second factor, api keys and audit log ([#25](https://github.com/AnasKnanoua/lorakus/issues/25)) ([b0cb705](https://github.com/AnasKnanoua/lorakus/commit/b0cb7059e8015c1017a61361feedd721750c4ce1))
+* **core:** tools and specialists, close phase 2 ([#30](https://github.com/AnasKnanoua/lorakus/issues/30)) ([ca9e3c9](https://github.com/AnasKnanoua/lorakus/commit/ca9e3c9e8bca2220a1ae879b7fb354bccd7372c8))
+
+
+### Corrigé
+
+* **ops:** give the field encryption key to the api service ([#28](https://github.com/AnasKnanoua/lorakus/issues/28)) ([461d032](https://github.com/AnasKnanoua/lorakus/commit/461d032335590aac286f03fd25e0ebe6cb8b6ae2))
+* **ops:** take the pre-migration backup with the new release image ([#24](https://github.com/AnasKnanoua/lorakus/issues/24)) ([a0b7ea7](https://github.com/AnasKnanoua/lorakus/commit/a0b7ea77387c29ba1b3fc70509f7abcbfff4a12f))
+
 ## [0.1.0] — 2026-11-11
 
 Fin de la phase 1 : fondations techniques en production.
