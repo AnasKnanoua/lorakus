@@ -45,7 +45,21 @@ lorakus/
 | `make evals` | Evals Promptfoo sur `FakeProvider` |
 | `make new-module NAME=...` | Crée un module depuis le gabarit |
 
-## 4. Git et revue
+## 4. Circuit d'une modification
+
+Une modification fait toujours le même trajet : **Dell → PR → `main` → serveur**. Fusionner ne touche pas au serveur ; seul le déploiement le fait, et il attend ton approbation.
+
+| Étape | Commande | Ce qui se passe |
+| --- | --- | --- |
+| 1. Proposer | `make pr PATCH=~/Téléchargements/x.patch BRANCH=feat/x TITLE="feat(core): ..."` | Branche à jour de `main`, patch appliqué, commit, PR ouverte, vérifications suivies jusqu'au bout |
+| 2. Fusionner | `make merge` (quand tout est vert) | Squash dans `main`, retour sur `main` à jour |
+| 3. Déployer | `make deploy` (si la PR change ce qui tourne sur le serveur) | Staging jetable, puis la page d'approbation s'ouvre : « Review deployments » → « Approve » |
+| Annuler | `make rollback` | Version précédente remise en service |
+| Vérifier | `make prod-status` | Version en service et précédente |
+
+Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
+
+## 5. Git et revue
 
 - Trunk-based : branches courtes `feat/…`, `fix/…`, `chore/…`, `docs/…` ; protection de `main` (CI verte obligatoire, pas de push direct).
 - Pull request obligatoire, même seul : la CI est le relecteur ; squash merge.
@@ -54,14 +68,14 @@ lorakus/
 - `release-please` génère le CHANGELOG, le numéro de version et les tags à partir de l'historique de `main`.
 - Template de PR : tests, migration, documentation du module, `PROJECT_STATE.md`, impact sécurité (nouvel outil IA ? nouvelle donnée sensible ? nouvelle dépendance justifiée ?).
 
-## 5. Standards de code
+## 6. Standards de code
 
 - Python : Ruff (lint + format), pyright en mode strict sur `lorakus/` et `lorakus_modules/`, docstrings sur les ports et cas d'usage.
 - Pas de logique métier dans les routes ; pas d'accès base hors `infrastructure`.
 - Frontend : TypeScript strict, ESLint, client API généré depuis l'OpenAPI, aucun appel `fetch` écrit à la main vers l'API.
 - Dépendances : toute nouvelle dépendance est justifiée dans la PR ; une dépendance sans release depuis 12 mois déclenche une revue.
 
-## 6. Tests
+## 7. Tests
 
 | Niveau | Outil | Cible |
 | --- | --- | --- |
@@ -74,7 +88,7 @@ lorakus/
 | E2E | Playwright | Scénarios d'acceptation du MVP |
 | Frontend | Vitest, axe-core | Composants et accessibilité |
 
-## 7. Migrations
+## 8. Migrations
 
 1. Modifier les modèles SQLAlchemy du module.
 2. `make migration MODULE=<module> MSG="ajoute colonne x"` puis relire le fichier généré.
@@ -82,10 +96,10 @@ lorakus/
 4. Écrire le `downgrade` ; marquer `irreversible = True` si impossible.
 5. La CI rejoue `upgrade heads`, `downgrade -1`, `upgrade heads`, puis `alembic check`.
 
-## 8. Définition de « terminé »
+## 9. Définition de « terminé »
 
 Une fonctionnalité est terminée quand : le code est fusionné, les tests passent en CI, la migration est rejouable, la documentation du module est à jour, l'observabilité couvre le nouveau chemin (logs, métrique, span), et `PROJECT_STATE.md` reflète le nouvel état.
 
-## 9. Reprendre après une pause
+## 10. Reprendre après une pause
 
 Lire `PROJECT_STATE.md`, puis `DECISIONS.md` (décisions récentes), puis la phase en cours dans `ROADMAP.md`. Dans une conversation avec Claude, coller `PROJECT_STATE.md` en premier message.

@@ -1,0 +1,10 @@
+# Surcharges du staging ephemere (CI), copiees par staging-test.sh dans compose.host.yml.
+# Jamais utilisees en production : aucun fichier compose.host.yml n'y existe.
+services:
+  # Les sauvegardes vont dans un dossier du runner au lieu de Backblaze B2 :
+  # rclone garde le nom de remote "b2" mais utilise le stockage local.
+  backup:
+    environment:
+      RCLONE_CONFIG_B2_TYPE: local
+    volumes:
+      - ${STAGING_FAKE_B2_DIR:?STAGING_FAKE_B2_DIR manquant}:/fake-b2

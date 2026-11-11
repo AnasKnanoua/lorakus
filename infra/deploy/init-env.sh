@@ -89,6 +89,7 @@ asked B2_KEY_ID "Identifiant de la cle B2 (keyID)" '^[A-Za-z0-9]+$' visible
 asked B2_APP_KEY "Cle d'application B2 (applicationKey)" '^[A-Za-z0-9/+_-]+$' secret
 asked B2_BUCKET "Nom du bucket B2" '^[a-z0-9][a-z0-9-]+$' visible
 asked BACKUP_AGE_RECIPIENT "Cle PUBLIQUE age (commence par age1)" '^age1[a-z0-9]+$' visible
+asked HEALTHCHECKS_PING_URL "Adresse de ping healthchecks.io (sentinelle externe)" '^https://hc-ping\.com/[0-9a-f-]{36}$' secret
 
 chmod 600 "$ENV_FILE"
 echo "Termine. Aucun secret n'a ete affiche."

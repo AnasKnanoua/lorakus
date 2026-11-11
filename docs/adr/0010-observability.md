@@ -25,3 +25,5 @@ Amendement du 2026-11-08 (déploiement par paliers, pour limiter la maintenance)
 
 
 Précision du 2026-11-08 (PR n°9) : en P1, les métriques utilisent la bibliothèque officielle `prometheus-client` (format Prometheus natif, bien typée), exposées sur un port séparé (9464) jamais publié. OpenTelemetry est introduit en P3 pour les traces ; un pont vers OpenTelemetry pour les métriques reste possible sans changer les noms des métriques.
+
+Décision du 2026-11-11 : Loki est reporté en P3, avec Tempo. En P1, un seul hôte, des journaux JSON bornés (`docker compose logs`) et aucun besoin de recherche croisée : Loki ajouterait un service à maintenir sans usage. Il devient utile quand les traces de l'orchestrateur (P3) devront être reliées aux journaux.

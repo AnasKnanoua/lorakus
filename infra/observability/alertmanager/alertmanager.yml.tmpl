@@ -1,5 +1,5 @@
-# Modele de configuration Alertmanager. Le marqueur __..__ est remplace au
-# demarrage du conteneur par la valeur de .env : aucun secret dans le depot.
+# Modele de configuration Alertmanager. Les marqueurs __..__ sont remplaces au
+# demarrage du conteneur par les valeurs de .env : aucun secret dans le depot.
 # Canal d'EXPLOITATION uniquement (ADR 0035) : jamais de notification produit ici.
 route:
   receiver: discord-ops
@@ -7,6 +7,16 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
+  routes:
+    # Signal de vie (ADR 0037) : en production, vers la sentinelle externe chaque minute.
+    - matchers: ['alertname="LorakusWatchdog"', 'environment="production"']
+      receiver: sentinel
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+    # Ailleurs (developpement, staging), il n'est envoye nulle part.
+    - matchers: ['alertname="LorakusWatchdog"']
+      receiver: blackhole
 
 receivers:
   - name: discord-ops
@@ -15,6 +25,13 @@ receivers:
         send_resolved: true
         title: '{{ template "lorakus.title" . }}'
         message: '{{ template "lorakus.message" . }}'
+
+  - name: sentinel
+    webhook_configs:
+      - url: "__HEALTHCHECKS_PING_URL__"
+        send_resolved: false
+
+  - name: blackhole
 
 templates:
   - /etc/alertmanager/templates/*.tmpl

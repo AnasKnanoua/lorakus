@@ -5,6 +5,10 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement
 ## [Non publié]
 
 ### Ajouté
+- 2026-11-11 — Staging éphémère (ADR 0037) : job `staging` de `deploy.yml` sur runner ARM, `infra/staging/staging-test.sh` (mise à jour depuis la version en production, retour arrière, sauvegarde, alerte de test, restauration vérifiée par une donnée témoin) ; un échec bloque la production. `infra/deploy/resolve-images.sh` partagé entre staging et production ; `deploy.sh compose` et fichier facultatif `compose.host.yml`.
+- 2026-11-11 — Sentinelle externe : règle `LorakusWatchdog` toujours active, envoyée à healthchecks.io en production seulement ; `LorakusHeartbeatFailing` si l'envoi échoue ; runbook « production disparue » ; `HEALTHCHECKS_PING_URL` demandée par `init-env.sh`.
+- 2026-11-11 — `make pr`, `make merge`, `make deploy`, `make rollback`, `make prod-status` ; circuit d'une modification dans `DEVELOPMENT.md`.
+- 2026-11-11 — Idées : aide à l'apprentissage, mémorisation de sourates, emploi du temps, personnalité « professeur ».
 - 2026-11-10 — Runbooks dans `docs/runbooks/` : API injoignable ou dégradée, sauvegarde en échec, disque plein, mémoire et métriques du serveur, déploiement en échec, restauration en production, pièges déjà rencontrés. Annotation `runbook_url` sur les 11 règles d'alerte, affichée dans le message Discord ; `make obs-check` refuse une règle sans runbook.
 - 2026-11-10 — `deploy.sh alert-test` : alerte de test sur le serveur, avec l'environnement dans le titre.
 - 2026-11-10 — Essais en production : retour arrière en 10 secondes, redéploiement en 26 secondes, alerte Discord 2 min 21 s après l'arrêt de l'API. Minuteur `lorakus-backup.timer` installé sur `lorakus-prod`.

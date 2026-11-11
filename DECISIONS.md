@@ -41,7 +41,8 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0033](docs/adr/0033-knowledge-graph-fsrs.md) | Archiviste : graphe PostgreSQL et FSRS | Accepté | Phase 16 |
 | [0034](docs/adr/0034-python-only-backend.md) | Python seul côté serveur, Rust seulement sur mesure | Accepté | Si un profilage montre un goulot CPU |
 | [0035](docs/adr/0035-notification-channels.md) | Canaux de notification : exploitation sur Discord, produit sur Telegram | Accepté | Ouverture à d'autres utilisateurs |
-| [0036](docs/adr/0036-environments.md) | Environnements : production sur Oracle, staging et sentinelle sur Azure (amende 0009) | Validé (2026-11-09) | Expiration du crédit Azure |
+| [0036](docs/adr/0036-environments.md) | Environnements : production sur Oracle (amende 0009) ; staging et sentinelle remplacés par 0037 | Validé (2026-11-09), amendé par 0037 | Changement d'hébergeur |
+| [0037](docs/adr/0037-ci-staging-external-sentinel.md) | Staging éphémère dans la CI, sentinelle externe par signal de vie (healthchecks.io) | Validé (2026-11-11) | Phase 17 ou disparition d'un service gratuit |
 
 ## Décisions en attente d'avis
 
@@ -67,5 +68,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | D-G | Domaine `lorakus.app` (Name.com) : `app.lorakus.app` (PWA et API à la même origine) et `staging.lorakus.app`, à partir de la phase 3. Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare | 2026-11-09 |
 | — | Environnements : production sur `oracleworker`, staging et sentinelle sur Azure for Students, pas de second compte Oracle (ADR 0036) | 2026-11-09 |
 | — | Alertes d'exploitation sur Discord, notifications produit sur Telegram (ADR 0035) | 2026-11-09 |
+| — | Pas de VM Azure : staging éphémère dans la CI, sentinelle healthchecks.io ; crédit Azure gardé (ADR 0037) | 2026-11-11 |
+| — | Loki reporté en P3, avec les traces (amendement de l'ADR 0010) | 2026-11-11 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

@@ -6,6 +6,7 @@
 #   deploy.sh status                                             affiche la version en service
 #   deploy.sh backup                                             sauvegarde (minuteur systemd quotidien)
 #   deploy.sh alert-test                                         alerte de test vers Discord
+#   deploy.sh compose ARGUMENTS...                               docker compose de la version en service
 #   deploy.sh ssh                                                point d'entree de la cle de GitHub
 #
 # COMMIT : commit de la branche main (40 caracteres). Il fixe la CONFIGURATION (fichiers Compose,
@@ -26,6 +27,9 @@ RELEASE="$ROOT/release.env"            # version en service
 PREVIOUS="$ROOT/release.previous.env"  # version precedente (pour rollback)
 NEXT="$ROOT/release.next.env"          # version en cours de deploiement
 LOCK="$ROOT/deploy.lock"
+# Surcharges propres a un hote, hors depot (facultatif). Absent en production ; le staging
+# ephemere de la CI s'en sert pour remplacer B2 par un dossier local (infra/staging/).
+HOST_COMPOSE="$ROOT/compose.host.yml"
 REGISTRY="${LORAKUS_REGISTRY:-ghcr.io/anasknanoua}"
 READY_URL="${LORAKUS_READY_URL:-http://127.0.0.1:8001/api/health/ready}"
 
@@ -43,8 +47,11 @@ fail() {
 # autre script.
 compose_command() {
   COMPOSE_CMD=(docker compose --project-directory "$APP"
-    -f "$APP/compose.yml" -f "$APP/compose.observability.yml" -f "$APP/compose.prod.yml"
-    --env-file "$ENV_FILE" --env-file "$1")
+    -f "$APP/compose.yml" -f "$APP/compose.observability.yml" -f "$APP/compose.prod.yml")
+  if [ -f "$HOST_COMPOSE" ]; then
+    COMPOSE_CMD+=(-f "$HOST_COMPOSE")
+  fi
+  COMPOSE_CMD+=(--env-file "$ENV_FILE" --env-file "$1")
 }
 
 compose() {
@@ -245,6 +252,12 @@ cmd_alert_test() {
   "$APP/infra/observability/alert-test.sh" "${COMPOSE_CMD[@]}"
 }
 
+# docker compose avec la configuration de la version en service (runbooks, staging).
+cmd_compose() {
+  [ -f "$RELEASE" ] || fail "aucune version deployee"
+  compose "$RELEASE" "$@"
+}
+
 cmd_status() {
   if [ -f "$RELEASE" ]; then
     echo "--- en service"
@@ -292,8 +305,9 @@ main() {
     status) cmd_status ;;
     backup) cmd_backup ;;
     alert-test) cmd_alert_test ;;
+    compose) cmd_compose "$@" ;;
     ssh) cmd_ssh ;;
-    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup | alert-test" ;;
+    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup | alert-test | compose ..." ;;
   esac
 }
 

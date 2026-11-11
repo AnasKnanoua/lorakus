@@ -47,17 +47,16 @@ Scénarios d'acceptation :
 8. API coupée → alerte Discord en moins de 5 min ; fournisseur IA coupé → réponse par gabarit, rappels intacts.
 9. Restauration automatique du dernier backup réussie.
 
-### P1 — Fondations (reste : staging et sentinelle externe)
+### P1 — Fondations (reste : vérifier la sentinelle en production)
 
 - **Fait** (PR n°7 à n°18 et PR Runbooks, en production depuis le 2026-11-10) : CI obligatoire, CodeQL, Dependabot, Gitleaks, Trivy, image API non-root, pile Compose durcie, images multi-architectures publiées sur GHCR (PR n°16), déploiement approuvé avec retour automatique (PR n°17), journaux JSON et métriques Prometheus, Grafana, alertes testées vers Discord, sauvegardes chiffrées vers B2 et test de restauration, préparation de l'hôte de production, sauvegarde quotidienne par minuteur systemd, label d'environnement dans les alertes, runbooks liés aux alertes. Essayés en production le 2026-11-10 : retour arrière (10 s), redéploiement (26 s), alerte d'API coupée (2 min 21 s).
 - **Reste, dans l'ordre** :
   1. Clés B2 par machine.
-  2. VM Azure (ADR 0036) : création, durcissement, mesure de la mémoire.
-  3. Sentinelle externe par signal de vie poussé depuis la production, runbook « production disparue ».
-  4. Staging léger sur la même VM, par le même `deploy.sh`.
-  5. Centralisation des journaux (Loki) : décision en dernier, P1 ou report en P3.
+  2. PR Staging et sentinelle (ADR 0037) : premier passage réel du staging dans la CI, sentinelle healthchecks.io installée, disparition simulée et alerte reçue.
+  3. Clôture de la P1 et tag `v0.1.0`.
+- **Décidé** : pas de VM Azure (ADR 0037) ; Loki reporté en P3 (ADR 0010).
 - **Tests** : CI obligatoire sur `main`, restauration, Trivy, image vérifiée sur ARM.
-- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (reste). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
+- **Terminée quand** : un déploiement approuvé met la production à jour depuis GHCR (fait) ; le retour arrière a été essayé (fait) ; la sauvegarde quotidienne tourne et son absence alerte (fait) ; la sentinelle alerte quand la production ne répond plus (reste) ; le staging a validé un déploiement réel (reste). Les traces corrélées arrivent avec l'observabilité palier 2 (P3).
 - **Risque** : temps passé sur l'outillage.
 
 ### P2 — Core platform + registre des spécialistes (3 semaines)
@@ -69,7 +68,7 @@ Scénarios d'acceptation :
 
 ### P3 — Majordome, IA et mémoire (4,5 semaines)
 
-- **Composants** : `AIProvider`, `ModelRouter`, budgets ; mémoire ; conversations SSE ; frontend React (design system, login, chat, `/memory`, PWA) ; **orchestrateur (parallélisme, délais, cache, disjoncteur), routage à trois paliers** ; observabilité palier 2 (traces Tempo). Le filtre de confidentialité n'est pas nécessaire ici : aucun spécialiste sensible avant P10.
+- **Composants** : `AIProvider`, `ModelRouter`, budgets ; mémoire ; conversations SSE ; frontend React (design system, login, chat, `/memory`, PWA) ; **orchestrateur (parallélisme, délais, cache, disjoncteur), routage à trois paliers** ; observabilité palier 2 (traces Tempo, journaux Loki). Le filtre de confidentialité n'est pas nécessaire ici : aucun spécialiste sensible avant P10.
 - **Dépend de** : D-D (budget IA). Adresse : `app.lorakus.app` (D-G tranchée).
 - **Tests** : evals Promptfoo sur `FakeProvider` ; orchestrateur (délais, disjoncteur, cache) ; trace complète d'une question.
 - **Terminée quand** : une question multi-spécialistes (factices) obtient une réponse en moins de 5 s avec trace complète ; utilisé 5 jours de suite.
@@ -125,5 +124,9 @@ Usage réel, ZAP baseline, exercice d'incident, relecture des runbooks (créés 
 - **Offre commerciale modulaire** : formules regroupant des modules au choix (par exemple Strava sans les échecs), définies à partir de sondages auprès d'utilisateurs potentiels. Déjà compatible avec l'activation des modules par utilisateur (phase 2) ; ajouter des « droits » par formule le moment venu.
 - **Authentification et facturation au moment de vendre** : réévaluer Clerk pour l'authentification ; Stripe pour la facturation (25 $ de crédit étudiant) ; Testmail pour tester l'envoi d'e-mails si Lorakus en envoie un jour.
 - **Heures de prière** : calcul local déterministe (ou Mawaqit si un accès autorisé existe), créneaux ajoutés à l'agenda, situation « heure de prière et réseaux sociaux » traitée par un pacte volontaire (notification plein écran, Ne pas déranger, blocage par l'extension sur PC). Fermer une application Android de force exigerait le service d'accessibilité, écarté par l'ADR 0016. Donnée religieuse, donc catégorie sensible du RGPD : module désactivé par défaut, classé `sensitive`, jamais transmis à un LLM, consentement explicite en cas de vente.
+- **Aide à l'apprentissage** (proposé le 2026-11-10) : révision orale d'un cours en répétition espacée (« Anas, c'est quoi un réseau de neurones ? »), lancée environ une semaine avant un quiz ou un examen. S'appuie sur l'Archiviste (cartes de révision, P9), le module académique (échéances, P4) et la voix (P16).
+- **Mémorisation de sourates** (usage personnel, jamais vendu) : texte découpé en parties, proposées sur les créneaux libres de l'agenda. Même moteur de répétition espacée ; même régime que les heures de prière (module désactivé par défaut, `sensitive`, jamais transmis à un LLM).
+- **Emploi du temps** : déjà lu par lien ICS en lecture seule (ADR 0020, Google Agenda en fournit un) ; un accès complet à Google Agenda reste à étudier.
+- **Personnalité « professeur »** pour les révisions : ton et façon d'interroger propres au mode révision.
 - **Montre connectée** : déjà prévue avec le Préparateur (P10), via Mi Fitness puis Health Connect.
 - **Alertes d'exploitation** : lien vers le tableau de bord Grafana dans chaque alerte (P6, quand Grafana aura une adresse) ; le lien vers le runbook est fait (P1).

@@ -88,12 +88,15 @@ services:
     restart: unless-stopped
     environment:
       DISCORD_OPS_WEBHOOK_URL: ${DISCORD_OPS_WEBHOOK_URL:?DISCORD_OPS_WEBHOOK_URL manquant dans .env}
+      # Sentinelle externe (ADR 0037) : utilisee en production seulement (voir alertmanager.yml.tmpl).
+      HEALTHCHECKS_PING_URL: ${HEALTHCHECKS_PING_URL:-https://hc-ping.com/non-configure}
     # Alertmanager ne lit pas les variables d'environnement dans sa configuration :
     # le fichier final est genere au demarrage, en memoire (/tmp), depuis le modele.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
         sed -e "s|__DISCORD_OPS_WEBHOOK_URL__|$${DISCORD_OPS_WEBHOOK_URL}|"
+        -e "s|__HEALTHCHECKS_PING_URL__|$${HEALTHCHECKS_PING_URL}|"
         /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
         && exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
         --storage.path=/alertmanager
