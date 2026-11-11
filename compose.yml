@@ -28,9 +28,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
       LORAKUS_MIGRATOR_DB_PASSWORD: ${LORAKUS_MIGRATOR_DB_PASSWORD:?manquant dans .env}
       LORAKUS_APP_DB_PASSWORD: ${LORAKUS_APP_DB_PASSWORD:?manquant dans .env}
-      # Chiffrement des secrets TOTP. Facultative en developpement (double authentification
-      # alors indisponible) ; obligatoire en staging et en production, creee par init-env.sh.
-      LORAKUS_FIELD_ENCRYPTION_KEY: ${LORAKUS_FIELD_ENCRYPTION_KEY:-}
     volumes:
       # PostgreSQL 18 : le volume se monte sur /var/lib/postgresql (et non plus .../data).
       - postgres-data:/var/lib/postgresql
@@ -78,6 +75,9 @@ services:
       LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
       LORAKUS_DB_HOST: postgres
       LORAKUS_APP_DB_PASSWORD: ${LORAKUS_APP_DB_PASSWORD:?manquant dans .env}
+      # Chiffrement des secrets TOTP. Facultative en developpement (double authentification
+      # alors indisponible) ; obligatoire en staging et en production, creee par init-env.sh.
+      LORAKUS_FIELD_ENCRYPTION_KEY: ${LORAKUS_FIELD_ENCRYPTION_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -22,6 +22,12 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Correction** : `pg_dump --enable-row-security` (déjà dans `infra/backup/lorakus-backup.sh`). La politique de `lorakus_migrator` lui laisse tout lire : la sauvegarde est complète. Trouvé en test avant la mise en production de la PR 23.
 - **Retour arrière** : revenir à une version antérieure à la PR 23 garde le schéma (RLS forcée) mais remet l'ancienne image de sauvegarde, sans l'option : la sauvegarde quotidienne échoue jusqu'au redéploiement suivant. Le redéploiement lui-même fonctionne : depuis le 2026-11-11, la sauvegarde avant migration utilise l'image de la **nouvelle** version (trouvé par le staging, qui rejoue justement ce retour arrière).
 
+## Une variable donnée au mauvais service
+
+- **Symptôme** : le staging refuse la nouvelle version (`container lorakus-api-1 is unhealthy`), alors que les tests passent et que l'API démarre bien hors de Docker.
+- **Cause** (2026-11-11) : `LORAKUS_FIELD_ENCRYPTION_KEY` avait été ajoutée à l'environnement de `postgres` au lieu de `api`. Sans la clé, l'API refuse de démarrer en staging et en production, comme prévu. En prime, la clé sortait de son périmètre.
+- **Correction** : la clé est dans le service `api`. `tests/unit/test_compose_environment.py` vérifie désormais quels services reçoivent chaque secret. `deploy.sh` affiche aussi les journaux de la version refusée avant de la remplacer : la cause est visible dans le job `staging`.
+
 ## `docker compose run` avale l'entrée standard
 
 - **Symptôme** : un script s'arrête sans erreur après un `docker compose run`, ou une boucle `while read` ne traite que sa première ligne ; une commande passée par SSH se termine trop tôt.
