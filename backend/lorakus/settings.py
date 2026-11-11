@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     login_max_failures_per_account: int = Field(default=5, ge=1)
     login_max_failures_per_ip: int = Field(default=20, ge=1)
 
+    # Re-authentification exigee pour une action sensible si la derniere preuve d'identite
+    # (connexion ou /auth/reauth) date de plus de cette duree.
+    reauth_window_minutes: int = Field(default=10, ge=1)
+    # Cle de chiffrement des champs sensibles en base (secrets TOTP) : 32 octets en
+    # hexadecimal (64 caracteres). Obligatoire en staging et en production. Elle n'est
+    # PAS dans les sauvegardes : la perdre rend les secrets TOTP illisibles.
+    field_encryption_key: SecretStr = SecretStr("")
+
     def app_database_url(self) -> URL:
         """URL de connexion de l'application (role lorakus_app)."""
         return self._database_url(self.app_db_user, self.app_db_password)

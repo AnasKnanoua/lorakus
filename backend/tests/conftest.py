@@ -5,6 +5,8 @@ Les fixtures de base de donnees ne se connectent que si un test les demande
 """
 
 import asyncio
+import os
+import secrets
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -16,6 +18,9 @@ from lorakus.api.app import create_app
 from lorakus.core.identity.service import IdentityService
 from lorakus.db.database import Database
 from lorakus.settings import get_settings
+
+# Cle de chiffrement des champs pour la duree des tests (jamais celle d'un vrai serveur).
+os.environ.setdefault("LORAKUS_FIELD_ENCRYPTION_KEY", secrets.token_hex(32))
 
 OWNER_EMAIL = "anas@example.com"
 OWNER_PASSWORD = "un mot de passe assez long"
@@ -65,7 +70,8 @@ async def migrator_sql(
 async def wipe_identity() -> None:
     """Vide les tables d'identite."""
     await migrator_sql(
-        "TRUNCATE lorakus.core_sessions, lorakus.core_login_attempts, lorakus.core_users CASCADE"
+        "TRUNCATE lorakus.core_audit_events, lorakus.core_login_attempts, "
+        "lorakus.core_users CASCADE"
     )
 
 

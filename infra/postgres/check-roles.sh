@@ -97,10 +97,17 @@ fi
   || ko "lorakus_app ne peut pas modifier le role d'un compte"
 
 [ "$(psql_as "${APP[@]}" "select count(*) from pg_proc where pronamespace = 'lorakus'::regnamespace
-  and proname like 'auth_%' and (not prosecdef or proconfig is null
+  and (proname like 'auth\_%' or proname like 'audit\_%') and (not prosecdef or proconfig is null
   or has_function_privilege('public', oid, 'EXECUTE'))")" = "0" ] \
   && ok "fonctions auth_* : SECURITY DEFINER, search_path fige, fermees a PUBLIC" \
   || ko "fonctions auth_* : SECURITY DEFINER, search_path fige, fermees a PUBLIC"
+
+# --- Journal d'audit en ajout seul (PR 25) ---
+for privilege in INSERT UPDATE DELETE TRUNCATE; do
+  [ "$(psql_as "${APP[@]}" "select has_table_privilege('core_audit_events', '$privilege')")" = "f" ] \
+    && ok "lorakus_app n'a pas $privilege sur le journal d'audit" \
+    || ko "lorakus_app n'a pas $privilege sur le journal d'audit"
+done
 
 echo "Resultat : $passed reussi(s), $failed echec(s)"
 [ "$failed" -eq 0 ]

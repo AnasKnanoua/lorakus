@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 # Cree ou complete le fichier des secrets de production, SUR le serveur.
-#   init-env.sh [FICHIER]      (par defaut : /opt/lorakus/.env)
+#   init-env.sh [--generated-only] [FICHIER]      (par defaut : /opt/lorakus/.env)
+# --generated-only : n'ajoute que les secrets tires au hasard, sans rien demander. deploy.sh
+#   l'appelle a chaque deploiement : un nouveau secret interne arrive donc tout seul.
 # - Les mots de passe internes sont tires au hasard ici meme : ils ne quittent jamais le serveur.
 # - Les valeurs venant de services externes (Discord, Backblaze B2, age) sont demandees au clavier.
 # - Une valeur deja presente n'est JAMAIS modifiee : relancer le script est sans danger, et
 #   PostgreSQL garde les mots de passe choisis a la creation de la base.
 set -euo pipefail
 
+GENERATED_ONLY=0
+if [ "${1:-}" = "--generated-only" ]; then
+  GENERATED_ONLY=1
+  shift
+fi
 ENV_FILE="${1:-/opt/lorakus/.env}"
 
 # Le fichier n'est lisible que par son proprietaire (droits 600).
@@ -34,7 +41,7 @@ random_hex() {
 
 fixed() {
   if has "$1"; then
-    echo "  conserve   $1"
+    [ "$GENERATED_ONLY" = 1 ] || echo "  conserve   $1"
   else
     put "$1" "$2"
     echo "  ajoute     $1"
@@ -43,11 +50,16 @@ fixed() {
 
 generated() {
   if has "$1"; then
-    echo "  conserve   $1"
+    [ "$GENERATED_ONLY" = 1 ] || echo "  conserve   $1"
   else
-    put "$1" "$(random_hex)"
+    put "$1" "${2:-$(random_hex)}"
     echo "  genere     $1"
   fi
+}
+
+# Cle de 32 octets (AES-256), en 64 caracteres hexadecimaux.
+random_key() {
+  head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
 }
 
 # asked CLE "question" MOTIF secret|visible
@@ -74,7 +86,7 @@ asked() {
   echo "  enregistre $key"
 }
 
-echo "Fichier : $ENV_FILE"
+[ "$GENERATED_ONLY" = 1 ] || echo "Fichier : $ENV_FILE"
 
 fixed LORAKUS_ENVIRONMENT production
 fixed POSTGRES_DB lorakus
@@ -83,6 +95,14 @@ generated POSTGRES_PASSWORD
 generated LORAKUS_MIGRATOR_DB_PASSWORD
 generated LORAKUS_APP_DB_PASSWORD
 generated GRAFANA_ADMIN_PASSWORD
+# Chiffrement des secrets TOTP en base. A COPIER aussi dans le gestionnaire de mots de
+# passe : elle n'est pas dans les sauvegardes, et sans elle les secrets TOTP sont perdus.
+generated LORAKUS_FIELD_ENCRYPTION_KEY "$(random_key)"
+
+if [ "$GENERATED_ONLY" = 1 ]; then
+  chmod 600 "$ENV_FILE"
+  exit 0
+fi
 
 asked DISCORD_OPS_WEBHOOK_URL "URL du webhook Discord (#lorakus-infra)" '^https://(discord|discordapp)\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$' secret
 asked B2_KEY_ID "Identifiant de la cle B2 (keyID)" '^[A-Za-z0-9]+$' visible
