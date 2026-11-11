@@ -1,6 +1,7 @@
 """Environnement Alembic : applique les migrations avec le role lorakus_migrator."""
 
 import asyncio
+import importlib
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -9,8 +10,16 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from lorakus.core.identity import models as _identity_models  # noqa: F401 (tables enregistrees)
+from lorakus.core.modules import models as _module_models  # noqa: F401
+from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.db.base import SCHEMA, Base
 from lorakus.settings import get_settings
+
+# Tables des modules installes : leurs modeles sont importes pour que alembic check les
+# compare aussi a la base.
+for _manifest in ModuleRegistry.from_entry_points():
+    if _manifest.models:
+        importlib.import_module(_manifest.models)
 
 config = context.config
 if config.config_file_name is not None:

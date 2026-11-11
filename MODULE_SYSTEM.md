@@ -51,6 +51,13 @@ manifest = ModuleManifest(
 
 Un test de contrat commun (`tests/contract/test_manifests.py`) vérifie pour chaque module : champs complets, noms d'événements et de signaux préfixés par l'id, tables préfixées, permissions de la forme `module:action`, branche Alembic existante, outils documentés avec un niveau de risque.
 
+### 2.1 Mise en œuvre (PR 26)
+
+- `lorakus/core/modules/` : `ModuleManifest` (validé à la construction : id, SemVer, `requires_core`, préfixes des événements, signaux, permissions et tables, classe de chaque table, branche Alembic obligatoire dès qu'il y a des tables), `ModuleRegistry` (découverte, compatibilité, ordre), `ModuleService` (activation et configuration par utilisateur).
+- Champs encore absents, ajoutés avec leur PR et une valeur par défaut : `tools`, `scheduled_jobs` (PR 27 et 28), `specialist` (PR 29), `provides`, `device_ingest`.
+- Routes : `GET /api/v1/modules`, `PUT /api/v1/modules/{id}` (`enabled`, `config`), `GET /api/v1/modules/health` (propriétaire). Les routes d'un module, montées sous `/api/v1/<id>`, exigent une session et répondent 404 si le module n'est pas activé pour l'utilisateur.
+- Garde-fous en test : contrat de chaque module (`tests/contract/`), et pour toute table portant `user_id`, présence d'une politique RLS qui filtre sur l'utilisateur courant (`tests/isolation/`).
+
 ## 3. Cycle de vie
 
 | Étape | Mécanisme |
@@ -58,7 +65,7 @@ Un test de contrat commun (`tests/contract/test_manifests.py`) vérifie pour cha
 | Découverte | Entry point `lorakus.modules` dans `pyproject.toml` du module |
 | Résolution | Au démarrage : tri topologique de `depends_on`, vérification de `requires_core` ; incompatibilité = échec de démarrage avec message explicite |
 | Migrations | Conteneur `migrate` : `alembic upgrade heads` (toutes les branches) avant le démarrage de l'API |
-| Activation | Table `core_user_modules(user_id, module_id, enabled, config)` ; un module désactivé ne monte ni routes, ni outils, ni jobs, ni signaux pour cet utilisateur |
+| Activation | Table `core_user_modules(user_id, module_id, enabled, config)`, désactivé par défaut ; un module désactivé ne monte ni routes, ni outils, ni jobs, ni signaux pour cet utilisateur ; on ne peut pas activer un module avant ses dépendances, ni désactiver un module dont dépend un module actif |
 | Configuration | Validée par `config_schema` à l'activation et à chaque modification |
 | Mise à jour | Nouvelle version du module + migration de sa branche ; compatibilité ascendante des événements (`schema_version`) |
 | Santé | `health()` appelé par `/admin` et exposé en métrique |
@@ -102,12 +109,14 @@ Si un module qui fournit un port est désactivé, le port renvoie `None` et le C
 ## 8. Créer un module
 
 ```bash
-uv run scripts/new_module.py nom_du_module   # copie lorakus_modules/_template
+make new-module ID=academic PREFIX=acad NAME="Academic Manager"
 ```
 
-1. Remplir le manifeste ; choisir le préfixe de tables.
+La commande copie `lorakus_modules/_template` (tables préfixées avec `user_id`, RLS forcée, configuration validée, routes, santé, branche Alembic initiale), déclare le module (entry point dans `backend/pyproject.toml`) et ajoute sa branche de migrations à `backend/alembic.ini`.
+
+1. Compléter le manifeste et remplacer la table d'exemple.
 2. Écrire le domaine et ses tests unitaires d'abord.
-3. Créer la branche Alembic : `alembic revision --head=base --branch-label=nom_du_module -m "init"`.
+3. Adapter la migration initiale du module (`migrations/<id>_0001_init.py`) ; les suivantes : `alembic revision --head=<id>@head -m "..."`.
 4. Ajouter routes, outils, jobs, handlers.
 5. Rédiger `docs/modules/nom_du_module.md` (rôle, événements, signaux, outils, config, données).
 6. Vérifier : `make lint test contract`.
