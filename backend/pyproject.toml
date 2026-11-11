@@ -8,6 +8,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "cryptography>=50.0.2",
     "fastapi>=0.162.2",
+    "packaging>=26.3",
     "prometheus-client>=0.26.0",
     "psycopg[binary]>=3.3.8",
     "pydantic-settings>=2.16.2",

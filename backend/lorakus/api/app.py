@@ -6,8 +6,11 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 
-from lorakus.api.routes import auth, health
+from lorakus.api.modules import mount_module_routes
+from lorakus.api.routes import auth, health, modules
 from lorakus.core.identity.service import IdentityService
+from lorakus.core.modules.registry import ModuleRegistry
+from lorakus.core.modules.service import ModuleService
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -24,14 +27,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     database = Database.connect(settings)
     app.state.database = database
     app.state.identity = IdentityService(database, settings)
+    app.state.modules = ModuleService(database, app.state.registry)
     try:
         yield
     finally:
         await database.close()
 
 
-def create_app() -> FastAPI:
+def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     """Fabrique et configure une application neuve.
+
+    registry : modules a monter ; par defaut, ceux declares par entry point. Un ensemble
+    incoherent leve ModuleRegistryError : l'application ne demarre pas.
 
     Une fonction plutot qu'une variable globale : chaque test peut creer sa
     propre application isolee, et la configuration est lue au bon moment.
@@ -52,4 +59,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
+    app.include_router(modules.router, prefix="/api")
+    app.state.registry = registry if registry is not None else ModuleRegistry.from_entry_points()
+    mount_module_routes(app, app.state.registry)
     return app

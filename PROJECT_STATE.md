@@ -31,7 +31,8 @@
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 - Découpage en PR 22 à 29 et critères de fin validés le 2026-11-11 (`ROADMAP.md`, P2).
 
-- PR 25 — Double authentification, clés d'API, audit : TOTP chiffré et anti-rejeu, codes de secours, ré-authentification pour les actions sensibles, clés d'API à portée et expiration, journal d'audit en ajout seul, commande `recover-second-factor` ; `deploy.sh` ajoute seul les nouveaux secrets internes (`init-env.sh --generated-only`).
+- PR 26 — Système de modules : manifeste validé, registre (découverte par entry points, compatibilité, dépendances), activation et configuration par utilisateur, routes des modules protégées, santé, gabarit et `make new-module`, garde-fou RLS générique.
+- PR 25 (fusionnée et déployée) — Double authentification, clés d'API, audit : TOTP chiffré et anti-rejeu, codes de secours, ré-authentification pour les actions sensibles, clés d'API à portée et expiration, journal d'audit en ajout seul, commande `recover-second-factor` ; `deploy.sh` ajoute seul les nouveaux secrets internes (`init-env.sh --generated-only`).
 - PR 24 (fusionnée et déployée) — Correctif : sauvegarde avant migration avec l'image de la nouvelle version.
 - PR 23 (fusionnée et déployée, propriétaire créé) — Identité et RLS : comptes, mots de passe Argon2id, sessions par cookie `__Host-`, connexion limitée, changement de mot de passe, commande `create-owner`, RLS forcée avec politiques par rôle, fonctions `auth_*` ; tests d'isolation en `lorakus_app` ; `make deploy` attend la publication des images.
 - PR 22 (fusionnée et déployée) — Squelette du Core et versions : `lorakus/core/`, `lorakus_modules/`, contrats import-linter dans `make lint`, `release-please` lancé depuis le poste (`make release-pr`, `make release`).

@@ -5,7 +5,7 @@
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
         image up down logs obs-up obs-check alert-test \
         backup-image backup restore-test \
-        pr merge deploy deploy-skip-staging rollback prod-status release-pr release
+        pr merge deploy deploy-skip-staging rollback prod-status release-pr release new-module
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -26,6 +26,10 @@ dev: ## Lance l'API en local avec rechargement automatique (port 8000)
 
 test: ## Tests unitaires (sans base de donnees)
 > $(UV) run pytest -m "not integration"
+
+new-module: ## Cree un module : make new-module ID=academic PREFIX=acad NAME="Academic Manager"
+> @test -n "$(ID)" -a -n "$(PREFIX)" -a -n "$(NAME)" || { echo 'Usage : make new-module ID=academic PREFIX=acad NAME="Academic Manager"'; exit 2; }
+> $(UV) run python scripts/new_module.py "$(ID)" "$(PREFIX)" "$(NAME)" && $(UV) sync
 
 test-all: db-up migrate ## Tous les tests, y compris avec PostgreSQL
 > $(UV) run pytest
