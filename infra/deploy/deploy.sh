@@ -220,6 +220,10 @@ cmd_apply() {
   if ! activate "$mode" "$NEXT"; then
     rm -f "$NEXT"
     if [ -f "$RELEASE" ]; then
+      # Avant de la remplacer : ce que la version refusee a dit (sinon ses journaux disparaissent).
+      say "Echec : journaux de la nouvelle version"
+      compose "$NEXT" ps -a || true
+      compose "$NEXT" logs --no-color --tail 80 api migrate || true
       say "Echec : remise en service de la version en place avant ce deploiement"
       restore_current || fail "le retour automatique a aussi echoue : intervention manuelle necessaire"
       fail "la nouvelle version n'a pas demarre correctement ; la version precedente est de nouveau en service"
