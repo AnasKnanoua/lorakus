@@ -57,6 +57,63 @@ groups:
           description: L'API depasse 300 Mo depuis 10 minutes (limite du conteneur 384 Mo).
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/api-down.md
 
+  - name: lorakus-worker
+    rules:
+      - alert: LorakusWorkerDown
+        expr: up{job="lorakus-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: Le worker Lorakus est injoignable
+          description: Prometheus ne collecte plus les metriques du worker depuis 2 minutes ; jobs et evenements ne sont plus traites.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+      - alert: LorakusWorkerStalled
+        expr: time() - lorakus_worker_heartbeat_timestamp_seconds > 120
+        for: 1m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: Le worker Lorakus est bloque
+          description: Son battement de coeur n'a pas avance depuis plus de 2 minutes.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+      - alert: LorakusWorkerHighMemory
+        expr: process_resident_memory_bytes{job="lorakus-worker"} > 200 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Le worker Lorakus consomme beaucoup de memoire
+          description: Le worker depasse 200 Mo depuis 10 minutes (limite du conteneur 256 Mo).
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+      - alert: LorakusOutboxBacklog
+        expr: lorakus_outbox_oldest_pending_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Des evenements attendent depuis plus de 5 minutes
+          description: L'evenement en attente le plus ancien a plus de 5 minutes ; un handler echoue ou le worker est sature.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+      - alert: LorakusOutboxDeadEvents
+        expr: lorakus_outbox_dead > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Des evenements ont ete abandonnes
+          description: Au moins un evenement a echoue 8 fois et n'est plus retente ; voir last_error dans core_outbox.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
   - name: lorakus-backup
     rules:
       - alert: LorakusBackupFailed

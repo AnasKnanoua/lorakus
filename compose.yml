@@ -88,6 +88,34 @@ services:
         limits:
           memory: 384m
 
+  # Worker : jobs (Procrastinate) et livraison des evenements (outbox). Meme image que l'API.
+  worker:
+    <<: *app-hardening
+    image: ${LORAKUS_API_IMAGE:-lorakus-api:dev}
+    command: ["python", "-m", "lorakus.worker"]
+    restart: unless-stopped
+    environment:
+      LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
+      LORAKUS_DB_HOST: postgres
+      LORAKUS_APP_DB_PASSWORD: ${LORAKUS_APP_DB_PASSWORD:?manquant dans .env}
+    healthcheck:
+      # Battement de coeur ecrit a chaque tour de boucle : un worker bloque est detecte.
+      test: ["CMD", "python", "-m", "lorakus.worker", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      start_interval: 2s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
   # Conteneur ponctuel : sauvegarde chiffree vers B2 (make backup ; minuteur en production).
   # Il ne recoit que la cle PUBLIQUE age et une cle B2 sans droit de suppression.
   backup:

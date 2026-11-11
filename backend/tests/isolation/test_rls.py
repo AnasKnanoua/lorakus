@@ -138,7 +138,8 @@ async def test_every_table_has_forced_row_level_security(database: Database) -> 
                 text(
                     "SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class "
                     "WHERE relnamespace = 'lorakus'::regnamespace AND relkind = 'r' "
-                    "AND relname <> 'alembic_version' ORDER BY relname"
+                    "AND relname <> 'alembic_version' AND relname NOT LIKE 'procrastinate\\_%' "
+                    "ORDER BY relname"
                 )
             )
         ).all()
@@ -211,3 +212,36 @@ async def test_every_table_with_user_id_is_filtered_by_the_current_user(
     assert rows
     unfiltered = [table for table, filtered in rows if not filtered]
     assert unfiltered == []
+
+
+async def test_only_the_job_queue_tables_escape_rls_and_hold_no_user_column(
+    database: Database,
+) -> None:
+    """Exception unique et bornee : les tables de Procrastinate (file du systeme)."""
+    async with database.transaction() as session:
+        exempt = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT relname FROM pg_class WHERE relnamespace = 'lorakus'::regnamespace "
+                        "AND relkind = 'r' AND NOT relrowsecurity ORDER BY relname"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        user_columns = await session.scalar(
+            text(
+                "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'lorakus' "
+                "AND table_name LIKE 'procrastinate\\_%' AND column_name LIKE '%user%'"
+            )
+        )
+    assert set(exempt) == {
+        "alembic_version",
+        "procrastinate_events",
+        "procrastinate_jobs",
+        "procrastinate_periodic_defers",
+        "procrastinate_workers",
+    }
+    assert user_columns == 0

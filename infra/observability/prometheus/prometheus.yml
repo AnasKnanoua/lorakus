@@ -22,6 +22,10 @@ scrape_configs:
       - targets: ["api:9464"]
 
   # Machine (disque, memoire, CPU) et resultats des sauvegardes.
+  - job_name: lorakus-worker
+    static_configs:
+      - targets: ["worker:9464"]
+
   - job_name: node
     static_configs:
       - targets: ["node-exporter:9100"]

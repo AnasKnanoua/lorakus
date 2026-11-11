@@ -71,7 +71,8 @@ async def wipe_identity() -> None:
     """Vide les tables d'identite."""
     await migrator_sql(
         "TRUNCATE lorakus.core_audit_events, lorakus.core_login_attempts, "
-        "lorakus.core_user_modules, lorakus.core_users CASCADE"
+        "lorakus.core_user_modules, lorakus.core_outbox, lorakus.procrastinate_jobs, "
+        "lorakus.core_users CASCADE"
     )
 
 

@@ -31,7 +31,8 @@
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 - Découpage en PR 22 à 29 et critères de fin validés le 2026-11-11 (`ROADMAP.md`, P2).
 
-- Correctif (PR 28) : la clé de chiffrement allait au service `postgres` au lieu de `api` ; le staging a refusé les PR 25 et 26 (production restée sur la PR 24, sans dommage). Garde-fou sur la répartition des secrets, journaux de la version refusée affichés par `deploy.sh`.
+- PR 29 — Événements et jobs : outbox avec livraison au moins une fois (handlers non rejoués), port `JobQueue` avec Procrastinate (seul l'adaptateur l'importe), service `worker` (limite 256 Mo, test de santé par battement de cœur), 5 alertes et un runbook.
+- Correctif (PR 28, déployé) : la clé de chiffrement allait au service `postgres` au lieu de `api` ; le staging a refusé les PR 25 et 26 (production restée sur la PR 24, sans dommage). Garde-fou sur la répartition des secrets, journaux de la version refusée affichés par `deploy.sh`.
 - PR 26 (fusionnée sous le n°27) — Système de modules : manifeste validé, registre (découverte par entry points, compatibilité, dépendances), activation et configuration par utilisateur, routes des modules protégées, santé, gabarit et `make new-module`, garde-fou RLS générique.
 - PR 25 (fusionnée ; déployée avec le correctif) — Double authentification, clés d'API, audit : TOTP chiffré et anti-rejeu, codes de secours, ré-authentification pour les actions sensibles, clés d'API à portée et expiration, journal d'audit en ajout seul, commande `recover-second-factor` ; `deploy.sh` ajoute seul les nouveaux secrets internes (`init-env.sh --generated-only`).
 - PR 24 (fusionnée et déployée) — Correctif : sauvegarde avant migration avec l'image de la nouvelle version.
@@ -68,6 +69,7 @@
 
 | Hypothèse | Avant |
 | --- | --- |
+| Marge mémoire de `lorakus-prod` avec le `worker` (limite 256 Mo ; 86 Mo mesurés hors conteneur, sur x86) | Premier déploiement de la PR 29 (`docker stats`) |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |
