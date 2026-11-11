@@ -98,6 +98,9 @@ class ModuleManifest(BaseModel):
     data: DataDeclaration = Field(default_factory=DataDeclaration)
     frontend: FrontendEntry | None = None
     health: HealthCheck | None = None
+    # Outils (ADR 0012) et specialiste (ADR 0026), PR 30.
+    tools: list[Any] = Field(default_factory=list[Any])
+    specialist: Any | None = None
 
     @field_validator("id")
     @classmethod
@@ -143,6 +146,23 @@ class ModuleManifest(BaseModel):
                 )
         if self.id in self.depends_on:
             raise ManifestError("un module ne peut pas dependre de lui-meme")
+        for tool in self.tools:
+            if not tool.name.startswith(prefix):
+                raise ManifestError(f"outil '{tool.name}' : doit commencer par '{prefix}'")
+        if self.specialist is not None:
+            spec = self.specialist
+            if spec.name != self.id:
+                raise ManifestError(f"specialiste '{spec.name}' : doit porter l'id du module")
+            outside = sorted(set(spec.data_scopes) - set(self.data.tables))
+            if outside:
+                raise ManifestError(
+                    f"specialiste : data_scopes hors du module : {', '.join(outside)}"
+                )
+            unknown = sorted(set(spec.actions) - {t.name for t in self.tools})
+            if unknown:
+                raise ManifestError(
+                    f"specialiste : actions sans outil declare : {', '.join(unknown)}"
+                )
         if self.data.tables and self.migrations != self.id:
             raise ManifestError(
                 f"le module a des tables : migrations doit valoir '{self.id}' (branche Alembic)"

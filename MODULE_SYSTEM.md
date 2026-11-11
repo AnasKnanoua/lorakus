@@ -54,7 +54,7 @@ Un test de contrat commun (`tests/contract/test_manifests.py`) vérifie pour cha
 ### 2.1 Mise en œuvre (PR 26)
 
 - `lorakus/core/modules/` : `ModuleManifest` (validé à la construction : id, SemVer, `requires_core`, préfixes des événements, signaux, permissions et tables, classe de chaque table, branche Alembic obligatoire dès qu'il y a des tables), `ModuleRegistry` (découverte, compatibilité, ordre), `ModuleService` (activation et configuration par utilisateur).
-- Champs encore absents, ajoutés avec leur PR et une valeur par défaut : `tools`, `scheduled_jobs` (PR 27 et 28), `specialist` (PR 29), `provides`, `device_ingest`.
+- Ajoutés ensuite : `tools` (liste de `ToolSpec`, noms préfixés par l'id du module) et `specialist` (`SpecialistProfile`, nommé comme le module, `data_scopes` limités aux tables du module, `actions` limitées à ses outils) en PR 30 ; jobs et handlers d'événements par décorateurs (`@job`, `@periodic`, `@on`) en PR 29. Restent à venir : `provides`, `device_ingest`.
 - Routes : `GET /api/v1/modules`, `PUT /api/v1/modules/{id}` (`enabled`, `config`), `GET /api/v1/modules/health` (propriétaire). Les routes d'un module, montées sous `/api/v1/<id>`, exigent une session et répondent 404 si le module n'est pas activé pour l'utilisateur.
 - Garde-fous en test : contrat de chaque module (`tests/contract/`), et pour toute table portant `user_id`, présence d'une politique RLS qui filtre sur l'utilisateur courant (`tests/isolation/`).
 

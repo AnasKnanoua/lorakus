@@ -7,10 +7,12 @@ from importlib.metadata import version
 from fastapi import FastAPI
 
 from lorakus.api.modules import mount_module_routes
-from lorakus.api.routes import auth, health, modules
+from lorakus.api.routes import auth, health, modules, tools
+from lorakus.core.agents.service import AgentService
 from lorakus.core.identity.service import IdentityService
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.modules.service import ModuleService
+from lorakus.core.tools.runtime import ToolRuntime
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -28,6 +30,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.database = database
     app.state.identity = IdentityService(database, settings)
     app.state.modules = ModuleService(database, app.state.registry)
+    app.state.tools = ToolRuntime(database, app.state.modules)
+    app.state.agents = AgentService(database, app.state.modules)
     try:
         yield
     finally:
@@ -60,6 +64,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
     app.include_router(modules.router, prefix="/api")
+    app.include_router(tools.router, prefix="/api")
     app.state.registry = registry if registry is not None else ModuleRegistry.from_entry_points()
     mount_module_routes(app, app.state.registry)
     return app
