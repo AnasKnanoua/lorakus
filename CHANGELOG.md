@@ -1,17 +1,13 @@
 # Changelog
 
-Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement : [SemVer](https://semver.org/lang/fr/). Tenu à la main jusqu'à l'installation de `release-please` (prévue en P2).
-
-## [Non publié]
-
-### Modifié
-- 2026-11-11 — `make pr` attend que GitHub démarre les vérifications avant de les suivre.
+Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement : [SemVer](https://semver.org/lang/fr/). Depuis la v0.1.0, les nouvelles versions sont écrites par `release-please` à partir des titres de PR (Conventional Commits) : `make release-pr` puis `make release` (`DEVELOPMENT.md`). Les entrées antérieures ont été tenues à la main.
 
 ## [0.1.0] — 2026-11-11
 
 Fin de la phase 1 : fondations techniques en production.
 
 ### Ajouté
+- 2026-11-11 — `make pr` attend que GitHub démarre les vérifications avant de les suivre.
 - 2026-11-11 — Vérifié en conditions réelles : staging éphémère vert sur runner ARM (dont restauration complète sur PostgreSQL 18) ; sentinelle : production déclarée disparue sur Discord 8 minutes après l'arrêt d'Alertmanager.
 - 2026-11-11 — Staging éphémère (ADR 0037) : job `staging` de `deploy.yml` sur runner ARM, `infra/staging/staging-test.sh` (mise à jour depuis la version en production, retour arrière, sauvegarde, alerte de test, restauration vérifiée par une donnée témoin) ; un échec bloque la production. `infra/deploy/resolve-images.sh` partagé entre staging et production ; `deploy.sh compose` et fichier facultatif `compose.host.yml`.
 - 2026-11-11 — Sentinelle externe : règle `LorakusWatchdog` toujours active, envoyée à healthchecks.io en production seulement ; `LorakusHeartbeatFailing` si l'envoi échoue ; runbook « production disparue » ; `HEALTHCHECKS_PING_URL` demandée par `init-env.sh`.

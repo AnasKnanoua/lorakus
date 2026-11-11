@@ -56,6 +56,7 @@ Une modification fait toujours le même trajet : **Dell → PR → `main` → se
 | 3. Déployer | `make deploy` (si la PR change ce qui tourne sur le serveur) | Staging jetable, puis la page d'approbation s'ouvre : « Review deployments » → « Approve » |
 | Annuler | `make rollback` | Version précédente remise en service |
 | Vérifier | `make prod-status` | Version en service et précédente |
+| Publier une version (fin de phase) | `make release-pr VERSION=0.2.0`, puis `make merge` sur la PR de version, puis `make release` | `release-please` écrit le CHANGELOG à partir des titres de PR, met à jour le numéro, puis crée le tag et la release |
 
 Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 
@@ -65,7 +66,7 @@ Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 - Pull request obligatoire, même seul : la CI est le relecteur ; squash merge.
 - Format Conventional Commits : `type(scope): description` — types `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`, `build`, `perf` ; scope = module ou `core` (ex. `feat(academic): ajoute la détection de retard`) ; `!` ou `BREAKING CHANGE:` pour une rupture de compatibilité.
 - Fusion par squash : **le titre de la PR devient le commit sur `main`** et doit respecter le format (vérifié en CI à partir de la phase 1) ; les commits intermédiaires de la branche sont libres.
-- `release-please` génère le CHANGELOG, le numéro de version et les tags à partir de l'historique de `main`.
+- `release-please` génère le CHANGELOG, le numéro de version (`backend/lorakus/__init__.py`) et les tags à partir de l'historique de `main`. Il est lancé depuis le poste (`make release-pr`, `make release`) avec le compte `gh` : aucun jeton d'écriture n'est confié à la CI, et la PR de version déclenche les vérifications normalement.
 - Template de PR : tests, migration, documentation du module, `PROJECT_STATE.md`, impact sécurité (nouvel outil IA ? nouvelle donnée sensible ? nouvelle dépendance justifiée ?).
 
 ## 6. Standards de code
@@ -83,7 +84,7 @@ Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 | Intégration | pytest + testcontainers (PostgreSQL 18) | Repositories, migrations, RLS, jobs |
 | Contrat | pytest | Manifestes, ports, événements (`schema_version`) |
 | Isolation | pytest | Chaque table et chaque route testées avec deux utilisateurs |
-| Architecture | import-linter | Frontières entre modules et Core |
+| Architecture | import-linter (`make lint`) | Le Core n'importe jamais un module ; modules indépendants entre eux ; couches `api → core → db, observability → settings` |
 | LLM | Promptfoo | Comportement sur `FakeProvider` en CI ; vrais fournisseurs chaque semaine |
 | E2E | Playwright | Scénarios d'acceptation du MVP |
 | Frontend | Vitest, axe-core | Composants et accessibilité |

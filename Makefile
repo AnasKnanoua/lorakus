@@ -5,7 +5,7 @@
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
         image up down logs obs-up obs-check alert-test \
         backup-image backup restore-test \
-        pr merge deploy deploy-skip-staging rollback prod-status
+        pr merge deploy deploy-skip-staging rollback prod-status release-pr release
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -30,9 +30,10 @@ test: ## Tests unitaires (sans base de donnees)
 test-all: db-up migrate ## Tous les tests, y compris avec PostgreSQL
 > $(UV) run pytest
 
-lint: ## Verifie le style et les erreurs courantes
+lint: ## Verifie le style, les erreurs courantes et les frontieres d'architecture
 > $(UV) run ruff check .
 > $(UV) run ruff format --check .
+> $(UV) run lint-imports
 
 format: ## Formate le code et corrige ce qui peut l'etre automatiquement
 > $(UV) run ruff format .
@@ -129,3 +130,16 @@ rollback: ## Remet la version precedente en production (approbation requise)
 
 prod-status: ## Affiche la version en service et la precedente (approbation requise)
 > gh workflow run deploy.yml -f action=status && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status && gh run view "$$($(LAST_DEPLOY_RUN))" --log | grep -A5 -- '--- en service'
+
+# ---------------------------------------------------------------- Versions (release-please)
+# Lance depuis le Dell avec TON compte gh : la PR de version declenche donc la CI normalement
+# (une PR creee par le jeton d'Actions ne la declencherait pas). Aucun jeton d'ecriture en CI.
+RELEASE_PLEASE := npx --yes release-please@17.11.2
+RELEASE_ARGS = --token="$$(gh auth token)" --repo-url=AnasKnanoua/lorakus --target-branch=main
+
+release-pr: ## PR de version (CHANGELOG et numero) : make release-pr VERSION=0.2.0 (fin de phase)
+> @test -n "$(VERSION)" || { echo 'Usage : make release-pr VERSION=0.2.0'; exit 2; }
+> $(RELEASE_PLEASE) release-pr $(RELEASE_ARGS) --release-as="$(VERSION)" && sleep 20 && gh pr checks release-please--branches--main --watch
+
+release: ## Apres fusion de la PR de version : cree le tag et la release GitHub
+> git switch main && git pull --ff-only && $(RELEASE_PLEASE) github-release $(RELEASE_ARGS)

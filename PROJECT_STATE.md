@@ -3,7 +3,7 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : v0.1.0 (2026-11-11)
-- **Phase** : P1 terminée le 2026-11-11 ; prochaine : P2 — Core platform
+- **Phase** : P2 — Core platform (en cours depuis le 2026-11-11)
 - **Dernière mise à jour** : 2026-11-11
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
@@ -26,12 +26,12 @@
 - PR n°20 (Staging et sentinelle, ADR 0037), déployée le 2026-11-11 : premier passage réel du staging vert sur runner ARM (mise à jour, retour arrière, sauvegarde, restauration complète sur PostgreSQL 18) ; disparition simulée (Alertmanager arrêté) → message healthchecks.io « DOWN » sur Discord en 8 minutes ; raccourcis `make pr`, `make merge`, `make deploy`.
 - **Phase 1 close le 2026-11-11, version v0.1.0.**
 
-## En cours
+## En cours (P2)
+
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
+- Découpage en PR 22 à 29 et critères de fin validés le 2026-11-11 (`ROADMAP.md`, P2).
 
-## Prochaine étape
-
-P2 — Core platform : identité et authentification, isolation par utilisateur (RLS), système de modules, registre des spécialistes (`ROADMAP.md`).
+- PR 22 — Squelette du Core et versions : `lorakus/core/`, `lorakus_modules/`, contrats import-linter dans `make lint`, `release-please` lancé depuis le poste (`make release-pr`, `make release`).
 
 À faire quand c'est pratique, hors phase : clés B2 par machine (`DEPLOYMENT.md` §7.2).
 
@@ -45,6 +45,8 @@ P2 — Core platform : identité et authentification, isolation par utilisateur 
 
 ## Décisions prises récemment
 
+- 2026-11-11 — P2 : pas d'inscription publique (propriétaire créé par une commande sur le serveur), pas d'interface (API et tests seulement) ; critères de sécurité par PR dans `ROADMAP.md`.
+- 2026-11-11 — `release-please` lancé depuis le poste avec le compte `gh` (aucun jeton d'écriture en CI) ; version lue dans `backend/lorakus/__init__.py` pour que `uv.lock` ne change pas à chaque version.
 - 2026-11-11 — P1 close, v0.1.0 ; vérifié : staging réel vert (restauration PostgreSQL 18 comprise), sentinelle en 8 minutes.
 - 2026-11-11 — ADR 0037 : pas de VM Azure (tailles gratuites bloquées dans les régions autorisées) ; staging éphémère dans la CI avant chaque déploiement ; sentinelle healthchecks.io alimentée par une alerte toujours active ; crédit Azure (90 $, jusqu'au 09/11/2027) conservé.
 - 2026-11-11 — Loki reporté en P3, avec Tempo (amendement de l'ADR 0010).
@@ -84,7 +86,7 @@ P2 — Core platform : identité et authentification, isolation par utilisateur 
 
 ## Dette technique acceptée
 
-- `CHANGELOG.md` est tenu à la main : `release-please` (prévu par `DEVELOPMENT.md`) n'est pas encore installé. À mettre en place en P2, avant la v0.2.0.
+- Aucune.
 
 ## Pour reprendre
 

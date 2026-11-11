@@ -1,6 +1,6 @@
 [project]
 name = "lorakus"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Lorakus : backend (Core platform et modules)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
@@ -18,12 +18,18 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Version lue dans lorakus/__init__.py, mise a jour par release-please : uv.lock n'a pas a
+# changer a chaque version (uv sync --locked reste valide sur la PR de version).
+[tool.hatch.version]
+path = "lorakus/__init__.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["lorakus"]
+packages = ["lorakus", "lorakus_modules"]
 
 [dependency-groups]
 dev = [
     "httpx2>=2.16.0",
+    "import-linter>=2.15,<2.16",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.4",
@@ -66,3 +72,30 @@ venv = ".venv"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = ["integration: necessite PostgreSQL (make test-all)"]
+
+# --- import-linter : frontieres d'architecture (make lint, donc la CI) ---------------
+# Les dependances ne vont que dans un sens : modules -> Core -> infrastructure.
+[tool.importlinter]
+root_packages = ["lorakus", "lorakus_modules"]
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Le Core n'importe jamais un module"
+type = "forbidden"
+source_modules = ["lorakus"]
+forbidden_modules = ["lorakus_modules"]
+
+[[tool.importlinter.contracts]]
+name = "Les modules sont independants les uns des autres"
+type = "independence"
+modules = ["lorakus_modules.*"]
+
+[[tool.importlinter.contracts]]
+name = "Couches du Core : api -> core -> infrastructure -> reglages"
+type = "layers"
+layers = [
+    "lorakus.api",
+    "lorakus.core",
+    "lorakus.db | lorakus.observability",
+    "lorakus.settings",
+]
