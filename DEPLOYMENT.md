@@ -1,16 +1,16 @@
 # Déploiement
 
-État au 2026-11-10 : en production sur `lorakus-prod`, sauvegarde quotidienne active, retour arrière essayé. Le staging et la sentinelle externe (VM Azure) restent à créer. En cas d'incident : [`docs/runbooks/`](docs/runbooks/README.md).
+État au 2026-11-11 : en production sur `lorakus-prod`, sauvegarde quotidienne active, retour arrière essayé. Staging éphémère dans la CI et sentinelle externe healthchecks.io (ADR 0037). En cas d'incident : [`docs/runbooks/`](docs/runbooks/README.md).
 
 ## 1. Environnements
 
-Décision : [ADR 0036](docs/adr/0036-environments.md).
+Décisions : [ADR 0036](docs/adr/0036-environments.md), amendée par l'[ADR 0037](docs/adr/0037-ci-staging-external-sentinel.md).
 
 | Environnement | Hôte | Contenu | Données |
 | --- | --- | --- | --- |
 | Développement | Dell (Ubuntu) | `compose.yml`, `compose.dev.yml`, `compose.observability.yml` | Synthétiques |
-| Staging | VM ARM Azure for Students (à créer) | Pile réduite, dimensionnée à la création de la VM | Synthétiques |
-| Sentinelle externe | Même VM Azure (à créer) | Vérifie de l'extérieur que la production répond | Aucune |
+| Staging | Runner GitHub ARM jetable, avant chaque déploiement (`infra/staging/staging-test.sh`) | Pile complète de production, B2 remplacé par un dossier local | Synthétiques |
+| Sentinelle externe | healthchecks.io (formule gratuite) | Reçoit le signal de vie de la production, prévient Discord s'il cesse | Aucune |
 | Production | `oracleworker` (Oracle Always Free, ARM, 1 OCPU, 6 Go, Oracle Linux 9), alias SSH `lorakus-prod`, dédié à Lorakus | API, PostgreSQL, pile d'observabilité, sauvegardes | Réelles |
 | Red Team | À redimensionner en phase 17 | ZAP, Promptfoo | Aucune donnée de production |
 
@@ -53,10 +53,10 @@ Le workflow `publish.yml` construit les images API et sauvegarde sur une machine
 
 ## 4. Déploiement
 
-Le workflow `deploy.yml`, lancé à la main, attend l'approbation de l'environnement GitHub `production`. Il se connecte au serveur en vérifiant son empreinte SSH, avec une clé qui ne peut exécuter que `infra/deploy/deploy.sh` (option `command=` de `authorized_keys`).
+Le workflow `deploy.yml`, lancé à la main, rejoue d'abord le déploiement sur un staging jetable (section 4.2), puis attend l'approbation de l'environnement GitHub `production`. Il se connecte au serveur en vérifiant son empreinte SSH, avec une clé qui ne peut exécuter que `infra/deploy/deploy.sh` (option `command=` de `authorized_keys`).
 
 ```bash
-gh workflow run deploy.yml -f action=deploy     # ou rollback, status
+make deploy          # ou make rollback, make prod-status (gh workflow run deploy.yml -f action=...)
 ```
 
 `deploy.sh` désigne la configuration par un commit de `main` (copie du dépôt dans `/opt/lorakus/app`) et le code par l'empreinte des images. Séquence : vérification que le commit appartient à `main` → téléchargement des images → sauvegarde de la base (sauf au premier déploiement) → migrations → démarrage de tous les services → test de `/api/health/ready`. Si une étape échoue après le téléchargement, la version précédente est remise en service automatiquement.
@@ -73,6 +73,20 @@ Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus
 
 Côté GitHub, environnement `production` : approbation obligatoire, branche `main` seule ; secrets `DEPLOY_SSH_KEY` et `DEPLOY_HOST` ; variable `DEPLOY_KNOWN_HOSTS` (empreinte publique du serveur, vérifiée contre `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
 
+### 4.2 Staging éphémère
+
+Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la production) installe la version en production, y écrit une donnée témoin, déploie la nouvelle version par-dessus avec le vrai `deploy.sh`, essaie le retour arrière, redéploie, lance une sauvegarde et une alerte de test, puis restaure la dernière sauvegarde en suivant le [runbook](docs/runbooks/restore.md) et vérifie la donnée témoin. S'il échoue, la production n'est pas touchée.
+
+- « Version en production » = commit du dernier run « Deploy (deploy) » réussi.
+- B2 est remplacé par un dossier local grâce à `compose.host.yml` (copie de `infra/staging/compose.staging.yml`). Ce fichier n'existe pas en production.
+- Urgence absolue seulement : `make deploy-skip-staging`, à consigner dans une note d'incident.
+
+### 4.3 Sentinelle externe (une fois)
+
+1. Sur healthchecks.io : une vérification `lorakus-prod`, période 2 minutes, tolérance 5 minutes ; intégration Discord vers `#lorakus-infra`.
+2. Sur le serveur, en tant que `deploy` : `/opt/lorakus/app/infra/deploy/init-env.sh` demande l'adresse de ping (`HEALTHCHECKS_PING_URL`), puis `make deploy` depuis le Dell (ou `deploy.sh compose up -d --force-recreate alertmanager`).
+3. Vérifier : healthchecks.io passe à « up » en moins de 3 minutes. Puis tester une vraie disparition ([runbook](docs/runbooks/production-down.md#tester-la-sentinelle-après-chaque-changement-de-la-chaîne-dalerte)).
+
 ## 5. Migrations en production
 
 - Le conteneur `migrate` exécute `alembic upgrade heads` avant le démarrage de l'API.
@@ -81,7 +95,7 @@ Côté GitHub, environnement `production` : approbation obligatoire, branche `ma
 
 ## 6. Retour arrière
 
-`gh workflow run deploy.yml -f action=rollback` remet en service la version précédente (configuration et images), sans rejouer de migration : le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée, la voie sûre est la [restauration](docs/runbooks/restore.md) de la sauvegarde faite juste avant le déploiement.
+`make rollback` remet en service la version précédente (configuration et images), sans rejouer de migration : le schéma reste compatible grâce à l'expand/contract. Si une migration doit être annulée, la voie sûre est la [restauration](docs/runbooks/restore.md) de la sauvegarde faite juste avant le déploiement.
 
 Essayé en production le 2026-11-10 : retour arrière en 10 secondes. Après un retour arrière, les deux versions sont échangées : un second `rollback` ramène la version défectueuse.
 
@@ -152,6 +166,7 @@ Durée cible : une soirée.
 
 - [ ] `/api/health/ready` vert, empreinte de l'image attendue
 - [ ] Aucune erreur 5xx dans les 10 minutes
+- [ ] healthchecks.io affiche `lorakus-prod` « up »
 - [ ] Alerte de test reçue sur Discord avec `[production]` dans le titre et un lien vers le runbook : `/opt/lorakus/app/infra/deploy/deploy.sh alert-test` sur le serveur. Ne pas utiliser `amtool alert add` directement : une alerte injectée dans Alertmanager ne passe pas par Prometheus et ne reçoit pas le label `environment`
 - [ ] Sauvegarde du jour présente, métriques à jour
 - [ ] `PROJECT_STATE.md` et `CHANGELOG.md` à jour

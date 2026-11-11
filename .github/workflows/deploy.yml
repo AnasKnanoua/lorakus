@@ -1,7 +1,11 @@
-# Deploiement en production, lance a la main : gh workflow run deploy.yml
-# Il attend l'approbation de l'environnement GitHub "production" avant de pouvoir agir.
+# Deploiement en production, lance a la main : make deploy (ou gh workflow run deploy.yml)
+# 1. staging : la nouvelle version est rejouee sur un runner ARM jetable (ADR 0037) ;
+# 2. production : attend l'approbation de l'environnement GitHub "production", puis agit.
+# Si le staging echoue, la production n'est pas touchee.
 # GitHub ne detient qu'une cle SSH limitee a infra/deploy/deploy.sh : aucun secret applicatif.
 name: Deploy
+# Le titre du run porte l'action : le staging retrouve ainsi le dernier vrai deploiement.
+run-name: Deploy (${{ inputs.action }})
 
 on:
   workflow_dispatch:
@@ -11,6 +15,10 @@ on:
         type: choice
         options: [deploy, rollback, status]
         default: deploy
+      skip_staging:
+        description: Urgence seulement - deployer sans staging (a consigner)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,8 +29,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  staging:
+    name: staging
+    if: inputs.action == 'deploy' && !inputs.skip_staging
+    # Meme architecture que la production (ARM).
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Refuser toute autre branche que main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Le deploiement ne part que de main." >&2
+          exit 1
+
+      - name: Recuperer le code (historique complet)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Trouver la version en production et la nouvelle version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          # Version en production = commit du dernier deploiement reussi.
+          prev=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --status success \
+            --limit 50 --json headSha,displayTitle \
+            --jq '[.[] | select(.displayTitle == "Deploy (deploy)")][0].headSha // empty')
+          if [ -z "$prev" ]; then
+            # Runs anterieurs a ce titre : dernier run reussi, quel que soit son titre.
+            prev=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml --branch main --status success \
+              --limit 1 --json headSha --jq '.[0].headSha // empty')
+          fi
+          [ -n "$prev" ] || { echo "Version en production introuvable" >&2; exit 1; }
+          {
+            ./infra/deploy/resolve-images.sh "$prev" | sed 's/^/PREV_/'
+            ./infra/deploy/resolve-images.sh "$GITHUB_SHA" | sed 's/^/NEW_/'
+            echo "PREV_COMMIT=$prev"
+            echo "NEW_COMMIT=$GITHUB_SHA"
+          } >> "$GITHUB_ENV"
+          echo "### Staging : $prev -> $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Installer age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+      - name: Rejouer le deploiement sur un hote jetable
+        run: ./infra/staging/staging-test.sh
+
   production:
     name: production (${{ inputs.action }})
+    needs: staging
+    # Le staging est saute pour rollback et status (et en urgence) ; un echec bloque la production.
+    if: ${{ !cancelled() && (needs.staging.result == 'success' || needs.staging.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Les secrets de cet environnement ne sont fournis qu'apres approbation, et seulement pour main.
@@ -45,26 +107,12 @@ jobs:
       - name: Trouver les images publiees pour ce commit
         if: inputs.action == 'deploy'
         run: |
-          # Les images ne sont republiees que si leur code change : on prend le dernier commit
-          # qui a declenche le workflow Publish (memes chemins que dans publish.yml).
-          image_commit=$(git log -1 --format=%H -- backend infra/backup infra/ci/smoke-image.sh .github/workflows/publish.yml)
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          digest_of() {
-            docker buildx imagetools inspect "ghcr.io/${owner}/$1:sha-${image_commit}" \
-              --format '{{json .Manifest}}' | jq -r '.digest'
-          }
-          api=$(digest_of lorakus-api)
-          backup=$(digest_of lorakus-backup)
-          for d in "$api" "$backup"; do
-            if [[ ! "$d" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-              echo "Image introuvable pour le commit ${image_commit} : le workflow Publish a-t-il reussi ?" >&2
-              exit 1
-            fi
-          done
-          {
-            echo "API_DIGEST=$api"
-            echo "BACKUP_DIGEST=$backup"
-          } >> "$GITHUB_ENV"
+          # Memes images que celles validees par le staging (meme commit, memes empreintes).
+          ./infra/deploy/resolve-images.sh "$GITHUB_SHA" > images.env
+          cat images.env >> "$GITHUB_ENV"
+          image_commit=$(sed -n 's/^IMAGE_COMMIT=//p' images.env)
+          api=$(sed -n 's/^API_DIGEST=//p' images.env)
+          backup=$(sed -n 's/^BACKUP_DIGEST=//p' images.env)
           {
             echo "### Version deployee"
             echo "Configuration : ${GITHUB_SHA}"

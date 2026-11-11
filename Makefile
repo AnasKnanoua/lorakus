@@ -4,7 +4,8 @@
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
         image up down logs obs-up obs-check alert-test \
-        backup-image backup restore-test
+        backup-image backup restore-test \
+        pr merge deploy deploy-skip-staging rollback prod-status
 
 BACKEND := backend
 UV := uv --directory $(BACKEND)
@@ -92,7 +93,7 @@ obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus test rules /etc/prometheus/tests/lorakus_test.yml
 > ./infra/observability/check-runbooks.sh
-> $(OBS) run --rm --no-deps --entrypoint /bin/sh alertmanager -c 'sed -e "s|__DISCORD_OPS_WEBHOOK_URL__|https://discord.com/api/webhooks/1/test|" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/am.yml && amtool check-config /tmp/am.yml'
+> $(OBS) run --rm --no-deps --entrypoint /bin/sh alertmanager -c 'sed -e "s|__DISCORD_OPS_WEBHOOK_URL__|https://discord.com/api/webhooks/1/test|" -e "s|__HEALTHCHECKS_PING_URL__|https://hc-ping.com/test|" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/am.yml && amtool check-config /tmp/am.yml'
 
 alert-test: ## Envoie une alerte de test sur Discord (pile d'observabilite lancee)
 > ./infra/observability/alert-test.sh $(OBS)
@@ -105,3 +106,26 @@ backup: backup-image db-up ## Sauvegarde chiffree de la base vers B2
 
 restore-test: backup-image ## Restaure la derniere sauvegarde dans une base jetable et la verifie
 > ./infra/backup/restore-test.sh
+
+# ---------------------------------------------------------------- Circuit d'une modification
+# Dell -> PR -> main -> serveur. Detail et exemples : DEVELOPMENT.md, section "Circuit".
+LAST_DEPLOY_RUN = gh run list --workflow deploy.yml --limit 1 --json databaseId --jq '.[0].databaseId'
+
+pr: ## Applique un patch et ouvre la PR : make pr PATCH=chemin BRANCH=nom TITLE="type: titre"
+> @test -n "$(PATCH)" -a -n "$(BRANCH)" -a -n "$(TITLE)" || { echo 'Usage : make pr PATCH=chemin BRANCH=nom TITLE="type: titre"'; exit 2; }
+> git switch main && git pull --ff-only && git switch -c "$(BRANCH)" && git apply --index "$(PATCH)" && git commit -m "$(TITLE)" && git push -u origin HEAD && gh pr create --fill && gh pr checks --watch
+
+merge: ## Fusionne la PR de la branche courante dans main, puis revient sur main a jour
+> gh pr merge --squash --delete-branch && git switch main && git pull --ff-only
+
+deploy: ## Deploie main en production : staging, puis approbation dans la page qui s'ouvre
+> gh workflow run deploy.yml -f action=deploy && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status
+
+deploy-skip-staging: ## URGENCE seulement : deploie sans staging (a consigner)
+> gh workflow run deploy.yml -f action=deploy -f skip_staging=true && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status
+
+rollback: ## Remet la version precedente en production (approbation requise)
+> gh workflow run deploy.yml -f action=rollback && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status
+
+prod-status: ## Affiche la version en service et la precedente (approbation requise)
+> gh workflow run deploy.yml -f action=status && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status && gh run view "$$($(LAST_DEPLOY_RUN))" --log | grep -A5 -- '--- en service'

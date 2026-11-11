@@ -92,6 +92,33 @@ groups:
           description: Le minuteur de sauvegarde ne s'execute plus, ou ses metriques ne sont plus lues.
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/backup-failed.md
 
+  # Sentinelle externe (ADR 0037). LorakusWatchdog est TOUJOURS active : Alertmanager l'envoie
+  # chaque minute a healthchecks.io (production uniquement), jamais a Discord. Si ce signal de
+  # vie s'arrete (serveur eteint, Prometheus ou Alertmanager arretes, reseau coupe),
+  # healthchecks.io previent Discord de l'exterieur.
+  - name: lorakus-sentinel
+    rules:
+      - alert: LorakusWatchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          component: sentinel
+        annotations:
+          summary: Signal de vie de Lorakus
+          description: Alerte toujours active, transmise a la sentinelle externe. Sa disparition signifie que la production ne surveille plus rien.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/production-down.md
+
+      - alert: LorakusHeartbeatFailing
+        expr: increase(alertmanager_notifications_failed_total{integration="webhook"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: sentinel
+        annotations:
+          summary: Le signal de vie n'atteint plus la sentinelle externe
+          description: Alertmanager n'arrive plus a joindre healthchecks.io ; la sentinelle va bientot declarer la production disparue.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/production-down.md
+
   - name: lorakus-host
     rules:
       - alert: LorakusDiskSpaceLow

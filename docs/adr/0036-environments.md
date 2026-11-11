@@ -1,6 +1,6 @@
 # ADR-0036 — Environnements : production sur Oracle, staging et sentinelle sur Azure
 
-- **Statut** : Validé (2026-11-09)
+- **Statut** : Validé (2026-11-09) ; staging et sentinelle remplacés par l'[ADR 0037](0037-ci-staging-external-sentinel.md) (2026-11-11)
 - **Date** : 2026-11-09
 - **Revue prévue** : expiration du crédit Azure for Students, ou changement d'hébergeur
 
@@ -8,7 +8,7 @@
 
 L'ADR 0009 prévoyait deux instances Oracle Always Free : `oracleworker` en production et une seconde instance A1 en staging. Or la seconde instance du compte, `oraclevps`, héberge Anime Notif et ne doit pas être modifiée, et le quota gratuit ne laisse aucune place pour une troisième. Par ailleurs, une surveillance installée sur le même hôte ou chez le même fournisseur que la production ne peut pas signaler la disparition de cet hôte.
 
-Un crédit Azure for Students est disponible (100 $ sur 12 mois, sans carte bancaire, avec une petite VM ARM incluse), réservé à un usage non commercial.
+Un crédit Azure for Students est disponible (90 $ sur 12 mois, jusqu'au 09/11/2027, sans carte bancaire, avec une petite VM ARM incluse), réservé à un usage non commercial.
 
 ## Décision
 
@@ -40,3 +40,5 @@ Un crédit Azure for Students est disponible (100 $ sur 12 mois, sans carte banc
 - La « sentinelle externe » (surveillance de disponibilité) n'est pas le module `sentinel` du Veilleur (ADR 0031) : ce dernier arrive en phase 7 et pourra s'appuyer sur elle.
 - L'environnement Red Team, prévu sur l'hôte de staging, est à redimensionner en phase 17 selon la mémoire réellement disponible.
 - Usage non commercial : avant toute vente, le staging et la sentinelle quittent Azure for Students.
+
+Amendement du 2026-11-11 : les tailles de VM gratuites ne sont disponibles dans aucune des cinq régions autorisées par l'abonnement ; le plan de repli prévu ci-dessus est appliqué (ADR 0037). Aucune ressource Azure n'est créée.

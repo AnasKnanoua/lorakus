@@ -3,9 +3,9 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : aucune (pré-v0.1.0)
-- **Phase** : P1 — Fondations techniques : en production et exploitée ; restent le staging et la sentinelle externe
-- **Dernière mise à jour** : 2026-11-10
-- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; commit `5b248ec` en service, `f08b8f9` en version précédente ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. Staging et sentinelle externe prévus sur Azure for Students (ADR 0036).
+- **Phase** : P1 — Fondations techniques : en production et exploitée ; reste à vérifier la sentinelle et le staging en conditions réelles
+- **Dernière mise à jour** : 2026-11-11
+- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; commit `5b248ec` en service, `f08b8f9` en version précédente ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR Runbooks (n°19) déployée le 2026-11-10, alerte de test « [production] » reçue avec son lien de runbook. Staging éphémère dans la CI et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
@@ -26,16 +26,14 @@
 
 ## En cours
 
-- VM Azure : création et durcissement, mesure de la mémoire réelle, puis sentinelle externe et staging léger.
+- PR Staging et sentinelle (ADR 0037) : staging éphémère avant chaque déploiement, signal de vie vers healthchecks.io, runbook « production disparue », raccourcis `make pr`, `make merge`, `make deploy`.
 - **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
 
 ## Reste à faire en P1 (dans l'ordre)
 
 1. Clés B2 par machine (`DEPLOYMENT.md` §7.2) : créer les deux clés, les installer, supprimer la clé partagée.
-2. VM Azure (ADR 0036) : guide pas à pas, durcissement identique à `lorakus-prod`, mesure de la mémoire réelle.
-3. Sentinelle externe : signal de vie poussé par la production (aucun port ouvert avant la P3), alerte Discord si elle disparaît, runbook « production disparue ».
-4. Staging léger sur la même VM, déployé par le même `deploy.sh` ; y répéter la restauration complète (`docs/runbooks/restore.md`).
-5. Décision Loki (P1 ou report en P3), puis clôture de la P1 et tag `v0.1.0`.
+2. Déployer la PR Staging et sentinelle : premier passage réel du staging, adresse healthchecks.io saisie sur le serveur, disparition simulée (`docs/runbooks/production-down.md`) et message reçu sur Discord.
+3. Clôture de la P1 et tag `v0.1.0`.
 
 Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
@@ -49,6 +47,8 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 ## Décisions prises récemment
 
+- 2026-11-11 — ADR 0037 : pas de VM Azure (tailles gratuites bloquées dans les régions autorisées) ; staging éphémère dans la CI avant chaque déploiement ; sentinelle healthchecks.io alimentée par une alerte toujours active ; crédit Azure (90 $, jusqu'au 09/11/2027) conservé.
+- 2026-11-11 — Loki reporté en P3, avec Tempo (amendement de l'ADR 0010).
 - 2026-11-10 — Une clé B2 par machine : écriture sans suppression pour le serveur, lecture seule pour le Dell (`DEPLOYMENT.md` §7.2).
 - 2026-11-10 — Chaque alerte porte un lien vers son runbook ; une règle sans runbook fait échouer la CI.
 - 2026-11-10 — Images de production épinglées par empreinte ; mémoire de l'hôte : environ 1,3 Go utilisés sur 5,6 Go, Loki envisageable en P1.
@@ -62,8 +62,9 @@ Ensuite : P2 (Core : identité, RLS, modules, registre des spécialistes).
 
 | Hypothèse | Avant |
 | --- | --- |
-| Mémoire réelle de la VM Azure et pile de staging qu'elle peut porter | Création de la VM Azure |
-| Restauration complète sur PostgreSQL 18 avec les conteneurs réels (étape SQL vérifiée sur PostgreSQL 16 seulement) | Mise en place du staging |
+| Restauration complète sur PostgreSQL 18 avec les conteneurs réels (étape SQL vérifiée sur PostgreSQL 16 seulement) | Premier passage du staging |
+| Le staging (simulé avec un faux Docker) passe sur un vrai runner ARM | Premier `make deploy` après la PR |
+| Alerte de healthchecks.io en moins de 10 minutes après une disparition | Disparition simulée en production |
 | Santé de Procrastinate | P2 |
 | Qualité du routage d'intention sans LLM (règles + embeddings locaux) | P3 |
 | Quota réel du free tier Gemini | P9 |

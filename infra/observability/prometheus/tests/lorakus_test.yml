@@ -269,3 +269,53 @@ tests:
               summary: Les metriques du serveur ne sont plus collectees
               description: node_exporter est injoignable depuis 5 minutes (disque, memoire et sauvegardes non surveilles).
               runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/host.md
+
+  # ------------------------------------------------------------------ Sentinelle externe
+  - name: Signal de vie toujours actif
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusWatchdog
+        exp_alerts:
+          - exp_labels:
+              severity: none
+              component: sentinel
+            exp_annotations:
+              summary: Signal de vie de Lorakus
+              description: Alerte toujours active, transmise a la sentinelle externe. Sa disparition signifie que la production ne surveille plus rien.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/production-down.md
+
+  - name: Signal de vie qui n'atteint plus la sentinelle
+    interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="webhook", reason="other"}'
+        values: '0 0 0 1 2 3 4 5 6 7 8 9 10 11 12'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: LorakusHeartbeatFailing
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: LorakusHeartbeatFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: sentinel
+              job: alertmanager
+              instance: alertmanager:9093
+              integration: webhook
+              reason: other
+            exp_annotations:
+              summary: Le signal de vie n'atteint plus la sentinelle externe
+              description: Alertmanager n'arrive plus a joindre healthchecks.io ; la sentinelle va bientot declarer la production disparue.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/production-down.md
+
+  - name: Envois vers Discord en echec, pas d'alerte de sentinelle
+    interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="discord", reason="other"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10 11 12'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: LorakusHeartbeatFailing
+        exp_alerts: []
