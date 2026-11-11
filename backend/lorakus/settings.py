@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     migrator_db_user: str = "lorakus_migrator"
     migrator_db_password: SecretStr = SecretStr("")
 
+    # --- Sessions et connexion (PR 23) ---
+    # Une session expire apres une periode sans activite ET apres une duree maximale.
+    session_idle_timeout_minutes: int = Field(default=7 * 24 * 60, ge=5)
+    session_max_age_hours: int = Field(default=30 * 24, ge=1)
+    # Limitation des tentatives de connexion echouees, sur une fenetre glissante.
+    login_window_minutes: int = Field(default=15, ge=1)
+    login_max_failures_per_account: int = Field(default=5, ge=1)
+    login_max_failures_per_ip: int = Field(default=20, ge=1)
+
     def app_database_url(self) -> URL:
         """URL de connexion de l'application (role lorakus_app)."""
         return self._database_url(self.app_db_user, self.app_db_password)

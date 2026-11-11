@@ -5,6 +5,7 @@ description = "Lorakus : backend (Core platform et modules)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.20.1",
+    "argon2-cffi>=25.1.0",
     "fastapi>=0.162.2",
     "prometheus-client>=0.26.0",
     "psycopg[binary]>=3.3.8",
@@ -55,7 +56,7 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]                 # assert est normal dans les tests
+"tests/**" = ["S101", "S105", "S106"]  # assert et faux mots de passe sont normaux dans les tests
 "alembic/versions/**" = ["F401"]      # le modele importe sqlalchemy meme si une migration ne l'utilise pas
 
 # --- Pyright : vérification des types --------------------------------------
@@ -91,10 +92,10 @@ type = "independence"
 modules = ["lorakus_modules.*"]
 
 [[tool.importlinter.contracts]]
-name = "Couches du Core : api -> core -> infrastructure -> reglages"
+name = "Couches du Core : api, cli -> core -> infrastructure -> reglages"
 type = "layers"
 layers = [
-    "lorakus.api",
+    "lorakus.api | lorakus.cli",
     "lorakus.core",
     "lorakus.db | lorakus.observability",
     "lorakus.settings",

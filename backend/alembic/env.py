@@ -8,6 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
+from lorakus.core.identity import models as _identity_models  # noqa: F401 (tables enregistrees)
 from lorakus.db.base import SCHEMA, Base
 from lorakus.settings import get_settings
 
@@ -42,7 +43,13 @@ async def run_async_migrations() -> None:
     engine = create_async_engine(
         get_settings().migrator_database_url(),
         poolclass=pool.NullPool,
-        connect_args={"application_name": "lorakus-migrate", "options": "-c lock_timeout=5000"},
+        connect_args={
+            "application_name": "lorakus-migrate",
+            # search_path neutre : le schema lorakus n'est plus le schema "par defaut", et
+            # la comparaison des modeles (alembic check) le traite comme un schema nomme,
+            # a l'identique des modeles. Toutes les migrations qualifient leurs objets.
+            "options": "-c lock_timeout=5000 -c search_path=pg_catalog",
+        },
     )
     async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)

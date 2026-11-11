@@ -6,7 +6,8 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 
-from lorakus.api.routes import health
+from lorakus.api.routes import auth, health
+from lorakus.core.identity.service import IdentityService
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         start_metrics_server(settings.metrics_port)
     database = Database.connect(settings)
     app.state.database = database
+    app.state.identity = IdentityService(database, settings)
     try:
         yield
     finally:
@@ -49,4 +51,5 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix="/api")
+    app.include_router(auth.router, prefix="/api")
     return app

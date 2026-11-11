@@ -119,10 +119,12 @@ pr: ## Applique un patch et ouvre la PR : make pr PATCH=chemin BRANCH=nom TITLE=
 merge: ## Fusionne la PR de la branche courante dans main, puis revient sur main a jour
 > gh pr merge --squash --delete-branch && git switch main && git pull --ff-only
 
-deploy: ## Deploie main en production : staging, puis approbation dans la page qui s'ouvre
+deploy: ## Deploie main : attend les images, staging, puis approbation dans la page qui s'ouvre
+> ./infra/deploy/wait-publish.sh
 > gh workflow run deploy.yml -f action=deploy && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status
 
 deploy-skip-staging: ## URGENCE seulement : deploie sans staging (a consigner)
+> ./infra/deploy/wait-publish.sh
 > gh workflow run deploy.yml -f action=deploy -f skip_staging=true && sleep 5 && gh run view "$$($(LAST_DEPLOY_RUN))" --web && gh run watch "$$($(LAST_DEPLOY_RUN))" --exit-status
 
 rollback: ## Remet la version precedente en production (approbation requise)

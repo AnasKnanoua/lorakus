@@ -15,6 +15,13 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : les deux jobs créent le paquet GHCR au même instant ; l'un des deux est refusé.
 - **Correction** : `gh run rerun <id> --failed`. Le paquet existe alors, le second passage réussit. Penser ensuite à rendre le nouveau paquet public (réglage irréversible), sinon le serveur ne peut pas le télécharger.
 
+## `pg_dump` refuse de lire les tables à RLS forcée
+
+- **Symptôme** : `pg_dump: error: query would be affected by row-level security policy for table …`, sauvegarde en échec.
+- **Cause** : `pg_dump` désactive la RLS par défaut et s'arrête si elle s'appliquerait quand même. Avec `FORCE ROW LEVEL SECURITY`, elle s'applique aussi au propriétaire des tables.
+- **Correction** : `pg_dump --enable-row-security` (déjà dans `infra/backup/lorakus-backup.sh`). La politique de `lorakus_migrator` lui laisse tout lire : la sauvegarde est complète. Trouvé en test avant la mise en production de la PR 23.
+- **Attention au retour arrière** : revenir à une version antérieure à la PR 23 garde le schéma (RLS forcée) mais remet l'ancienne image de sauvegarde, sans l'option : les sauvegardes échouent jusqu'au redéploiement d'une version récente.
+
 ## `docker compose run` avale l'entrée standard
 
 - **Symptôme** : un script s'arrête sans erreur après un `docker compose run`, ou une boucle `while read` ne traite que sa première ligne ; une commande passée par SSH se termine trop tôt.

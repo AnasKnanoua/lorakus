@@ -68,7 +68,9 @@ run_backup() {
   WORK=$(mktemp -d /tmp/backup.XXXXXX)
 
   # Dump chiffre a la volee : la version en clair ne touche jamais le disque.
-  pg_dump --format=custom | age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$WORK/$name"
+  # --enable-row-security : avec la RLS forcee (PR 23), pg_dump refuse sinon de lire les
+  # tables, meme en proprietaire. La politique de lorakus_migrator lui laisse tout lire.
+  pg_dump --format=custom --enable-row-security | age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$WORK/$name"
 
   rclone copyto "$WORK/$name" "$REMOTE/daily/$name" --retries 3
   # Le 1er du mois, une copie est aussi conservee 12 mois (regle du bucket monthly/).
