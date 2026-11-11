@@ -55,7 +55,7 @@ Aucune de ces actions ne change la version en service. Si la panne suit un dépl
 ## Tester la sentinelle (après chaque changement de la chaîne d'alerte)
 
 ```bash
-ssh lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh compose stop alertmanager' && echo "Arrete a $(date -u +%H:%M) UTC : attendre le message DOWN (10 min au plus)"
+ssh lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh compose stop alertmanager' && echo "Arrete a $(date -u +%H:%M) UTC : attendre le message DOWN (8 min mesurees le 2026-11-11, 10 au plus)"
 ```
 
 Quand le message est arrivé :
