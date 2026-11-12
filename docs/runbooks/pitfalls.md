@@ -72,3 +72,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : `alembic.ini` cherche les migrations des modules dans `lorakus_modules/<id>/migrations` à côté de lui ; l'image ne les copiait pas (le code des modules est installé dans `.venv`). Alembic ne signale pas un dossier de `version_locations` absent.
 - **Correction** : le Dockerfile copie les seuls fichiers de migration des modules dans `/app/lorakus_modules/` ; `alembic/env.py` refuse de migrer si un module installé déclare une branche introuvable. Vérifié en simulant l'image (wheel installée hors du dépôt).
 - **Corollaire** : `alembic_version` a une ligne par branche (Core et chaque module).
+
+## « commande | grep -q » échoue au hasard dans les scripts
+
+- **Symptôme** (2026-11-12, PR 33) : « ECHEC : metrique des requetes absente » dans le test de fumée de l'image, sur une seule architecture, alors que la métrique est bien exposée.
+- **Cause** : avec `set -o pipefail` (nos scripts, et toute étape `run:` de GitHub Actions), `grep -q` s'arrête à la première correspondance et ferme le tuyau ; si la commande de gauche écrit encore (le serveur de métriques envoie sa page en plusieurs morceaux), elle reçoit SIGPIPE et le tuyau entier est en échec. Mesuré : 12 à 22 échecs sur 50 essais contre une vraie API.
+- **Correction** : lire la sortie d'abord, chercher ensuite : `page=$(curl -fsS …)` puis `grep -qF '…' <<<"$page"` (50 sur 50). Appliqué au test de fumée, à la CI, au test de restauration et au staging.
+- **À ne pas faire** : écrire un nouveau `… | grep -q` dans un script ou un workflow.

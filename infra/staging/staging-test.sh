@@ -134,7 +134,9 @@ before=$(backups | wc -l)
 sleep 1
 "$DEPLOY" backup
 [ "$(backups | wc -l)" -gt "$before" ] || fail "la sauvegarde quotidienne n'a rien produit"
-dc exec -T node-exporter cat /textfile/lorakus_backup.prom </dev/null | grep -qx 'lorakus_backup_last_success 1' \
+backup_metrics=$(dc exec -T node-exporter cat /textfile/lorakus_backup.prom </dev/null) \
+  || fail "fichier de metriques de sauvegarde illisible"
+grep -qx 'lorakus_backup_last_success 1' <<<"$backup_metrics" \
   || fail "metrique de sauvegarde absente ou en echec"
 "$DEPLOY" alert-test
 
