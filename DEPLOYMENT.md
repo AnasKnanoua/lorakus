@@ -69,7 +69,7 @@ Mesuré le 2026-11-10 : déploiement complet en 26 secondes. En cas d'échec : [
 
 ### 4.1 Mise en place (une fois)
 
-Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus/app`, puis `infra/deploy/init-env.sh`. Les mots de passe internes sont tirés au hasard sur place ; le webhook Discord, la clé B2 et la clé publique `age` sont saisis au clavier ; une valeur existante n'est jamais modifiée.
+Sur le serveur, en tant que `deploy` : `git clone` du dépôt dans `/opt/lorakus/app`, puis `infra/deploy/init-env.sh`. Les mots de passe internes sont tirés au hasard sur place ; le webhook Discord, la clé B2, la clé publique `age`, l'adresse healthchecks.io et la clé d'API Anthropic sont saisis au clavier ; une valeur existante n'est jamais modifiée.
 
 Côté GitHub, environnement `production` : approbation obligatoire, branche `main` seule ; secrets `DEPLOY_SSH_KEY` et `DEPLOY_HOST` ; variable `DEPLOY_KNOWN_HOSTS` (empreinte publique du serveur, vérifiée contre `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
 
@@ -190,3 +190,11 @@ Durée cible : une soirée.
 - [ ] Alerte de test reçue sur Discord avec `[production]` dans le titre et un lien vers le runbook : `/opt/lorakus/app/infra/deploy/deploy.sh alert-test` sur le serveur. Ne pas utiliser `amtool alert add` directement : une alerte injectée dans Alertmanager ne passe pas par Prometheus et ne reçoit pas le label `environment`
 - [ ] Sauvegarde du jour présente, métriques à jour
 - [ ] `PROJECT_STATE.md` et `CHANGELOG.md` à jour
+
+### Clé d'API Anthropic (PR 33, D-D)
+
+1. Console Anthropic : clé dédiée `lorakus-prod`, crédit prépayé, **rechargement automatique désactivé** (c'est le plafond global).
+2. Après le déploiement de la PR 33 (qui apporte la nouvelle version du script), sur le serveur en tant que `deploy` : `/opt/lorakus/app/infra/deploy/init-env.sh` ne demande que la clé (saisie masquée, format vérifié).
+3. Redémarrer l'API pour qu'elle la lise : `dc up -d --force-recreate api` (raccourci `dc` : `docs/runbooks/README.md`).
+
+Sans clé, l'assistant répond par son message de secours ; la clé ne va qu'au service `api` (test `test_compose_environment.py`). Rotation ou fuite : `docs/runbooks/ai.md`.

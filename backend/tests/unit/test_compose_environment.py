@@ -15,6 +15,7 @@ COMPOSE = Path(__file__).resolve().parents[3] / "compose.yml"
 # Secret -> services autorises a le recevoir.
 ALLOWED = {
     "LORAKUS_FIELD_ENCRYPTION_KEY": {"api"},
+    "LORAKUS_ANTHROPIC_API_KEY": {"api"},
     "LORAKUS_APP_DB_PASSWORD": {"postgres", "api", "worker"},
     "BACKUP_AGE_RECIPIENT": {"backup"},
 }

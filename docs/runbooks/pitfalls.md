@@ -65,3 +65,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Correction** : exception dans `infra/ci/trivy-secret.yaml`, passée à l'étape « Secrets dans l'image » par `--secret-config`. Une exception de Trivy porte soit sur un chemin, soit sur le texte, jamais les deux ensemble ; une exception par texte masquerait aussi les vraies clés (même texte). Elle est donc limitée aux dossiers concernés du code tiers. Vérifié : une vraie forme de clé ailleurs, y compris dans le reste du SDK, reste bloquante.
 - **À ne pas faire** : supprimer l'étape « Secrets dans l'image » (l'image ne serait plus analysée pour un `.env` ou une clé embarqués par erreur), ou désactiver la règle `gcp-service-account` (une vraie clé Google ne serait plus signalée que par sa clé privée).
 - **Depuis le 2026-11-12** : les secrets ont leur propre étape, bloquante dès HIGH (règle `private-key` comprise) ; les étapes de vulnérabilités utilisent `--scanners vuln`.
+
+## Alembic ignore en silence un dossier de migrations absent
+
+- **Symptôme** (évité avant la production, 2026-11-12, PR 33) : la migration se termine sans erreur, mais les tables d'un module manquent ; l'API démarre puis répond 500 sur les routes du module.
+- **Cause** : `alembic.ini` cherche les migrations des modules dans `lorakus_modules/<id>/migrations` à côté de lui ; l'image ne les copiait pas (le code des modules est installé dans `.venv`). Alembic ne signale pas un dossier de `version_locations` absent.
+- **Correction** : le Dockerfile copie les seuls fichiers de migration des modules dans `/app/lorakus_modules/` ; `alembic/env.py` refuse de migrer si un module installé déclare une branche introuvable. Vérifié en simulant l'image (wheel installée hors du dépôt).
+- **Corollaire** : `alembic_version` a une ligne par branche (Core et chaque module).

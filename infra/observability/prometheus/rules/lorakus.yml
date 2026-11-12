@@ -225,3 +225,60 @@ groups:
           summary: Les metriques du serveur ne sont plus collectees
           description: node_exporter est injoignable depuis 5 minutes (disque, memoire et sauvegardes non surveilles).
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/host.md
+
+  # Moteur IA et assistant (PR 33). Metriques lorakus_ai_* (ModelRouter) et
+  # lorakus_assistant_replies_total (module assistant).
+  - name: lorakus-ai
+    rules:
+      - alert: LorakusAiProviderFailing
+        expr: |
+          sum(increase(lorakus_ai_requests_total{outcome!="ok"}[15m])) >= 3
+          and (sum(increase(lorakus_ai_requests_total{outcome="ok"}[15m])) or vector(0)) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Le fournisseur d'IA echoue
+          description: Au moins 3 appels IA en echec et aucun reussi en 15 minutes. L'assistant repond par son message de secours.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaiproviderfailing
+
+      - alert: LorakusAiUsageNotRecorded
+        expr: increase(lorakus_ai_usage_record_failures_total[1h]) > 0
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Des depenses IA n'ont pas ete enregistrees
+          description: Au moins un appel IA reussi n'a pas pu etre ecrit dans core_ai_usage. Le plafond mensuel le sous-estime.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaiusagenotrecorded
+
+      - alert: LorakusAiSpendHigh
+        expr: sum(increase(lorakus_ai_cost_usd_total[24h])) > 0.5
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Depense IA anormale
+          description: Plus de 0,50 dollar d'IA en 24 heures, environ dix fois l'usage attendu. Possible boucle ou abus.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaispendhigh
+
+      - alert: LorakusAiBudgetReached
+        expr: sum(increase(lorakus_ai_refusals_total{reason="budget"}[1h])) > 0
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Plafond IA mensuel atteint
+          description: Des messages ont recu la reponse de secours car le plafond mensuel d'un utilisateur est atteint.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaibudgetreached
+
+      - alert: LorakusAssistantInternalError
+        expr: sum(increase(lorakus_assistant_replies_total{reason="error"}[15m])) > 0
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Erreur interne dans l'assistant
+          description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror

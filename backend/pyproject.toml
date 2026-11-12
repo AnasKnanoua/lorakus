@@ -62,13 +62,14 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]  # assert et faux mots de passe sont normaux dans les tests
 "alembic/versions/**" = ["F401"]      # le modele importe sqlalchemy meme si une migration ne l'utilise pas
+"lorakus_modules/*/prompts.py" = ["E501"]  # texte envoye au modele : pas de coupure artificielle
 
 # --- Pyright : vérification des types --------------------------------------
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
-strict = ["lorakus"]
-include = ["lorakus", "tests"]
+strict = ["lorakus", "lorakus_modules"]
+include = ["lorakus", "lorakus_modules", "tests"]
 venvPath = "."
 venv = ".venv"
 
@@ -134,3 +135,7 @@ type = "forbidden"
 source_modules = ["lorakus.ai.port", "lorakus.ai.router", "lorakus.ai.catalog", "lorakus.ai.usage", "lorakus.ai.breaker", "lorakus.ai.testing", "lorakus.core", "lorakus.api", "lorakus_modules"]
 forbidden_modules = ["anthropic"]
 allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas appeler le SDK
+
+# Modules decouverts par le Core.
+[project.entry-points."lorakus.modules"]
+assistant = "lorakus_modules.assistant.manifest:manifest"

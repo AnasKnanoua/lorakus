@@ -4,7 +4,8 @@
 # --generated-only : n'ajoute que les secrets tires au hasard, sans rien demander. deploy.sh
 #   l'appelle a chaque deploiement : un nouveau secret interne arrive donc tout seul.
 # - Les mots de passe internes sont tires au hasard ici meme : ils ne quittent jamais le serveur.
-# - Les valeurs venant de services externes (Discord, Backblaze B2, age) sont demandees au clavier.
+# - Les valeurs venant de services externes (Discord, Backblaze B2, age, Anthropic) sont demandees
+#   au clavier.
 # - Une valeur deja presente n'est JAMAIS modifiee : relancer le script est sans danger, et
 #   PostgreSQL garde les mots de passe choisis a la creation de la base.
 set -euo pipefail
@@ -109,6 +110,9 @@ asked B2_KEY_ID "Identifiant de la cle B2 (keyID)" '^[A-Za-z0-9]+$' visible
 asked B2_APP_KEY "Cle d'application B2 (applicationKey)" '^[A-Za-z0-9/+_-]+$' secret
 asked B2_BUCKET "Nom du bucket B2" '^[a-z0-9][a-z0-9-]+$' visible
 asked BACKUP_AGE_RECIPIENT "Cle PUBLIQUE age (commence par age1)" '^age1[a-z0-9]+$' visible
+# Cle d'API Anthropic (D-D) : creer une cle dediee « lorakus-prod » dans la console, avec un
+# credit prepaye et le rechargement automatique desactive.
+asked LORAKUS_ANTHROPIC_API_KEY "Cle d'API Anthropic (commence par sk-ant-)" '^sk-ant-[A-Za-z0-9_-]{20,}$' secret
 asked HEALTHCHECKS_PING_URL "Adresse de ping healthchecks.io (sentinelle externe)" '^https://hc-ping\.com/[0-9a-f-]{36}$' secret
 
 chmod 600 "$ENV_FILE"

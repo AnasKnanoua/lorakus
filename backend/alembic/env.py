@@ -21,9 +21,25 @@ from lorakus.settings import get_settings
 
 # Tables des modules installes : leurs modeles sont importes pour que alembic check les
 # compare aussi a la base.
-for _manifest in ModuleRegistry.from_entry_points():
+_modules = list(ModuleRegistry.from_entry_points())
+for _manifest in _modules:
     if _manifest.models:
         importlib.import_module(_manifest.models)
+
+# Garde-fou : Alembic ignore en silence un dossier de migrations absent. Sans ce controle,
+# une image mal construite declarerait la base a jour sans les tables d'un module, et l'API
+# demarrerait quand meme (erreurs 500 ensuite). Ici, la migration echoue, donc le deploiement.
+_known_branches = {
+    label for revision in context.script.walk_revisions() for label in revision.branch_labels
+}
+_missing = sorted(
+    m.migrations for m in _modules if m.migrations and m.migrations not in _known_branches
+)
+if _missing:
+    raise RuntimeError(
+        f"migrations introuvables pour : {', '.join(_missing)} "
+        "(verifier version_locations dans alembic.ini et la copie des migrations dans l'image)"
+    )
 
 config = context.config
 if config.config_file_name is not None:

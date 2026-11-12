@@ -29,6 +29,14 @@ COPY lorakus ./lorakus
 COPY lorakus_modules ./lorakus_modules
 RUN uv sync --locked --no-dev --no-editable
 
+# Migrations des modules, rangees comme dans le depot : alembic.ini les cherche dans
+# lorakus_modules/<id>/migrations a cote de lui. Seuls les fichiers de migration sont copies
+# (pas de __init__.py) : le code des modules reste celui installe dans .venv.
+RUN mkdir -p /migrations/lorakus_modules \
+ && find lorakus_modules -path lorakus_modules/_template -prune \
+      -o -path '*/migrations/*.py' -print \
+    | xargs -r -I{} install -D -m 644 {} /migrations/{}
+
 # ---------------------------------------------------------------- runtime
 FROM ${PYTHON_IMAGE} AS runtime
 
@@ -47,6 +55,7 @@ WORKDIR /app
 COPY --from=builder --chown=root:root /app/.venv /app/.venv
 COPY --chown=root:root alembic.ini ./
 COPY --chown=root:root alembic ./alembic
+COPY --from=builder --chown=root:root /migrations/lorakus_modules ./lorakus_modules
 
 USER lorakus
 

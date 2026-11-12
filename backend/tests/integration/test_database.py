@@ -33,5 +33,5 @@ async def test_malicious_input_is_treated_as_data() -> None:
 
     # La base a renvoye la chaine telle quelle, sans l'executer...
     assert echoed == MALICIOUS
-    # ...et la table visee existe toujours.
-    assert versions == 1
+    # ...et la table visee existe toujours (une ligne par branche : Core et chaque module).
+    assert versions >= 1
