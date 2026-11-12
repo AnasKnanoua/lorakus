@@ -107,7 +107,17 @@ jobs:
           GHCR_TOKEN: ${{ github.token }}
         run: |
           echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          docker push "$REF"
+          # GHCR renvoie parfois « unknown blob » ou une erreur 5xx passagere : trois essais
+          # espaces. Un nouvel essai ne change rien a une couche deja envoyee (meme empreinte).
+          for attempt in 1 2 3; do
+            if docker push "$REF"; then
+              exit 0
+            fi
+            echo "::warning::Envoi de $REF en echec (essai $attempt sur 3)"
+            sleep $((attempt * 15))
+          done
+          echo "::error::Envoi de $REF impossible apres 3 essais"
+          exit 1
 
   manifest:
     name: manifest (${{ matrix.image }})

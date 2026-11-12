@@ -5,6 +5,9 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # Verrou de pnpm : plusieurs documents YAML par fichier (format pnpm 12), genere par
+        # l'outil et valide en CI par pnpm install --frozen-lockfile.
+        exclude: ^frontend/pnpm-lock\.yaml$
       - id: check-toml
       - id: check-added-large-files
         args: ["--maxkb=500"]

@@ -16,6 +16,10 @@ SPA React (Vite, TanStack Router et Query, shadcn/ui sur Radix, Tailwind) en PWA
 
 Next.js (SSR inutile pour une app privée) ; app native (coût double).
 
+## Revue du 2026-11-12 (PR 34, avant la phase 3)
+
+Pile confirmée. Précisions : routes déclarées en code (pas de génération de fichiers par le routeur) ; composants façon shadcn/ui copiés au besoin seulement ; réponses en flux lues par `fetch` (EventSource ne fait que des GET) ; service worker écrit à la main, sans Workbox (il ne cache que la coquille, jamais `/api/`) ; client typé par `openapi-typescript` et `openapi-fetch`, contrat vérifié en CI ; pnpm avec `minimumReleaseAge` (14 jours). Détails : `docs/frontend.md`.
+
 ## Conséquences
 
 Aucun impact backend. Le design system (tokens, composants) est indépendant du framework.

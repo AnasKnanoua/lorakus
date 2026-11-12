@@ -16,6 +16,21 @@ updates:
       prefix: build
       include: scope
 
+  # Frontend (pnpm). Le delai de 14 jours est aussi impose par pnpm (minimumReleaseAge).
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    groups:
+      frontend:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

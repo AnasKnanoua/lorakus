@@ -79,3 +79,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : avec `set -o pipefail` (nos scripts, et toute étape `run:` de GitHub Actions), `grep -q` s'arrête à la première correspondance et ferme le tuyau ; si la commande de gauche écrit encore (le serveur de métriques envoie sa page en plusieurs morceaux), elle reçoit SIGPIPE et le tuyau entier est en échec. Mesuré : 12 à 22 échecs sur 50 essais contre une vraie API.
 - **Correction** : lire la sortie d'abord, chercher ensuite : `page=$(curl -fsS …)` puis `grep -qF '…' <<<"$page"` (50 sur 50). Appliqué au test de fumée, à la CI, au test de restauration et au staging.
 - **À ne pas faire** : écrire un nouveau `… | grep -q` dans un script ou un workflow.
+
+## `.env` appartient à root après `init-env.sh`
+
+- **Symptôme** (2026-11-12) : `docker compose` répond « permission denied » sur `/opt/lorakus/.env` ; le déploiement suivant échouerait.
+- **Cause** : `init-env.sh` lancé avec `sudo` ; le script remplace le fichier, et le nouveau appartient à qui le lance (root).
+- **Correction** : `sudo chown deploy:deploy /opt/lorakus/.env && sudo chmod 600 /opt/lorakus/.env`. Depuis la PR 34, le script refuse root et tout utilisateur autre que le propriétaire du fichier, et donne la bonne commande (`sudo -iu deploy …`).
