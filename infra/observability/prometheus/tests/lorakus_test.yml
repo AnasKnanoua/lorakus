@@ -401,3 +401,127 @@ tests:
               summary: Des evenements ont ete abandonnes
               description: Au moins un evenement a echoue 8 fois et n'est plus retente ; voir last_error dans core_outbox.
               runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
+
+  # ------------------------------------------------------------------ IA
+  - name: Fournisseur IA en echec
+    interval: 1m
+    input_series:
+      - series: 'lorakus_ai_requests_total{task="chat", provider="anthropic", model="claude-haiku-5-5", outcome="error"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: LorakusAiProviderFailing
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: LorakusAiProviderFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Le fournisseur d'IA echoue
+              description: Au moins 3 appels IA en echec et aucun reussi en 15 minutes. L'assistant repond par son message de secours.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaiproviderfailing
+
+  - name: Echecs ponctuels avec des reussites (pas d'alerte)
+    interval: 1m
+    input_series:
+      - series: 'lorakus_ai_requests_total{task="chat", provider="anthropic", model="claude-haiku-5-5", outcome="error"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10'
+      - series: 'lorakus_ai_requests_total{task="chat", provider="anthropic", model="claude-haiku-5-5", outcome="ok"}'
+        values: '0 2 4 6 8 10 12 14 16 18 20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: LorakusAiProviderFailing
+        exp_alerts: []
+
+  - name: Depense IA non enregistree
+    interval: 1m
+    input_series:
+      - series: 'lorakus_ai_usage_record_failures_total'
+        values: '0 0 0 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: LorakusAiUsageNotRecorded
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: LorakusAiUsageNotRecorded
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Des depenses IA n'ont pas ete enregistrees
+              description: Au moins un appel IA reussi n'a pas pu etre ecrit dans core_ai_usage. Le plafond mensuel le sous-estime.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaiusagenotrecorded
+
+  - name: Depense IA anormale
+    interval: 1h
+    input_series:
+      # 0,05 dollar par heure : 1,20 dollar par jour.
+      - series: 'lorakus_ai_cost_usd_total{provider="anthropic", model="claude-haiku-5-5"}'
+        values: '0+0.05x30'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: LorakusAiSpendHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Depense IA anormale
+              description: Plus de 0,50 dollar d'IA en 24 heures, environ dix fois l'usage attendu. Possible boucle ou abus.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaispendhigh
+
+  - name: Usage IA normal (pas d'alerte)
+    interval: 1h
+    input_series:
+      # 0,002 dollar par heure : environ 0,05 dollar par jour.
+      - series: 'lorakus_ai_cost_usd_total{provider="anthropic", model="claude-haiku-5-5"}'
+        values: '0+0.002x30'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: LorakusAiSpendHigh
+        exp_alerts: []
+
+  - name: Plafond IA atteint
+    interval: 1m
+    input_series:
+      - series: 'lorakus_ai_refusals_total{task="chat", reason="budget"}'
+        values: '0 0 1 2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusAiBudgetReached
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: LorakusAiBudgetReached
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Plafond IA mensuel atteint
+              description: Des messages ont recu la reponse de secours car le plafond mensuel d'un utilisateur est atteint.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusaibudgetreached
+
+  - name: Erreur interne de l'assistant
+    interval: 1m
+    input_series:
+      - series: 'lorakus_assistant_replies_total{status="fallback", reason="error"}'
+        values: '0 0 1'
+      - series: 'lorakus_assistant_replies_total{status="ok", reason="ok"}'
+        values: '0 5 10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusAssistantInternalError
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: LorakusAssistantInternalError
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Erreur interne dans l'assistant
+              description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror

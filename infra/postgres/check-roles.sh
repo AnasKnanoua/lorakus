@@ -63,7 +63,9 @@ fi
   || ko "extension pgvector installee"
 
 
-[ "$(psql_as "${APP[@]}" "select count(*) from alembic_version")" = "1" ] \
+# Une ligne par branche de migrations (Core et chaque module) : au moins une.
+versions=$(psql_as "${APP[@]}" "select count(*) from alembic_version" || true)
+[[ "$versions" =~ ^[1-9][0-9]*$ ]] \
   && ok "lorakus_app lit la version du schema" \
   || ko "lorakus_app lit la version du schema"
 

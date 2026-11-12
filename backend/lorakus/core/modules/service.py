@@ -55,6 +55,14 @@ class ModuleService:
             )
         return result
 
+    async def config(self, user_id: uuid.UUID, module_id: str) -> dict[str, Any]:
+        """Configuration enregistree d'un module pour cet utilisateur ({} si jamais reglee)."""
+        async with self._db.transaction(user_id) as session:
+            stored = await session.scalar(
+                select(UserModule.config).where(UserModule.module_id == module_id)
+            )
+        return dict(stored) if stored else {}
+
     async def is_enabled(self, user_id: uuid.UUID, module_id: str) -> bool:
         if self.registry.get(module_id) is None:
             return False

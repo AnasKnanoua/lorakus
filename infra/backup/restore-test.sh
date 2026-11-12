@@ -46,7 +46,8 @@ docker run -d --name "$CONTAINER" --network none \
   -e POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
   "$PG_IMAGE" >/dev/null
 for _ in $(seq 1 60); do
-  if docker logs "$CONTAINER" 2>&1 | grep -q "PostgreSQL init process complete" \
+  # Journaux lus d'abord : « ... | grep -q » echoue au hasard avec pipefail (pitfalls.md).
+  if grep -qF "PostgreSQL init process complete" <<<"$(docker logs "$CONTAINER" 2>&1)" \
      && docker exec "$CONTAINER" pg_isready -U restore_admin -d lorakus >/dev/null 2>&1; then
     break
   fi

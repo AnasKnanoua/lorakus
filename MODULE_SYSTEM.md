@@ -7,7 +7,7 @@ Un module est un package Python autonome qui apporte un domaine métier à LORAK
 1. Un module **n'importe jamais** un autre module ni `lorakus.ai.providers` (vérifié par `import-linter` depuis la PR 32 ; aucun SDK d'IA hors des adaptateurs, vérifié aussi par `tests/unit/test_ai_boundaries.py`). Le Core n'importe **jamais** un module : il les découvre par leurs entry points.
 2. Un module **ne lit ni n'écrit** les tables d'un autre ; il possède ses tables, préfixées.
 3. Un module **n'envoie jamais de notification** : il émet des signaux (`Signals.emit`), l'`InterventionPolicy` décide.
-4. Un module **n'appelle jamais un SDK d'IA** : il passe par `ModelRouter` avec une tâche et une classe de données.
+4. Un module **n'appelle jamais un SDK d'IA** : il passe par `ModelRouter` avec une tâche et une classe de données. Une route l'obtient par la dépendance `lorakus.api.ai.get_ai`, et lit la configuration de l'utilisateur par `ModuleService.config` (exemple : `lorakus_modules/assistant`).
 5. Toute donnée porte `user_id` ; toute requête passe par la session RLS fournie par le Core.
 6. Toute dépendance transversale est **déclarée** dans le manifeste : événements, ports fournis, signaux, outils.
 

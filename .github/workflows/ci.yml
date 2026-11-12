@@ -100,7 +100,9 @@ jobs:
           curl -fsS http://127.0.0.1:8000/api/health
           test "$(docker inspect -f '{{.Config.User}}' api-ci)" = "lorakus"
           test "$(docker exec api-ci id -u)" = "10001"
-          curl -fsS http://127.0.0.1:9464/metrics | grep -q 'lorakus_http_requests_total{method="GET",route="/api/health"'
+          # Page lue d'abord : « curl | grep -q » echoue au hasard avec pipefail (pitfalls.md).
+          page=$(curl -fsS http://127.0.0.1:9464/metrics)
+          grep -qF 'lorakus_http_requests_total{method="GET",route="/api/health"' <<<"$page"
           docker logs api-ci 2>&1 | tail -n 1 | python3 -c 'import json, sys; json.loads(sys.stdin.read())'
           docker rm -f api-ci
 

@@ -78,6 +78,10 @@ services:
       # Chiffrement des secrets TOTP. Facultative en developpement (double authentification
       # alors indisponible) ; obligatoire en staging et en production, creee par init-env.sh.
       LORAKUS_FIELD_ENCRYPTION_KEY: ${LORAKUS_FIELD_ENCRYPTION_KEY:-}
+      # Moteur IA (ADR 0007, D-D). Cle au SEUL service api ; vide = reponses par gabarit.
+      LORAKUS_ANTHROPIC_API_KEY: ${LORAKUS_ANTHROPIC_API_KEY:-}
+      LORAKUS_AI_KILL_SWITCH: ${LORAKUS_AI_KILL_SWITCH:-false}
+      LORAKUS_AI_MONTHLY_BUDGET_USD: ${LORAKUS_AI_MONTHLY_BUDGET_USD:-3.00}
     depends_on:
       postgres:
         condition: service_healthy

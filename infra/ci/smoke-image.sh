@@ -58,7 +58,11 @@ smoke_api() {
   fi
   echo "Lecture seule : OK"
 
-  curl -fsS "$metrics/metrics" | grep -q 'lorakus_http_requests_total{method="GET",route="/api/health"' \
+  # Page lue d'abord, cherchee ensuite : avec pipefail, « curl | grep -q » echoue au hasard
+  # (grep ferme le tuyau des qu'il trouve, curl recoit SIGPIPE ; docs/runbooks/pitfalls.md).
+  local page
+  page=$(curl -fsS "$metrics/metrics") || fail "page des metriques injoignable"
+  grep -qF 'lorakus_http_requests_total{method="GET",route="/api/health"' <<<"$page" \
     || fail "metrique des requetes absente"
   echo "Metriques : OK"
 
