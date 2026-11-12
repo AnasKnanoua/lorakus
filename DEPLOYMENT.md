@@ -109,7 +109,7 @@ Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la p
 
 ### 4.6 Exposition publique (PR 35, une fois)
 
-Avant le premier déploiement qui apporte Caddy, vérifier qu'aucun réseau Docker n'occupe déjà `172.31.250.0/28` (réseau `edge` de `compose.prod.yml`) :
+Avant le premier déploiement qui apporte Caddy, vérifier qu'aucun réseau Docker n'occupe déjà `172.31.250.0/24`, et qu'aucun programme n'écoute déjà sur les ports 80 et 443 (`sudo ss -ltnp 'sport = :80 or sport = :443'` ne doit rien afficher) (réseau `edge` de `compose.prod.yml`) :
 
 ```bash
 ssh lorakus-prod 'docker network inspect $(docker network ls -q) --format "{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}"'

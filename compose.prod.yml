@@ -59,11 +59,14 @@ services:
       - ./infra/observability/prometheus/production:/etc/prometheus-extra:ro
 
 networks:
-  # Reseau de Caddy, a adresses fixes : l'API sait quelle adresse est celle du proxy.
+  # Reseau de Caddy. Caddy a une adresse fixe (.2), hors de la plage ou Docker choisit celles
+  # des autres conteneurs (ip_range, .128 a .254) : sinon l'API, creee avant Caddy, pourrait
+  # recevoir .2 et Caddy ne demarrerait plus (« Address already in use », staging du 2026-11-12).
   edge:
     ipam:
       config:
-        - subnet: 172.31.250.0/28
+        - subnet: 172.31.250.0/24
+          ip_range: 172.31.250.128/25
 
 volumes:
   caddy-data:

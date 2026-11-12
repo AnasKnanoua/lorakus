@@ -104,3 +104,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : l'image officielle de Caddy pose la capacité de fichier `cap_net_bind_service` sur son binaire (`setcap`). Un programme qui porte une capacité absente de l'ensemble autorisé du conteneur (`cap_drop: ALL`) ne peut pas être lancé : le noyau refuse l'`exec`.
 - **Correction** : notre image recopie le binaire sans attribut étendu (`install`) dans `/usr/local/bin` et supprime l'original. Caddy écoute sur 8080 et 8443, il n'a besoin d'aucune capacité.
 - **À retenir** : toute image de base qui utilise `setcap` pose le même problème avec notre durcissement ; le test de fumée, qui lance l'image avec les mêmes options que Compose, le détecte.
+
+## Caddy ne démarre pas : « Address already in use »
+
+- **Symptôme** (2026-11-12, staging de la PR 35) : « failed to set up container networking: Address already in use » au démarrage de `web` ; le déploiement revient à la version précédente.
+- **Cause** : le réseau `edge` n'avait pas de plage réservée. L'API et Prometheus, attachés au réseau avant Caddy (premier passage du déploiement), ont reçu les premières adresses libres, dont `172.31.250.2`, l'adresse fixe de Caddy.
+- **Correction** : `ip_range` (`172.31.250.128/25`) limite l'attribution automatique à la moitié haute du réseau ; les adresses fixes (Caddy) sont prises dans la moitié basse.
+- **Corrigé au passage** : en cas d'échec, `deploy.sh` supprimait `release.next.env` avant d'afficher les journaux de la version refusée (« couldn't find env file ») ; il le garde désormais jusque-là.
