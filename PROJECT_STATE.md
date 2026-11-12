@@ -86,6 +86,8 @@
 - FastAPI 0.162 n'aplatit plus `include_router` : le modèle de route des métriques est reconstitué à partir de `scope["route"]` (fait et testé) ; à surveiller lors des montées de version.
 - Name.com ne gère pas les enregistrements CAA : à ajouter si le DNS passe chez Cloudflare.
 - `deploy.sh` ne supprime pas les anciennes images Docker : elles s'accumulent à chaque déploiement (nettoyage manuel dans `docs/runbooks/disk-full.md`, automatisation à prévoir si le disque le demande).
+- Les secrets trouvés par Trivy dans les images ne bloquent qu'en gravité CRITICAL : une clé privée (règle `private-key`, gravité HIGH) embarquée par erreur ne ferait pas échouer la CI. Constaté le 2026-11-12 ; correctif prévu dans une petite PR dédiée après la PR 32 (étape de secrets bloquante dès HIGH, vérifiée sur l'image réelle).
+- Exception Trivy pour le SDK Anthropic : `infra/ci/trivy-secret.yaml`, à revoir à chaque mise à jour du SDK (`docs/runbooks/pitfalls.md`).
 - La clé B2 est encore partagée entre le Dell et le serveur tant que l'étape 1 ci-dessus n'est pas faite.
 
 ## Dette technique acceptée
