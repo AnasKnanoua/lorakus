@@ -9,9 +9,10 @@ import { conversationQuery } from "@/lib/queries";
 
 import { Composer } from "./Composer";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { TopBar } from "./layout";
 import { AssistantMessage, UserMessage } from "./MessageItem";
 import { MessageList } from "./MessageList";
-import { startReply, useBudgetWarning, useLiveTurn } from "./replies";
+import { startReply, useBudgetWarning, useLiveTurn, withoutLiveTurn } from "./replies";
 
 function asStatus(value: string): ReplyStatus {
   return value === "interrupted" || value === "fallback" ? value : "ok";
@@ -36,33 +37,40 @@ export function ConversationScreen() {
 
   if (conversation.isError) {
     return (
-      <div className="mx-auto max-w-md px-6 py-16">
-        <h1 className="text-xl font-bold">Conversation introuvable</h1>
-        <p className="mt-2 text-ink-muted">Elle a peut-être été supprimée.</p>
+      <div className="flex flex-1 flex-col">
+        <TopBar />
+        <div className="mx-auto max-w-md px-6 py-16 text-center">
+          <h1 className="text-xl font-semibold">Conversation introuvable</h1>
+          <p className="mt-2 text-ink-muted">Elle a peut-être été supprimée.</p>
+        </div>
       </div>
     );
   }
 
-  const messages = conversation.data?.messages ?? [];
+  // Sans doublon : le tour en direct affiche deja son message et sa reponse.
+  const messages = withoutLiveTurn(conversation.data?.messages ?? [], live);
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-4 sm:px-6">
-        <h1 className="min-w-0 flex-1 truncate font-medium">{conversation.data?.title ?? ""}</h1>
-        <Button
-          variant="quiet"
-          size="icon"
-          aria-label="Supprimer la conversation"
-          onClick={() => {
-            setConfirming(true);
-          }}
-        >
-          <Trash2 aria-hidden="true" />
-        </Button>
-      </header>
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <TopBar
+        actions={
+          <Button
+            variant="quiet"
+            size="icon"
+            aria-label="Supprimer la conversation"
+            onClick={() => {
+              setConfirming(true);
+            }}
+          >
+            <Trash2 aria-hidden="true" className="!size-[18px]" />
+          </Button>
+        }
+      >
+        <h1 className="truncate text-[0.9375rem] font-medium text-ink-muted">{conversation.data?.title ?? ""}</h1>
+      </TopBar>
 
       {budgetWarning && (
-        <p role="status" className="bg-notice-soft px-4 py-2 text-center text-sm text-notice">
-          Vous avez utilisé 80 % du budget d'IA de ce mois.
+        <p role="status" className="mx-auto mb-2 w-fit rounded-full bg-notice-soft px-4 py-1.5 text-center text-sm text-notice">
+          Tu as utilisé 80 % du budget d'IA de ce mois.
         </p>
       )}
 
@@ -81,14 +89,23 @@ export function ConversationScreen() {
           </>
         )}
         {live?.status === "error" && (
-          <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
-            La réponse n'a pas pu être reçue. Vérifiez votre connexion ; votre message est conservé
+          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+            La réponse n'a pas pu être reçue. Vérifie ta connexion ; ton message est conservé
             ci-dessus s'il a été enregistré.
           </p>
         )}
       </MessageList>
 
-      <Composer onSend={(text) => void startReply(queryClient, conversationId, text)} disabled={busy} />
+      <Composer
+        onSend={(text) => void startReply(queryClient, conversationId, text)}
+        busy={busy}
+        autoFocus
+        footer={
+          <p className="mt-2 text-center text-xs text-ink-faint">
+            Lorakus peut se tromper. Vérifie les informations importantes.
+          </p>
+        }
+      />
 
       <ConfirmDialog
         open={confirming}

@@ -20,6 +20,10 @@ Next.js (SSR inutile pour une app privée) ; app native (coût double).
 
 Pile confirmée. Précisions : routes déclarées en code (pas de génération de fichiers par le routeur) ; composants façon shadcn/ui copiés au besoin seulement ; réponses en flux lues par `fetch` (EventSource ne fait que des GET) ; service worker écrit à la main, sans Workbox (il ne cache que la coquille, jamais `/api/`) ; client typé par `openapi-typescript` et `openapi-fetch`, contrat vérifié en CI ; pnpm avec `minimumReleaseAge` (14 jours). Détails : `docs/frontend.md`.
 
+## Refonte de l'interface (2026-11-12)
+
+Pile inchangée. Identité « encre de nuit et aurore » (thème sombre de référence, accent jade, orbe), police Inter à la place d'Atkinson Hyperlegible (OpenAI Sans, demandée comme modèle, est propriétaire), accueil au champ centré qui glisse vers le bas au premier envoi par les View Transitions du navigateur (aucune bibliothèque d'animation), barre latérale repliable. Aucune dépendance ajoutée hormis la police. Détails et contrastes : `docs/frontend.md`.
+
 ## Conséquences
 
 Aucun impact backend. Le design system (tokens, composants) est indépendant du framework.

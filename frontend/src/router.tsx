@@ -75,6 +75,8 @@ export function makeRouter(queryClient: QueryClient, history?: RouterHistory) {
     routeTree,
     context: { queryClient },
     defaultPreload: false,
+    // Fondu bref entre les ecrans ; l'accueil fait en plus glisser le champ de saisie.
+    defaultViewTransition: true,
     ...(history ? { history } : {}),
   });
 }

@@ -55,18 +55,18 @@ REPLIES: Final = Counter(
 FALLBACKS: Final[dict[str, str]] = {
     "budget": (
         "J'ai atteint le budget d'IA prévu pour ce mois : je ne peux plus utiliser mon modèle "
-        "de langage avant le 1er du mois prochain. Votre message est bien enregistré."
+        "de langage avant le 1er du mois prochain. Ton message est bien enregistré."
     ),
     "unavailable": (
-        "Mon modèle de langage est indisponible pour le moment. Réessayez dans quelques "
-        "minutes ; votre message est bien enregistré."
+        "Mon modèle de langage est indisponible pour le moment. Réessaie dans quelques "
+        "minutes ; ton message est bien enregistré."
     ),
     "too_long": (
-        "Ce message est trop long pour que je le traite en une fois. Pouvez-vous le raccourcir "
+        "Ce message est trop long pour que je le traite en une fois. Peux-tu le raccourcir "
         "ou le découper ?"
     ),
     "refused": "Je ne peux pas envoyer ces données à un modèle externe.",
-    "error": "Une erreur interne m'empêche de répondre. Elle a été signalée ; réessayez plus tard.",
+    "error": "Une erreur interne m'empêche de répondre. Elle a été signalée ; réessaie plus tard.",
 }
 
 
