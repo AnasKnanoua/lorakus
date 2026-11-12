@@ -166,6 +166,10 @@ check_public_access
 step "3/6 Retour arriere puis redeploiement"
 "$DEPLOY" rollback
 expect_release "$PREV_COMMIT"
+if [ -z "${PREV_WEB_DIGEST:-}" ]; then
+  # Version d'avant l'image web : Caddy doit avoir disparu avec le retour arriere.
+  [ -z "$(docker ps -q --filter name=lorakus-web-1)" ] || fail "Caddy tourne encore apres le retour arriere"
+fi
 deploy_new
 expect_release "$NEW_COMMIT"
 check_public_access

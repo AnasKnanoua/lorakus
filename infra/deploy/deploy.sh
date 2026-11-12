@@ -260,8 +260,13 @@ cmd_apply() {
   fi
 
   # Succes : la version en service devient la precedente, la nouvelle devient la version en service.
+  # Meme commit avec d'autres images (second passage d'un deploiement en deux temps, ou image
+  # ajoutee) : la version en service est seulement completee. La precedente reste la vraie
+  # version d'avant, sinon un retour arriere ramenerait l'etat intermediaire du premier passage.
   if same_release "$NEXT" "$RELEASE"; then
     rm -f "$NEXT"
+  elif [ "$(release_value "$NEXT" LORAKUS_RELEASE_COMMIT)" = "$(release_value "$RELEASE" LORAKUS_RELEASE_COMMIT)" ]; then
+    mv "$NEXT" "$RELEASE"
   else
     if [ -f "$RELEASE" ]; then
       mv "$RELEASE" "$PREVIOUS"

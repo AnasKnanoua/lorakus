@@ -111,3 +111,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : le réseau `edge` n'avait pas de plage réservée. L'API et Prometheus, attachés au réseau avant Caddy (premier passage du déploiement), ont reçu les premières adresses libres, dont `172.31.250.2`, l'adresse fixe de Caddy.
 - **Correction** : `ip_range` (`172.31.250.128/25`) limite l'attribution automatique à la moitié haute du réseau ; les adresses fixes (Caddy) sont prises dans la moitié basse.
 - **Corrigé au passage** : en cas d'échec, `deploy.sh` supprimait `release.next.env` avant d'afficher les journaux de la version refusée (« couldn't find env file ») ; il le garde désormais jusque-là.
+
+## Le retour arrière ramène l'étape intermédiaire d'un déploiement en deux passages
+
+- **Symptôme** (2026-11-12, staging) : après le déploiement de la PR 35, `rollback` remet le même commit sans Caddy au lieu de la version d'avant.
+- **Cause** : chaque passage réussi faisait de la version en service la « précédente ». Après deux passages, la précédente était donc le premier passage.
+- **Correction** : un passage qui garde le même commit (images complétées) remplace la version en service sans toucher à la précédente. Le staging vérifie que le retour arrière revient bien à la version de production, sans Caddy quand elle n'en avait pas.
