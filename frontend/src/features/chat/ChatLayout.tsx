@@ -1,64 +1,111 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { AssistantDisabledError } from "@/api/assistant";
-import { Button } from "@/components/ui/button";
+import { Orb } from "@/components/Orb";
+import { cn } from "@/lib/cn";
 import { conversationsQuery } from "@/lib/queries";
 
 import { EnableAssistant } from "./EnableAssistant";
+import { LayoutContext } from "./layout";
 import { Sidebar } from "./Sidebar";
 
+const COLLAPSED_KEY = "lorakus.sidebar.collapsed";
+
+/** Preference d'affichage seulement (aucune donnee personnelle) ; stockage facultatif. */
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Mise en page : sur grand ecran, la liste des conversations a gauche ; sur telephone, un
- * panneau qui s'ouvre depuis le bouton menu.
+ * Mise en page : barre laterale repliable sur grand ecran, panneau coulissant sur telephone.
+ * La zone principale n'affiche rien tant qu'on ne sait pas si l'assistant est active : sinon
+ * l'accueil s'affichait un instant avant l'ecran d'activation.
  */
 export function ChatLayout() {
-  const [open, setOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const conversations = useQuery(conversationsQuery);
   const disabled = conversations.error instanceof AssistantDisabledError;
 
-  return (
-    <div className="flex h-full">
-      <aside className="hidden w-72 shrink-0 border-r border-line lg:block">
-        <Sidebar />
-      </aside>
+  const setSidebar = useCallback((value: boolean) => {
+    setCollapsed(value);
+    try {
+      window.localStorage.setItem(COLLAPSED_KEY, value ? "1" : "0");
+    } catch {
+      // Stockage indisponible : la preference vaut pour cette session seulement.
+    }
+  }, []);
 
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-ink/40 lg:hidden" />
-          <Dialog.Content
-            aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 w-[85%] max-w-xs pt-[env(safe-area-inset-top)] lg:hidden"
-          >
-            <Dialog.Title className="sr-only">Conversations</Dialog.Title>
+  const layout = useMemo(
+    () => ({
+      openDrawer: () => {
+        setDrawerOpen(true);
+      },
+      sidebarCollapsed: collapsed,
+      expandSidebar: () => {
+        setSidebar(false);
+      },
+    }),
+    [collapsed, setSidebar],
+  );
+
+  return (
+    <LayoutContext.Provider value={layout}>
+      <div className="flex h-dvh overflow-hidden bg-background">
+        <aside
+          aria-hidden={collapsed}
+          inert={collapsed}
+          className={cn(
+            "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-[var(--ease-out-soft)] lg:block",
+            collapsed ? "w-0" : "w-[264px]",
+          )}
+        >
+          <div className="h-full w-[264px]">
             <Sidebar
-              onNavigate={() => {
-                setOpen(false);
+              onCollapse={() => {
+                setSidebar(true);
               }}
             />
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </div>
+        </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-14 shrink-0 items-center border-b border-line px-2 lg:hidden">
-          <Button
-            variant="quiet"
-            size="icon"
-            aria-label="Ouvrir la liste des conversations"
-            onClick={() => {
-              setOpen(true);
-            }}
-          >
-            <Menu aria-hidden="true" />
-          </Button>
-          <span className="font-bold">Lorakus</span>
-        </div>
-        {disabled ? <EnableAssistant /> : <Outlet />}
-      </main>
-    </div>
+        <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="scrim fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px] lg:hidden" />
+            <Dialog.Content
+              aria-describedby={undefined}
+              className="drawer fixed inset-y-0 left-0 z-50 w-[86%] max-w-[300px] shadow-float lg:hidden"
+            >
+              <Dialog.Title className="sr-only">Conversations</Dialog.Title>
+              <Sidebar
+                onNavigate={() => {
+                  setDrawerOpen(false);
+                }}
+              />
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          {conversations.isPending ? (
+            <div className="flex flex-1 items-center justify-center" aria-busy="true">
+              <Orb thinking className="size-8" />
+              <span className="sr-only">Chargement…</span>
+            </div>
+          ) : disabled ? (
+            <EnableAssistant />
+          ) : (
+            <Outlet />
+          )}
+        </main>
+      </div>
+    </LayoutContext.Provider>
   );
 }

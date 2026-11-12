@@ -24,17 +24,17 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
+        <Dialog.Overlay className="scrim fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px]" />
         {/* alertdialog : confirmation destructive, annoncee comme une alerte qui attend une reponse. */}
         <Dialog.Content
           role="alertdialog"
-          className="fixed inset-x-4 bottom-4 mx-auto max-w-md rounded-2xl bg-surface p-6 sm:top-1/3 sm:bottom-auto"
+          className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md animate-fade-up rounded-3xl border border-line bg-raised p-6 shadow-float sm:top-1/3 sm:bottom-auto"
         >
-          <Dialog.Title className="text-lg font-bold">{title}</Dialog.Title>
+          <Dialog.Title className="text-lg font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
           <Dialog.Description className="mt-2 text-ink-muted">{description}</Dialog.Description>
           {failed && (
             <p role="alert" className="mt-3 text-sm text-danger">
-              La suppression a échoué. Réessayez.
+              La suppression a échoué. Réessaie.
             </p>
           )}
           <div className="mt-6 flex justify-end gap-2">

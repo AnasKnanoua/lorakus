@@ -18,19 +18,38 @@ pnpm installe les dépendances et refuse toute version publiée depuis moins de 
 | Adresse | Écran |
 | --- | --- |
 | `/connexion` | Connexion, avec le code de double authentification si le compte l'exige |
-| `/` | Nouvelle conversation |
-| `/c/<id>` | Conversation : messages enregistrés, réponse en direct, suppression |
+| `/` | Accueil : la question et le champ de saisie au centre de la zone principale (barre latérale exclue) |
+| `/c/<id>` | Conversation : messages enregistrés, réponse en direct, champ de saisie en bas, suppression |
 
-Une réponse n'appartient pas à l'écran qui l'a demandée (`src/features/chat/replies.ts`) : on peut changer de conversation pendant qu'elle s'écrit, elle se termine et s'enregistre côté serveur, puis l'écran affiche les messages enregistrés, seule source de vérité.
+Au premier envoi depuis l'accueil, le champ de saisie **glisse** du centre vers le bas pendant que la conversation apparaît en fondu : les deux écrans donnent au champ le même nom de transition (`view-transition-name: composer`) et le routeur navigue avec les View Transitions du navigateur. Les autres changements d'écran font un fondu bref. Un navigateur sans View Transitions affiche directement le nouvel écran.
 
-## Design system
+Une réponse n'appartient pas à l'écran qui l'a demandée (`src/features/chat/replies.ts`) : on peut changer de conversation pendant qu'elle s'écrit, elle se termine et s'enregistre côté serveur, puis l'écran affiche les messages enregistrés, seule source de vérité. Le serveur enregistrant le message de l'utilisateur dès le début du tour, `withoutLiveTurn` évite de l'afficher deux fois (testé).
 
-Jetons dans `src/styles.css` (variables CSS exposées à Tailwind), thème clair et sombre selon le réglage du système.
+La zone principale n'affiche rien tant qu'on ne sait pas si l'assistant est activé (sinon l'accueil apparaissait un instant avant l'écran d'activation). L'application et les tests partagent le même client de requêtes (`src/lib/queryClient.ts`) : jamais de nouvelle tentative sur une réponse définitive de l'API (4xx, module désactivé), retour à la connexion si la session expire.
 
-- **Couleurs** : fond brume (`#eef0f3`) ou ardoise nuit (`#131a24`), encre bleu-noir, un seul accent vert-de-gris (`#287363` clair, `#5fc2ae` sombre). Contrastes **calculés** (WCAG 2.x) : texte courant 11,6 à 15,6:1, texte secondaire 4,7 à 7,0:1, accent 4,54:1 minimum sur les trois fonds clairs (l'accent d'origine, `#2f7f6f`, ne faisait que 4,19:1 sur le fond et a été assombri).
-- **Typographie** : Atkinson Hyperlegible Next (texte) et Mono (code), conçues pour la lisibilité ; lecture à 17 px, interligne 1,6, 68 caractères au plus par ligne.
-- **Mouvement** : un seul, le monogramme qui respire pendant que l'assistant écrit ; coupé si le système demande moins d'animations.
-- **Formes** : coins arrondis par niveau (bulles 16 px, champs et boutons 12 px), aucune ombre décorative.
+## Design system : « encre de nuit et aurore »
+
+Jetons centralisés dans `src/styles.css` (variables CSS exposées à Tailwind) ; les composants n'utilisent que leurs noms (`bg-raised`, `text-ink-muted`…), jamais une couleur en dur. Thème sombre de référence, thème clair dérivé, selon le réglage du système.
+
+- **Couleurs** : encre de nuit bleutée (`#0b0e13`), surfaces légèrement plus claires pour la barre latérale (`surface`) et ce qui flotte (`raised` : champ de saisie, bulles, code), un seul accent, le **jade lumineux** de Lorakus (`#4fd9bd` ; `#0e7563` en clair), une pointe de violet réservée aux dégradés. Contrastes **calculés** (WCAG 2.x) avant d'écrire le code : texte 5,64:1 minimum en sombre, 4,92:1 en clair ; bordure du champ au focus 9,9:1 et 5,6:1.
+- **Typographie** : Inter (variable), la meilleure alternative libre à la police de ChatGPT (propriétaire) ; lecture à 16 px, interligne 1,75, colonne de 768 px au plus ; titres en graisse 500 à 600, approche resserrée. Une seule police ; le code utilise la police à chasse fixe du système (rien à télécharger).
+- **L'orbe** (`components/Orb.tsx`, `.orb`) : emblème de Lorakus, une sphère jade et violet. Elle marque les réponses, l'accueil, la connexion et l'icône de l'application ; quand Lorakus réfléchit, son halo tourne et elle respire. Agrandie, elle sera le cœur du mode vocal (ROADMAP, Idées).
+- **L'aurore** (`.aurora`) : deux halos de lumière diffuse, lents, derrière l'accueil et la connexion ; elle disparaît dans la conversation pour ne pas gêner la lecture.
+- **Formes et profondeur** : champ de saisie flottant à 26 px d'arrondi, bulles à 22 px, code à 16 px ; une ombre douce pour ce qui flotte ; **aucune ligne de séparation** entre les zones (le champ ancré en bas repose sur un fondu).
+- **Mouvement** : apparition des messages (fondu montant, 360 ms), glissement du champ (460 ms), panneau mobile (240 ms), orbe et reflet « Lorakus réfléchit ». Tout est coupé si le système demande moins d'animations.
+- **Voix** : tutoiement dans toute l'interface et dans les messages de secours du backend.
+
+## Champ de saisie
+
+`features/chat/Composer.tsx`, deux variantes (`hero` au centre, `docked` en bas). Entrée envoie et Maj+Entrée va à la ligne sur ordinateur ; sur écran tactile, Entrée va à la ligne et l'envoi passe par le bouton. Pendant qu'une réponse s'écrit, on peut préparer la suite sans l'envoyer. Les emplacements `leading` et `trailing` accueilleront les futurs outils (pièce jointe, micro, choix du modèle) : rien n'y est affiché tant que la fonction n'existe pas. Sur Android, `interactive-widget=resizes-content` garde le champ au-dessus du clavier.
+
+## Barre latérale
+
+Marque, « Nouvelle conversation » (icône jade), conversations récentes (titre complet au survol), profil et déconnexion. Repliable sur ordinateur (préférence d'affichage gardée dans le navigateur, aucune donnée personnelle) ; sur téléphone, panneau coulissant par-dessus l'écran.
+
+## Vérification visuelle
+
+Les écrans sont capturés dans un vrai navigateur (Chromium sans interface) contre le vrai backend et un faux fournisseur d'IA : connexion, activation, accueil, saisie, transition, réflexion, conversation, barre repliée, thème clair, sur ordinateur (1440 × 900) et téléphone (390 × 844). Ces captures ont révélé trois défauts que les tests n'avaient pas vus (écran d'activation retardé, clignotement de l'accueil, message affiché deux fois), tous corrigés et désormais testés.
 
 ## Sécurité de l'interface
 
@@ -41,8 +60,8 @@ Jetons dans `src/styles.css` (variables CSS exposées à Tailwind), thème clair
 
 ## Tests
 
-Vitest et Testing Library sur l'application complète, contre un faux backend (`src/test/fakeApi.ts`) qui imite les routes, codes et flux SSE réels : connexion (avec et sans double authentification), premier message, Entrée et Maj+Entrée, message de secours et avertissement de budget, réponse interrompue, coupure réseau, suppression, activation du module, déconnexion. axe-core vérifie l'accessibilité des écrans de connexion et de conversation (le contraste, que jsdom ne sait pas mesurer, est calculé à part).
+Vitest et Testing Library sur l'application complète, avec le même client de requêtes que l'application, contre un faux backend (`src/test/fakeApi.ts`) qui imite les routes, codes et flux SSE réels (message enregistré dès le début du tour, réponse à la fin) : connexion (avec et sans double authentification), session expirée, premier message, message affiché une seule fois pendant l'écriture, Entrée et Maj+Entrée, message de secours et avertissement de budget, réponse interrompue, coupure réseau, suppression, activation du module, déconnexion. axe-core vérifie l'accessibilité des écrans de connexion et de conversation (le contraste, que jsdom ne sait pas mesurer, est calculé à part).
 
 ## Icônes
 
-`scripts/make-icons.py` dessine les icônes (dont la version « maskable » d'Android) à partir de la géométrie du monogramme ; à relancer si l'accent change.
+`scripts/make-icons.py` dessine l'orbe sur fond encre de nuit (dont la version « maskable », qui reste entière dans la découpe ronde d'Android) ; à relancer si l'accent change.

@@ -3,13 +3,13 @@ import { useNavigate } from "@tanstack/react-router";
 import { useId, useState, type SyntheticEvent } from "react";
 
 import { login, type LoginResult } from "@/api/auth";
-import { Monogram } from "@/components/Monogram";
+import { Orb } from "@/components/Orb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const MESSAGES: Record<Exclude<LoginResult, "ok" | "second_factor_required">, string> = {
   invalid: "Adresse ou mot de passe incorrect.",
-  too_many_attempts: "Trop de tentatives. Patientez quelques minutes avant de réessayer.",
+  too_many_attempts: "Trop de tentatives. Patiente quelques minutes avant de réessayer.",
 };
 
 export function LoginScreen() {
@@ -35,29 +35,33 @@ export function LoginScreen() {
         await navigate({ to: "/" });
       } else if (result === "second_factor_required") {
         if (needsCode) {
-          setError("Code incorrect. Saisissez le code affiché dans votre application, ou un code de secours.");
+          setError("Code incorrect. Saisis le code affiché dans ton application, ou un code de secours.");
         }
         setNeedsCode(true);
       } else {
         setError(MESSAGES[result]);
       }
     } catch {
-      setError("Le serveur ne répond pas. Vérifiez votre connexion, puis réessayez.");
+      setError("Le serveur ne répond pas. Vérifie ta connexion, puis réessaie.");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <main className="flex min-h-full items-center justify-center px-6 py-12">
+    <main className="relative flex min-h-full items-center justify-center overflow-hidden px-5 py-12">
+      <div className="aurora" aria-hidden="true" />
       <form
         onSubmit={(event) => void submit(event)}
-        className="w-full max-w-sm space-y-6"
+        className="relative w-full max-w-[380px] animate-fade-up space-y-6"
         aria-describedby={error ? ids.error : undefined}
       >
-        <div className="flex items-center gap-3">
-          <Monogram className="size-10" />
-          <h1 className="text-2xl font-bold">Lorakus</h1>
+        <div className="flex flex-col items-center gap-4 pb-2 text-center">
+          <Orb thinking={busy} className="size-12" />
+          <div>
+            <h1 className="text-[1.625rem] font-semibold tracking-[-0.02em]">Lorakus</h1>
+            <p className="mt-1 text-[0.9375rem] text-ink-muted">Ton assistant personnel.</p>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -108,7 +112,7 @@ export function LoginScreen() {
                 }}
               />
               <p className="text-sm text-ink-muted">
-                Le code à 6 chiffres de votre application d'authentification, ou un code de secours.
+                Le code à 6 chiffres de ton application d'authentification, ou un code de secours.
               </p>
             </div>
           )}

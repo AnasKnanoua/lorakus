@@ -1,30 +1,16 @@
 import "./styles.css";
 
-import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ApiError } from "@/api/client";
+import { makeQueryClient, returnToLogin } from "@/lib/queryClient";
 
 import { makeRouter } from "./router";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failures, error) => !(error instanceof ApiError && error.status < 500) && failures < 2,
-      refetchOnWindowFocus: false,
-    },
-  },
-  queryCache: new QueryCache({
-    // Session expiree pendant l'utilisation : retour a l'ecran de connexion.
-    onError: (error) => {
-      if (error instanceof ApiError && error.status === 401) {
-        queryClient.clear();
-        void router.navigate({ to: "/connexion" });
-      }
-    },
-  }),
+const queryClient = makeQueryClient(() => {
+  returnToLogin(queryClient, () => router.navigate({ to: "/connexion" }));
 });
 
 const router = makeRouter(queryClient);

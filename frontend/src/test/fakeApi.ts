@@ -24,6 +24,8 @@ export interface FakeState {
   nextReply: { chunks: string[]; status: "ok" | "interrupted" | "fallback"; budgetWarning?: boolean };
   /** Simule une coupure reseau a l'envoi du prochain message. */
   failNextSend: boolean;
+  /** Si defini, le flux s'arrete apres les morceaux de texte jusqu'a ce que la promesse aboutisse. */
+  holdReply: Promise<void> | null;
   requests: { method: string; path: string; body: unknown }[];
 }
 
@@ -36,14 +38,23 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-function sse(events: { event: string; data: unknown }[]): Response {
+function sse(
+  deltas: { event: string; data: unknown }[],
+  done: { event: string; data: unknown },
+  hold: Promise<void> | null,
+  onDone: () => void,
+): Response {
   const encoder = new TextEncoder();
+  const send = (controller: ReadableStreamDefaultController<Uint8Array>, e: { event: string; data: unknown }) => {
+    // Chaque evenement dans son propre morceau, comme sur le reseau.
+    controller.enqueue(encoder.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`));
+  };
   const body = new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const { event, data } of events) {
-        // Chaque evenement dans son propre morceau, comme sur le reseau.
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-      }
+    async start(controller) {
+      for (const e of deltas) send(controller, e);
+      if (hold) await hold;
+      onDone(); // comme le serveur : la reponse n'est enregistree qu'a la fin du flux
+      send(controller, done);
       controller.close();
     },
   });
@@ -59,6 +70,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     conversations: new Map(),
     nextReply: { chunks: ["Bonjour", " Anas."], status: "ok" },
     failNextSend: false,
+    holdReply: null,
     requests: [],
     ...overrides,
   };
@@ -148,16 +160,18 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
         created_at: NOW,
       });
       const reply = state.nextReply;
+      // Comme le serveur : le message de l'utilisateur est enregistre des le debut du tour.
       conversation.messages.push(message("user", content, "ok"));
       const saved = message("assistant", reply.chunks.join(""), reply.status);
-      conversation.messages.push(saved);
-      return sse([
-        ...reply.chunks.map((t) => ({ event: "delta", data: { text: t } })),
+      return sse(
+        reply.chunks.map((t) => ({ event: "delta", data: { text: t } })),
         {
           event: "done",
           data: { message_id: saved.id, status: reply.status, budget_warning: reply.budgetWarning ?? false },
         },
-      ]);
+        state.holdReply,
+        () => conversation.messages.push(saved),
+      );
     }
     return json(404, { detail: `route inconnue du faux backend : ${request.method} ${path}` });
   };

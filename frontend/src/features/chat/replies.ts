@@ -85,6 +85,34 @@ export async function startReply(
   }
 }
 
+/**
+ * Messages enregistres a afficher a cote du tour en direct, sans doublon.
+ *
+ * Le serveur enregistre le message de l'utilisateur des le debut du tour, puis la reponse a la
+ * fin : selon le moment ou la conversation est rechargee, ils figurent deja dans la liste
+ * enregistree alors que le tour en direct les affiche aussi.
+ * - Pendant l'ecriture, seul le message de l'utilisateur peut etre enregistre : on le retire
+ *   s'il termine la liste.
+ * - Une fois la reponse terminee (avant l'effacement du tour en direct), on retire la paire.
+ * Pendant l'ecriture, une ancienne paire identique (meme message envoye deux fois) n'est donc
+ * jamais retiree a tort.
+ */
+export function withoutLiveTurn<M extends { role: string; content: string }>(
+  messages: readonly M[],
+  live: LiveTurn | null,
+): readonly M[] {
+  if (!live || live.status === "error") return messages;
+  const last = messages.at(-1);
+  const beforeLast = messages.at(-2);
+  if (live.status === "streaming") {
+    return last?.role === "user" && last.content === live.user ? messages.slice(0, -1) : messages;
+  }
+  if (last?.role === "assistant" && beforeLast?.role === "user" && beforeLast.content === live.user) {
+    return messages.slice(0, -2);
+  }
+  return last?.role === "user" && last.content === live.user ? messages.slice(0, -1) : messages;
+}
+
 /** Pour les tests : repart d'un etat vide. */
 export function resetReplies(): void {
   turns.clear();
