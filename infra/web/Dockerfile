@@ -19,6 +19,13 @@ RUN pnpm build
 # ---------------------------------------------------------------- execution
 FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
 
+# L'image officielle donne a /usr/bin/caddy la capacite de fichier cap_net_bind_service
+# (setcap). Avec cap_drop: ALL et no-new-privileges, le noyau refuse alors de lancer le
+# programme (« exec /usr/bin/caddy: operation not permitted »). Caddy ecoute sur 8080 et
+# 8443 et n'en a pas besoin : on le recopie sans cette capacite (install ne copie pas les
+# attributs etendus) et on supprime l'original.
+RUN install -m 0755 /usr/bin/caddy /usr/local/bin/caddy && rm /usr/bin/caddy
+
 # Utilisateur dedie, sans shell. /data (certificats) et /config lui appartiennent : un volume
 # neuf monte sur /data herite de ces droits.
 RUN addgroup -S -g 10002 caddy-web \

@@ -97,3 +97,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Constat** (2026-11-12, PR 35) : la clé SSH de GitHub exécute le `deploy.sh` déjà présent sur le serveur, celui de la version en service. Ce script n'accepte que les arguments qu'il connaissait (trois empreintes avant la PR 35).
 - **Solution** : `deploy.sh status` annonce `LORAKUS_DEPLOY_PROTOCOL` ; `deploy.yml` n'envoie l'empreinte web qu'à un script de protocole 2, sinon il déploie d'abord sans elle (ce qui installe le nouveau script), puis avec elle. Le staging rejoue ces deux passages.
 - **À retenir** : toute nouvelle option de `deploy.sh` doit rester acceptée par l'ancien script, ou suivre le même schéma (numéro de protocole et deux passages).
+
+## « exec /usr/bin/caddy: operation not permitted »
+
+- **Symptôme** (2026-11-12, CI de la PR 35) : le conteneur `web` s'arrête aussitôt ; le test de fumée de l'image échoue sur les deux architectures.
+- **Cause** : l'image officielle de Caddy pose la capacité de fichier `cap_net_bind_service` sur son binaire (`setcap`). Un programme qui porte une capacité absente de l'ensemble autorisé du conteneur (`cap_drop: ALL`) ne peut pas être lancé : le noyau refuse l'`exec`.
+- **Correction** : notre image recopie le binaire sans attribut étendu (`install`) dans `/usr/local/bin` et supprime l'original. Caddy écoute sur 8080 et 8443, il n'a besoin d'aucune capacité.
+- **À retenir** : toute image de base qui utilise `setcap` pose le même problème avec notre durcissement ; le test de fumée, qui lance l'image avec les mêmes options que Compose, le détecte.
