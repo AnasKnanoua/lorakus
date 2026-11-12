@@ -92,11 +92,14 @@ jobs:
           sha256sum --check --ignore-missing "trivy_${TRIVY_VERSION}_checksums.txt"
           tar -xzf "trivy_${TRIVY_VERSION}_${TRIVY_ASSET}.tar.gz" trivy
 
+      - name: Secrets dans l'image (bloquant des HIGH)
+        run: ./trivy image --scanners secret --exit-code 1 --severity HIGH,CRITICAL --no-progress --secret-config infra/ci/trivy-secret.yaml "$REF"
+
       - name: Vulnerabilites critiques corrigeables (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml "$REF"
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --scanners vuln "$REF"
 
       - name: Vulnerabilites hautes (rapport, non bloquant)
-        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml "$REF"
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --scanners vuln "$REF"
 
       - name: Publier l'image de cette architecture (main uniquement)
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

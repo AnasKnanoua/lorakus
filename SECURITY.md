@@ -87,7 +87,7 @@ Table append-only `core_audit_events`. Obligatoire : connexions et échecs, chan
 | Niveau | Contenu | Fréquence |
 | --- | --- | --- |
 | Chaque PR | Ruff, pyright, Bandit, Semgrep (règles maison : `user_id` obligatoire, pas d'import de SDK IA hors providers), Gitleaks, pip-audit, tests d'isolation, Promptfoo (profil `ingest`), import-linter, CodeQL | Continu |
-| Chaque image | Trivy (échec sur `critical`) | Chaque build |
+| Chaque image | Trivy : vulnérabilités (échec sur `critical` corrigeable), secrets (échec dès `high`, exceptions étroites dans `infra/ci/trivy-secret.yaml`) | Chaque build |
 | Nightly staging | OWASP ZAP baseline, E2E | Chaque nuit |
 | Mensuel | ZAP complet, Promptfoo étendu, revue manuelle (Burp), revue des permissions d'outils, checklist OWASP ASVS niveau 2 et OWASP LLM Top 10 | 1er week-end du mois |
 | Phase 16 | Agent Red Team isolé qui planifie et exécute les campagnes et ouvre des issues | Déclenché |

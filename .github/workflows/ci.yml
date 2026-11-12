@@ -115,17 +115,23 @@ jobs:
           sha256sum --check --ignore-missing "trivy_${TRIVY_VERSION}_checksums.txt"
           tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
 
+      - name: Secrets dans l'image (bloquant des HIGH)
+        run: ./trivy image --scanners secret --exit-code 1 --severity HIGH,CRITICAL --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-api:ci
+
       - name: Vulnerabilites critiques corrigeables (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-api:ci
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --scanners vuln lorakus-api:ci
 
       - name: Vulnerabilites hautes (rapport, non bloquant)
-        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-api:ci
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --scanners vuln lorakus-api:ci
 
       - name: Construire l'image de sauvegarde
         run: docker build -t lorakus-backup:ci infra/backup
 
+      - name: Secrets dans l'image de sauvegarde (bloquant des HIGH)
+        run: ./trivy image --scanners secret --exit-code 1 --severity HIGH,CRITICAL --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-backup:ci
+
       - name: Vulnerabilites critiques corrigeables de l'image de sauvegarde (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-backup:ci
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --scanners vuln lorakus-backup:ci
 
       - name: Creer un .env jetable pour la pile complete
         run: |
