@@ -48,9 +48,53 @@ jobs:
       - name: Migrations rejouables (montee, descente, montee)
         run: make migrate-check
 
+      - name: Contrat OpenAPI du frontend a jour
+        # Le client TypeScript est genere depuis frontend/openapi.json : s'il ne decrit plus
+        # l'API, la PR echoue ici au lieu de casser l'interface en production.
+        run: make openapi-check
+
       - name: Arreter PostgreSQL
         if: always()
         run: make db-down
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Installer Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Installer pnpm (version figee dans package.json)
+        run: npm install --global "pnpm@$(node -p 'require("./package.json").packageManager.split("@")[1]')"
+
+      - name: Installer les dependances (versions exactes du lockfile, 14 jours minimum)
+        run: pnpm install --frozen-lockfile
+
+      - name: Client de l'API genere a jour
+        run: pnpm api:generate && git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Lint (ESLint strict, aucun appel fetch hors du client genere)
+        run: pnpm lint
+
+      - name: Types (TypeScript strict)
+        run: pnpm typecheck
+
+      - name: Tests (parcours, accessibilite, rendu sur)
+        run: pnpm test
+
+      - name: Construction
+        run: pnpm build
 
   secrets:
     name: secrets

@@ -130,7 +130,17 @@ def _sse(event: ReplyEvent) -> str:
     return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-@router.post("/conversations/{conversation_id}/messages")
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "Reponse en flux : evenements delta, puis un evenement done.",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        },
+        404: {"description": "Conversation introuvable."},
+    },
+)
 async def send_message(
     conversation_id: uuid.UUID, body: MessageIn, request: Request, user: User, service: Service
 ) -> StreamingResponse:

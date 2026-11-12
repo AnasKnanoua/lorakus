@@ -10,12 +10,26 @@
 #   PostgreSQL garde les mots de passe choisis a la creation de la base.
 set -euo pipefail
 
+ARGS="$*"  # pour les messages d'erreur, avant que les options soient consommees
 GENERATED_ONLY=0
 if [ "${1:-}" = "--generated-only" ]; then
   GENERATED_ONLY=1
   shift
 fi
 ENV_FILE="${1:-/opt/lorakus/.env}"
+
+# Le script remplace le fichier (put) : le nouveau appartient a qui le lance. Lance par root
+# (sudo), il rendait .env illisible pour deploy, et le deploiement suivant echouait
+# (constate le 2026-11-12). On refuse donc root et tout autre utilisateur que le proprietaire.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Refuse : ne pas lancer ce script en root (sudo). Utiliser : sudo -iu deploy $0 $ARGS" >&2
+  exit 1
+fi
+if [ -e "$ENV_FILE" ] && [ "$(stat -c %u "$ENV_FILE")" != "$(id -u)" ]; then
+  owner=$(stat -c %U "$ENV_FILE")
+  echo "Refuse : $ENV_FILE appartient a $owner. Lancer en tant que $owner : sudo -iu $owner $0 $ARGS" >&2
+  exit 1
+fi
 
 # Le fichier n'est lisible que par son proprietaire (droits 600).
 umask 077

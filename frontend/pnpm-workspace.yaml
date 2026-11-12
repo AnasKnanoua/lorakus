@@ -1,0 +1,3 @@
+# Regle du projet : aucune version publiee depuis moins de 14 jours (20 160 minutes),
+# directe ou transitive. pnpm l'applique a chaque installation ou mise a jour.
+minimumReleaseAge: 20160

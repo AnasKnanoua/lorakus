@@ -19,6 +19,7 @@ help: ## Affiche cette aide
 
 bootstrap: ## Installe les dependances et les hooks pre-commit
 > $(UV) sync
+> cd frontend && pnpm install --frozen-lockfile
 > pre-commit install
 
 dev: ## Lance l'API en local avec rechargement automatique (port 8000)
@@ -47,6 +48,20 @@ typecheck: ## Verifie les types (pyright strict)
 > $(UV) run pyright
 
 check: lint typecheck test-all db-check obs-check ## Tout verifier avant d'ouvrir une PR
+
+front-dev: ## Lance l'interface en local (http://localhost:5173), /api relaye vers localhost:8001
+> cd frontend && pnpm dev
+
+front-check: ## Frontend : lint, types, tests (parcours, accessibilite) et construction
+> cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
+
+openapi: ## Regenere le contrat OpenAPI et le client TypeScript du frontend (apres un changement d'API)
+> $(UV) run python scripts/export_openapi.py ../frontend/openapi.json
+> cd frontend && pnpm api:generate
+
+openapi-check: ## Echoue si frontend/openapi.json ne decrit plus l'API
+> $(UV) run python scripts/export_openapi.py /tmp/lorakus-openapi.json
+> diff -u frontend/openapi.json /tmp/lorakus-openapi.json || { echo "Contrat OpenAPI perime : lancer make openapi" >&2; exit 1; }
 
 db-up: ## Demarre PostgreSQL en local et attend qu'il soit pret
 > $(COMPOSE) up -d --wait postgres

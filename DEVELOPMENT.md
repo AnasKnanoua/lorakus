@@ -44,6 +44,9 @@ lorakus/
 | `make migrate` | Applique les migrations en local |
 | `make evals` | Evals Promptfoo sur `FakeProvider` |
 | `make new-module NAME=...` | Crée un module depuis le gabarit |
+| `make front-dev` | Lance l'interface sur http://localhost:5173 ; `/api` est relayé vers `localhost:8001` (tunnel SSH vers la production, ou pile locale) |
+| `make front-check` | Frontend : ESLint, TypeScript strict, tests (parcours, accessibilité) et construction |
+| `make openapi` | Après un changement d'API : régénère `frontend/openapi.json` et le client TypeScript (la CI refuse un contrat périmé) |
 
 ## 4. Circuit d'une modification
 
