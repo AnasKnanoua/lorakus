@@ -26,6 +26,13 @@ FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d
 # attributs etendus) et on supprime l'original.
 RUN install -m 0755 /usr/bin/caddy /usr/local/bin/caddy && rm /usr/bin/caddy
 
+# Correctifs de securite Alpine plus recents que l'image de base (epinglee a plus de 14 jours).
+# Exception assumee a la regle des 14 jours : un correctif d'une vulnerabilite critique venant
+# du depot officiel d'Alpine. Version minimale exigee : la construction echoue si elle manque.
+# A retirer quand Dependabot proposera une image de base qui l'inclut.
+# - brotli-libs : CVE-2026-111497 (critique, ecriture hors limites dans le decodeur).
+RUN apk add --no-cache --upgrade 'brotli-libs>=1.2.1-r0'
+
 # Utilisateur dedie, sans shell. /data (certificats) et /config lui appartiennent : un volume
 # neuf monte sur /data herite de ces droits.
 RUN addgroup -S -g 10002 caddy-web \
