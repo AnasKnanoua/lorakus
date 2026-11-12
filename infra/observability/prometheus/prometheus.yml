@@ -10,6 +10,10 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.yml
 
+# Cibles propres a un environnement (production : Caddy). Dossier absent en developpement.
+scrape_config_files:
+  - /etc/prometheus-extra/*.yml
+
 alerting:
   alertmanagers:
     - static_configs:

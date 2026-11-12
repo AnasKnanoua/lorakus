@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -65,6 +65,21 @@ class Settings(BaseSettings):
     # PAS dans les sauvegardes : la perdre rend les secrets TOTP illisibles.
     field_encryption_key: SecretStr = SecretStr("")
 
+    # Double authentification exigee pour ouvrir une session (decision du 2026-11-12).
+    # Toujours vraie en production, quoi que dise la variable (voir _production_rules).
+    require_second_factor: bool = False
+
+    # --- Exposition publique (PR 35) ---
+    # Adresse publique de l'interface, sans chemin : https://app.lorakus.app. Les requetes
+    # qui modifient des donnees doivent venir de cette origine (en-tete Origin). Exigee par
+    # l'API en staging et en production (create_app) ; en developpement, le serveur Vite
+    # (localhost:5173) est aussi admis. Le worker et les migrations n'en ont pas besoin.
+    public_origin: str = Field(default="", pattern=r"^(https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?)?$")
+    # Limites par utilisateur (session ou cle d'API), par minute. Les ecritures comptent aussi
+    # dans la limite generale. Au-dela : 429 avec Retry-After.
+    api_requests_per_minute: int = Field(default=300, ge=1)
+    api_writes_per_minute: int = Field(default=60, ge=1)
+
     # --- Moteur IA (PR 32, ADR 0007) ---
     # Cle de l'API Anthropic ; vide = fournisseur absent (reponses par gabarit). Fournie au
     # seul service api, comme toute cle d'IA.
@@ -74,6 +89,26 @@ class Settings(BaseSettings):
     # Plafond de depense IA par utilisateur et par mois civil (UTC), en dollars (D-D).
     # Alerte dans la reponse a 80 %, plus aucun appel a 100 %.
     ai_monthly_budget_usd: Decimal = Field(default=Decimal("3.00"), ge=0, le=100)
+    # Rythme des appels IA par utilisateur (PR 35) : protege le budget contre une rafale
+    # (script, session volee, boucle d'un client). Au-dela : reponse par gabarit.
+    ai_calls_per_minute: int = Field(default=6, ge=1)
+    ai_calls_per_day: int = Field(default=200, ge=1)
+    # Reponses IA simultanees par utilisateur (dans ce processus).
+    ai_concurrent_calls: int = Field(default=2, ge=1)
+
+    @model_validator(mode="after")
+    def _production_rules(self) -> "Settings":
+        """Regles qu'aucune variable ne peut assouplir hors developpement."""
+        if self.environment == "production":
+            self.require_second_factor = True
+        return self
+
+    def allowed_origins(self) -> frozenset[str]:
+        """Origines admises pour les requetes qui modifient des donnees."""
+        origins = {self.public_origin} if self.public_origin else set[str]()
+        if self.environment in ("development", "test"):
+            origins |= {"http://localhost:5173", "http://127.0.0.1:5173"}
+        return frozenset(origins)
 
     def app_database_url(self) -> URL:
         """URL de connexion de l'application (role lorakus_app)."""

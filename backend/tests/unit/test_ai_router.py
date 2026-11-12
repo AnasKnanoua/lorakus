@@ -103,6 +103,8 @@ def make_router(
     budget: str = "3",
     kill_switch: bool = False,
     breaker: CircuitBreaker | None = None,
+    quota: "CountingQuota | None" = None,
+    max_concurrent: int | None = None,
 ) -> ModelRouter:
     return ModelRouter(
         Catalog.from_toml(ROUTING, PRICING),
@@ -111,7 +113,21 @@ def make_router(
         monthly_budget_usd=Decimal(budget),
         kill_switch=kill_switch,
         breaker=breaker,
+        quota=quota,
+        max_concurrent_per_user=max_concurrent,
     )
+
+
+class CountingQuota:
+    """Quota en memoire : `allowed` appels, puis refus (la version PostgreSQL est testee a part)."""
+
+    def __init__(self, allowed: int) -> None:
+        self.allowed = allowed
+        self.asked: list[uuid.UUID] = []
+
+    async def allow(self, user_id: uuid.UUID) -> bool:
+        self.asked.append(user_id)
+        return len(self.asked) <= self.allowed
 
 
 async def collect(
@@ -355,6 +371,59 @@ async def test_refusals_are_counted() -> None:
         await collect(router)
 
     assert counter._value.get() == before + 1  # pyright: ignore[reportPrivateUsage]
+
+
+async def test_call_quota_stops_a_burst_before_paying() -> None:
+    provider = external(["un", "deux", "trois"])
+    quota = CountingQuota(allowed=2)
+    router = make_router({"primary": provider}, quota=quota)
+
+    await collect(router)
+    await collect(router)
+    with pytest.raises(AIUnavailableError) as unavailable:
+        await collect(router)
+
+    assert unavailable.value.reason == "rate_limited"
+    assert len(provider.calls) == 2
+    assert quota.asked == [USER, USER, USER]
+
+
+async def test_quota_is_not_consumed_when_the_budget_is_already_reached() -> None:
+    quota = CountingQuota(allowed=10)
+    router = make_router(
+        {"primary": external(["non"])}, MemoryLedger(spent="3"), budget="3", quota=quota
+    )
+
+    with pytest.raises(AIUnavailableError):
+        await collect(router)
+
+    assert quota.asked == []
+
+
+async def test_concurrent_answers_per_user_are_capped_and_released() -> None:
+    quota = CountingQuota(allowed=10)
+    router = make_router(
+        {"primary": external(["un deux", "trois", "quatre"])}, quota=quota, max_concurrent=1
+    )
+    first = router.chat_stream(USER, task="chat", data_class="personal", request=request())
+    await anext(first)  # une reponse en cours
+
+    with pytest.raises(AIUnavailableError) as busy:
+        await collect(router)
+    assert busy.value.reason == "rate_limited"
+    assert len(quota.asked) == 1  # le refus pour reponse en cours ne consomme pas le quota
+
+    other = uuid.uuid4()  # un autre utilisateur n'est pas gene
+    events = [
+        e
+        async for e in router.chat_stream(
+            other, task="chat", data_class="personal", request=request()
+        )
+    ]
+    assert text_of(events) == "trois"
+
+    await first.aclose()  # le client part : la place se libere
+    assert text_of(await collect(router)) == "quatre"
 
 
 def test_usage_prompt_tokens_include_cache() -> None:

@@ -49,6 +49,15 @@ describe("connexion", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Adresse ou mot de passe incorrect.");
   });
 
+  it("explique qu'il faut activer la double authentification quand elle est obligatoire", async () => {
+    installFakeApi({ secondFactorSetupRequired: true });
+    renderApp("/connexion");
+
+    await signIn();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("La double authentification est obligatoire.");
+  });
+
   it("demande le code de double authentification quand le compte l'exige", async () => {
     const api = installFakeApi({ secondFactor: "123456" });
     renderApp("/connexion");

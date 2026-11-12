@@ -16,7 +16,7 @@ Décisions : [ADR 0036](docs/adr/0036-environments.md), amendée par l'[ADR 0037
 
 `oraclevps` héberge Anime Notif : il est hors du périmètre de Lorakus et ne doit jamais être modifié.
 
-Aucune exposition publique avant la phase 3 : l'API s'atteint par tunnel SSH. Adresses prévues ensuite : `app.lorakus.app` et `staging.lorakus.app`.
+Depuis la PR 35 (ADR 0038), seul Caddy (service `web`) est publié : `https://app.lorakus.app` (interface et API à la même origine). Tout le reste (API `127.0.0.1:8001`, Prometheus, Grafana, Alertmanager) n'est joignable que depuis le serveur ou par tunnel SSH. `staging.lorakus.app` n'existe pas : le staging est éphémère, dans la CI (ADR 0037).
 
 ## 2. Prérequis d'un hôte
 
@@ -25,11 +25,11 @@ Réalisé sur `lorakus-prod` :
 - Système à jour ; `dnf-automatic` limité aux mises à jour de sécurité.
 - Docker Engine et plugin Compose, avec rotation des journaux, `live-restore` et `no-new-privileges`.
 - Utilisateur `deploy` (groupe `docker`), clé SSH dédiée au déploiement ; SSH par clé uniquement.
-- `firewalld` limité à SSH ; les ports 80 et 443 y seront ouverts en phase 3. Liste de sécurité Oracle : 22, 80, 443 et ICMP.
+- `firewalld` : SSH, HTTP et HTTPS (section 4.6). Liste de sécurité Oracle : 22, 80, 443 et ICMP.
 - Répertoire `/opt/lorakus` : fichier Compose, `.env` (600, `deploy`), volumes nommés.
 - Nom d'hôte persistant (section 2.1).
 
-À faire en phase 3 : enregistrements DNS chez Name.com (TLS terminé par le reverse proxy). Name.com ne gère pas les enregistrements CAA.
+DNS chez Name.com (fait le 2026-11-12) : un seul enregistrement `A` `app` vers l'adresse publique du serveur, TTL 300 ; enregistrements de stationnement supprimés ; aucun `AAAA` (le serveur n'a pas d'IPv6, Let's Encrypt l'essaierait en premier). Name.com ne gère pas les enregistrements CAA.
 
 ### 2.1 Nom d'hôte sur une image Oracle Linux
 
@@ -91,7 +91,7 @@ Un second appel est refusé : il n'y a qu'un propriétaire.
 ssh lorakus-prod 'sudo -iu deploy grep ^LORAKUS_FIELD_ENCRYPTION_KEY= /opt/lorakus/.env'
 ```
 
-Sans elle, une base restaurée sur un serveur neuf garde ses comptes mais perd la double authentification : la réactiver après `python -m lorakus.cli recover-second-factor`.
+Sans elle, une base restaurée sur un serveur neuf garde ses comptes mais perd la double authentification : `python -m lorakus.cli recover-second-factor`, puis `python -m lorakus.cli enable-second-factor` (en production, la connexion est impossible entre les deux).
 
 ### 4.4 Staging éphémère
 
@@ -106,6 +106,28 @@ Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la p
 1. Sur healthchecks.io : une vérification `lorakus-prod`, période 2 minutes, tolérance 5 minutes ; intégration Discord vers `#lorakus-infra`.
 2. Sur le serveur, en tant que `deploy` : `/opt/lorakus/app/infra/deploy/init-env.sh` demande l'adresse de ping (`HEALTHCHECKS_PING_URL`), puis `make deploy` depuis le Dell (ou `deploy.sh compose up -d --force-recreate alertmanager`).
 3. Vérifier : healthchecks.io passe à « up » en moins de 3 minutes. Puis tester une vraie disparition ([runbook](docs/runbooks/production-down.md#tester-la-sentinelle-après-chaque-changement-de-la-chaîne-dalerte)).
+
+### 4.6 Exposition publique (PR 35, une fois)
+
+Avant le premier déploiement qui apporte Caddy, vérifier qu'aucun réseau Docker n'occupe déjà `172.31.250.0/28` (réseau `edge` de `compose.prod.yml`) :
+
+```bash
+ssh lorakus-prod 'docker network inspect $(docker network ls -q) --format "{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}"'
+```
+
+Après le déploiement, ouvrir HTTP et HTTPS dans `firewalld` (Docker publie ses ports en contournant `firewalld` ; cette règle rend la configuration explicite et cohérente avec la liste de sécurité Oracle) :
+
+```bash
+ssh -t lorakus-prod 'sudo firewall-cmd --permanent --add-service=http --add-service=https && sudo firewall-cmd --reload && sudo firewall-cmd --list-services'
+```
+
+Puis activer la double authentification du propriétaire (obligatoire en production pour se connecter). La commande affiche une clé à saisir dans une application d'authentification, demande un code, puis affiche les codes de secours, à ranger dans le gestionnaire de mots de passe :
+
+```bash
+ssh -t lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh compose exec api python -m lorakus.cli enable-second-factor'
+```
+
+Vérifications depuis le Dell : `curl -sI https://app.lorakus.app/ | head -3` (HTTP/2 200), puis sur le téléphone, installer l'application depuis Chrome (« Ajouter à l'écran d'accueil »). Les journaux de Caddy doivent montrer les vraies adresses des visiteurs (`dc logs --tail 20 web`), pas une adresse en `172.`.
 
 ## 5. Migrations en production
 

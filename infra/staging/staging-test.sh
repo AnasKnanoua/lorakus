@@ -3,18 +3,20 @@
 # que la production va vivre. Lance par deploy.yml avant la production, sur un runner ARM.
 #
 #   1. installe la version precedente (celle de la production), puis y ecrit une donnee temoin ;
-#   2. deploie la nouvelle version par-dessus (sauvegarde avant migration, migrations, sante) ;
+#   2. deploie la nouvelle version par-dessus (sauvegarde avant migration, migrations, sante),
+#      puis verifie l'acces public par Caddy (HTTPS avec un certificat local, origine, en-tetes) ;
 #   3. retour arriere, puis redeploiement de la nouvelle version ;
 #   4. sauvegarde quotidienne et alerte de test ;
 #   5. restauration de la derniere sauvegarde selon docs/runbooks/restore.md, donnee temoin verifiee.
 #
-# Variables attendues : PREV_COMMIT, PREV_API_DIGEST, PREV_BACKUP_DIGEST,
-#                       NEW_COMMIT, NEW_API_DIGEST, NEW_BACKUP_DIGEST.
+# Variables attendues : PREV_COMMIT, PREV_API_DIGEST, PREV_BACKUP_DIGEST, PREV_WEB_DIGEST (peut
+#                       etre vide : version anterieure a l'image web),
+#                       NEW_COMMIT, NEW_API_DIGEST, NEW_BACKUP_DIGEST, NEW_WEB_DIGEST.
 # Donnees synthetiques uniquement ; B2 est remplace par un dossier local, Discord par une adresse
 # inerte. Aucun secret de production n'est utilise.
 set -euo pipefail
 
-for var in PREV_COMMIT PREV_API_DIGEST PREV_BACKUP_DIGEST NEW_COMMIT NEW_API_DIGEST NEW_BACKUP_DIGEST; do
+for var in PREV_COMMIT PREV_API_DIGEST PREV_BACKUP_DIGEST NEW_COMMIT NEW_API_DIGEST NEW_BACKUP_DIGEST NEW_WEB_DIGEST; do
   [ -n "${!var:-}" ] || { echo "Variable manquante : $var" >&2; exit 2; }
 done
 
@@ -54,6 +56,41 @@ expect_release() {
   echo "OK : version $1 en service et saine"
 }
 
+# Deploie la nouvelle version comme le fait deploy.yml : si le script en place ne connait pas
+# encore l'image web (protocole 1), un premier passage l'installe, un second ajoute Caddy.
+deploy_new() {
+  local status
+  status=$("$DEPLOY" status)
+  if grep -qx 'LORAKUS_DEPLOY_PROTOCOL=2' <<<"$status"; then
+    "$DEPLOY" deploy "$NEW_COMMIT" "$NEW_API_DIGEST" "$NEW_BACKUP_DIGEST" "$NEW_WEB_DIGEST"
+  else
+    echo "Script en place anterieur a l'image web : deploiement en deux passages"
+    "$DEPLOY" deploy "$NEW_COMMIT" "$NEW_API_DIGEST" "$NEW_BACKUP_DIGEST"
+    "$DEPLOY" deploy "$NEW_COMMIT" "$NEW_API_DIGEST" "$NEW_BACKUP_DIGEST" "$NEW_WEB_DIGEST"
+  fi
+  grep -q '^LORAKUS_WEB_IMAGE=' "$LORAKUS_ROOT/release.env" || fail "image web absente de la version en service"
+}
+
+# Acces public par Caddy, avec le certificat de la CA locale (LORAKUS_TLS=internal).
+check_public_access() {
+  local https=https://localhost headers code
+  curl -fsSk --max-time 10 "$https/api/health/ready" >/dev/null || fail "API injoignable par Caddy en HTTPS"
+  headers=$(curl -fsSk -D - -o /dev/null "$https/")
+  grep -qiF "content-security-policy: default-src 'self'" <<<"$headers" || fail "CSP absente"
+  # Ecriture depuis l'interface : passe le controle d'origine (401 : identifiants faux).
+  code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://localhost' \
+    -H 'Content-Type: application/json' -d '{"email":"x@example.com","password":"faux"}' \
+    "$https/api/v1/auth/login")
+  [ "$code" = "401" ] || fail "connexion depuis l'interface : code $code au lieu de 401"
+  # Meme ecriture depuis un autre site : refusee avant la route.
+  code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://evil.example' \
+    -H 'Content-Type: application/json' -d '{}' "$https/api/v1/auth/login")
+  [ "$code" = "403" ] || fail "ecriture d'une autre origine : code $code au lieu de 403"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: localhost' http://127.0.0.1/)
+  [ "$code" = "308" ] || fail "HTTP -> HTTPS : code $code au lieu de 308"
+  echo "OK : acces public par Caddy (HTTPS, en-tetes, origine, redirection)"
+}
+
 backups() {
   find "$FAKE_B2/daily" -name 'lorakus-*.dump.age' 2>/dev/null | sort
 }
@@ -70,6 +107,7 @@ on_exit() {
     dc ps -a || true
     echo "---- journaux (fin)"
     dc logs --tail 40 api migrate postgres backup || true
+    dc logs --tail 40 web 2>/dev/null || true
   fi
   exit "$status"
 }
@@ -92,6 +130,8 @@ random_hex() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 umask 077
 cat > "$LORAKUS_ROOT/.env" <<ENV
 LORAKUS_ENVIRONMENT=staging
+LORAKUS_PUBLIC_HOST=localhost
+LORAKUS_TLS=internal
 POSTGRES_DB=lorakus
 POSTGRES_USER=lorakus_admin
 POSTGRES_PASSWORD=$(random_hex)
@@ -109,7 +149,7 @@ ENV
 umask 022
 
 step "1/6 Installation de la version de production ($PREV_COMMIT)"
-"$DEPLOY" deploy "$PREV_COMMIT" "$PREV_API_DIGEST" "$PREV_BACKUP_DIGEST"
+"$DEPLOY" deploy "$PREV_COMMIT" "$PREV_API_DIGEST" "$PREV_BACKUP_DIGEST" ${PREV_WEB_DIGEST:+"$PREV_WEB_DIGEST"}
 expect_release "$PREV_COMMIT"
 dc exec -T postgres psql -v ON_ERROR_STOP=1 -U lorakus_migrator -d lorakus -q \
   -c "create table lorakus.staging_marker (id serial primary key, note text not null);
@@ -117,16 +157,18 @@ dc exec -T postgres psql -v ON_ERROR_STOP=1 -U lorakus_migrator -d lorakus -q \
 [ "$(marker)" = "ecrite-avant-la-mise-a-jour" ] || fail "donnee temoin non ecrite"
 
 step "2/6 Mise a jour vers la nouvelle version ($NEW_COMMIT)"
-"$DEPLOY" deploy "$NEW_COMMIT" "$NEW_API_DIGEST" "$NEW_BACKUP_DIGEST"
+deploy_new
 expect_release "$NEW_COMMIT"
+check_public_access
 [ "$(backups | wc -l)" -ge 1 ] || fail "aucune sauvegarde avant migration"
 [ "$(marker)" = "ecrite-avant-la-mise-a-jour" ] || fail "donnee temoin perdue pendant la mise a jour"
 
 step "3/6 Retour arriere puis redeploiement"
 "$DEPLOY" rollback
 expect_release "$PREV_COMMIT"
-"$DEPLOY" deploy "$NEW_COMMIT" "$NEW_API_DIGEST" "$NEW_BACKUP_DIGEST"
+deploy_new
 expect_release "$NEW_COMMIT"
+check_public_access
 
 step "4/6 Sauvegarde quotidienne et alerte de test"
 before=$(backups | wc -l)
@@ -152,10 +194,11 @@ dc exec -T postgres pg_restore -U lorakus_admin -d lorakus --single-transaction 
 dc run --rm -T migrate </dev/null
 dc up -d --wait api
 expect_release "$NEW_COMMIT"
+check_public_access
 [ "$(marker)" = "ecrite-avant-la-mise-a-jour" ] \
   || fail "apres restauration, la base ne contient pas exactement l'etat sauvegarde : $(marker | tr '\n' ' ')"
 [ "$(dc exec -T postgres psql -U lorakus_app -d lorakus -qtA -c 'select count(*) from lorakus.staging_marker' </dev/null)" = "1" ] \
   || fail "lorakus_app ne lit plus les donnees restaurees"
 
 step "6/6 Termine"
-echo "Staging reussi : mise a jour, retour arriere, sauvegarde et restauration verifies."
+echo "Staging reussi : mise a jour, acces public, retour arriere, sauvegarde et restauration verifies."

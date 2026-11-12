@@ -67,7 +67,8 @@ jobs:
           fi
           [ -n "$prev" ] || { echo "Version en production introuvable" >&2; exit 1; }
           {
-            ./infra/deploy/resolve-images.sh "$prev" | sed 's/^/PREV_/'
+            # La version en production peut etre anterieure a l'image web (PR 35).
+            ./infra/deploy/resolve-images.sh "$prev" --web-optional | sed 's/^/PREV_/'
             ./infra/deploy/resolve-images.sh "$GITHUB_SHA" | sed 's/^/NEW_/'
             echo "PREV_COMMIT=$prev"
             echo "NEW_COMMIT=$GITHUB_SHA"
@@ -113,14 +114,18 @@ jobs:
           image_commit=$(sed -n 's/^IMAGE_COMMIT=//p' images.env)
           api=$(sed -n 's/^API_DIGEST=//p' images.env)
           backup=$(sed -n 's/^BACKUP_DIGEST=//p' images.env)
+          web_commit=$(sed -n 's/^WEB_IMAGE_COMMIT=//p' images.env)
+          web=$(sed -n 's/^WEB_DIGEST=//p' images.env)
           {
             echo "### Version deployee"
             echo "Configuration : ${GITHUB_SHA}"
-            echo "Images : ${image_commit}"
+            echo "Images : ${image_commit} (API, sauvegarde), ${web_commit} (web)"
             echo
             echo "lorakus-api@${api}"
             echo
             echo "lorakus-backup@${backup}"
+            echo
+            echo "lorakus-web@${web}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preparer la connexion SSH (empreinte du serveur verifiee)
@@ -138,18 +143,36 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
+          # StrictHostKeyChecking=yes : connexion refusee si l'empreinte du serveur a change.
+          remote() {
+            ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              -o ServerAliveInterval=30 -o ConnectTimeout=15 \
+              "deploy@${DEPLOY_HOST}" "$1"
+          }
           case "$ACTION" in
-            deploy) remote="deploy ${GITHUB_SHA} ${API_DIGEST} ${BACKUP_DIGEST}" ;;
-            rollback) remote="rollback" ;;
-            status) remote="status" ;;
+            deploy)
+              full="deploy ${GITHUB_SHA} ${API_DIGEST} ${BACKUP_DIGEST} ${WEB_DIGEST}"
+              # Le serveur execute son propre deploy.sh. Avant la PR 35, ce script refuse une
+              # quatrieme empreinte : on deploie d'abord sans l'image web (ce qui installe le
+              # nouveau script), puis on recommence avec elle. Ensuite, un seul passage.
+              status=$(remote status)
+              if grep -qx 'LORAKUS_DEPLOY_PROTOCOL=2' <<<"$status"; then
+                remote "$full"
+              else
+                echo "::notice::Script de deploiement anterieur a l'image web : deploiement en deux passages"
+                remote "deploy ${GITHUB_SHA} ${API_DIGEST} ${BACKUP_DIGEST}"
+                status=$(remote status)
+                grep -qx 'LORAKUS_DEPLOY_PROTOCOL=2' <<<"$status" \
+                  || { echo "Le serveur n'a toujours pas le nouveau script" >&2; exit 1; }
+                remote "$full"
+              fi
+              ;;
+            rollback) remote rollback ;;
+            status) remote status ;;
             *) echo "Action inconnue : $ACTION" >&2; exit 1 ;;
           esac
-          # StrictHostKeyChecking=yes : connexion refusee si l'empreinte du serveur a change.
-          ssh -i ~/.ssh/deploy_key \
-            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            -o ServerAliveInterval=30 -o ConnectTimeout=15 \
-            "deploy@${DEPLOY_HOST}" "$remote"
 
       - name: Effacer la cle
         if: always()

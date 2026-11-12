@@ -61,6 +61,10 @@ FALLBACKS: Final[dict[str, str]] = {
         "Mon modèle de langage est indisponible pour le moment. Réessaie dans quelques "
         "minutes ; ton message est bien enregistré."
     ),
+    "rate_limited": (
+        "Tu m'envoies beaucoup de messages d'un coup : je marque une courte pause pour "
+        "protéger ton budget d'IA. Réessaie dans une minute ; ton message est bien enregistré."
+    ),
     "too_long": (
         "Ce message est trop long pour que je le traite en une fois. Peux-tu le raccourcir "
         "ou le découper ?"
@@ -278,7 +282,7 @@ class AssistantService:
                         result = event
             except AIUnavailableError as error:
                 status, reason = "fallback", error.reason
-                key = "budget" if error.reason == "budget" else "unavailable"
+                key = error.reason if error.reason in ("budget", "rate_limited") else "unavailable"
                 parts[:] = [FALLBACKS[key]]
                 yield Delta(FALLBACKS[key])
             except AIRefusedError as error:

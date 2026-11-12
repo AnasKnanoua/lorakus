@@ -53,6 +53,14 @@ class SecondFactorRequiredError(Exception):
     """Mot de passe correct, mais le compte exige un code de double authentification."""
 
 
+class SecondFactorSetupRequiredError(Exception):
+    """Double authentification obligatoire ici, mais pas encore activee sur ce compte."""
+
+
+class SecondFactorMandatoryError(Exception):
+    """Refus de desactiver la double authentification la ou elle est obligatoire."""
+
+
 class TooManyAttemptsError(Exception):
     """Trop de tentatives echouees recentes pour ce compte ou cette adresse IP."""
 
@@ -155,6 +163,9 @@ class IdentityService:
         self._max_per_ip = settings.login_max_failures_per_ip
         self.reauth_window = timedelta(minutes=settings.reauth_window_minutes)
         self._cipher = FieldCipher.from_settings(settings)
+        # Obligatoire en production (Settings._production_rules) : sans second facteur
+        # confirme, aucune session ne s'ouvre et les anciennes sessions sont refusees.
+        self.second_factor_required = settings.require_second_factor
 
     # ------------------------------------------------------------------ connexion
     async def login(
@@ -204,6 +215,8 @@ class IdentityService:
                     error, reason = SecondFactorRequiredError(), "second_factor_required"
                 elif method == "invalid":
                     error, reason = InvalidCredentialsError(), "second_factor"
+                elif method == "none" and self.second_factor_required:
+                    error, reason = SecondFactorSetupRequiredError(), "second_factor_setup"
                 else:
                     reason = method
                     if new_hash is not None:
@@ -212,7 +225,7 @@ class IdentityService:
                         )
                     issued = await self._create_session(session, user_id)
             failed = isinstance(error, InvalidCredentialsError)
-            if not isinstance(error, SecondFactorRequiredError):
+            if not isinstance(error, (SecondFactorRequiredError, SecondFactorSetupRequiredError)):
                 await session.execute(
                     text("SELECT lorakus.auth_record_attempt(:email, :ip, :ok)"),
                     {"email": email, "ip": ip, "ok": not failed},
@@ -258,12 +271,19 @@ class IdentityService:
                         User.role,
                         User.is_active,
                         AuthSession.reauthenticated_at,
+                        Totp.confirmed_at.label("second_factor_since"),
                     )
                     .join(AuthSession, AuthSession.user_id == User.id)
+                    .outerjoin(Totp, (Totp.user_id == User.id) & Totp.confirmed_at.is_not(None))
                     .where(AuthSession.id == found.id)
                 )
             ).one_or_none()
             if row is None or not row.is_active:
+                return None
+            if self.second_factor_required and row.second_factor_since is None:
+                # Session ouverte avant que la double authentification ne soit exigee
+                # (ou apres une recuperation sur le serveur) : elle n'est plus valable.
+                await session.execute(delete(AuthSession).where(AuthSession.id == found.id))
                 return None
             if now - found.last_seen_at >= LAST_SEEN_RESOLUTION:
                 await session.execute(
@@ -404,7 +424,13 @@ class IdentityService:
         return codes
 
     async def totp_disable(self, user: CurrentUser, ip: str | None) -> None:
-        """Desactive la double authentification (re-authentification recente exigee par l'API)."""
+        """Desactive la double authentification (re-authentification recente exigee par l'API).
+
+        Refuse la ou elle est obligatoire : le seul recours est alors recover-second-factor
+        sur le serveur, suivi d'une nouvelle activation (enable-second-factor).
+        """
+        if self.second_factor_required:
+            raise SecondFactorMandatoryError
         async with self._db.transaction(user.id) as session:
             await session.execute(delete(Totp).where(Totp.user_id == user.id))
             await session.execute(delete(BackupCode).where(BackupCode.user_id == user.id))
@@ -555,6 +581,29 @@ class IdentityService:
             )
             await audit(session, user_id, "auth.owner_create", "success")
         return user_id
+
+    async def account_for_admin(self, email: str) -> CurrentUser | None:
+        """Compte designe par son adresse, pour une commande sur le serveur (sans session)."""
+        async with self._db.transaction() as session:
+            account = (
+                await session.execute(
+                    text("SELECT id, is_active FROM lorakus.auth_find_login(:email)"),
+                    {"email": normalize_email(email)},
+                )
+            ).one_or_none()
+            if account is None or not account.is_active:
+                return None
+            await bind_user(session, account.id)
+            row = (
+                await session.execute(select(User.email, User.role).where(User.id == account.id))
+            ).one()
+        return CurrentUser(
+            id=account.id,
+            email=row.email,
+            role=row.role,
+            session_id=uuid.UUID(int=0),
+            reauthenticated_at=None,
+        )
 
     async def recover_second_factor(self, email: str) -> bool:
         """Desactive la double authentification d'un compte (commande sur le serveur).

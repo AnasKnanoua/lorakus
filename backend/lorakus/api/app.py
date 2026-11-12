@@ -10,12 +10,15 @@ from lorakus.ai.catalog import Catalog
 from lorakus.ai.providers import build_providers
 from lorakus.ai.router import ModelRouter
 from lorakus.ai.usage import UsageStore
+from lorakus.api.auth import RequestLimits
 from lorakus.api.modules import mount_module_routes
+from lorakus.api.origin import OriginCheckMiddleware
 from lorakus.api.routes import auth, health, modules, tools
 from lorakus.core.agents.service import AgentService
 from lorakus.core.identity.service import IdentityService
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.modules.service import ModuleService
+from lorakus.core.ratelimit.service import AICallQuota, Limit, RateLimiter
 from lorakus.core.tools.runtime import ToolRuntime
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
@@ -36,12 +39,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.modules = ModuleService(database, app.state.registry)
     app.state.tools = ToolRuntime(database, app.state.modules)
     app.state.agents = AgentService(database, app.state.modules)
+    app.state.rate_limiter = RateLimiter(database)
+    app.state.request_limits = RequestLimits(
+        all_requests=Limit("api.requests", 60, settings.api_requests_per_minute),
+        writes=Limit("api.writes", 60, settings.api_writes_per_minute),
+    )
     app.state.ai = ModelRouter(
         app.state.ai_catalog,
         build_providers(settings),
         UsageStore(database),
         monthly_budget_usd=settings.ai_monthly_budget_usd,
         kill_switch=settings.ai_kill_switch,
+        quota=AICallQuota(
+            app.state.rate_limiter,
+            per_minute=settings.ai_calls_per_minute,
+            per_day=settings.ai_calls_per_day,
+        ),
+        max_concurrent_per_user=settings.ai_concurrent_calls,
     )
     try:
         yield
@@ -61,6 +75,9 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     settings = get_settings()
     configure_logging(log_format=settings.log_format, level=settings.log_level)
     is_production = settings.environment == "production"
+    if settings.environment in ("staging", "production") and not settings.public_origin:
+        # Sans origine connue, toute ecriture depuis un navigateur serait refusee.
+        raise ValueError(f"LORAKUS_PUBLIC_ORIGIN manquante en {settings.environment}")
 
     app = FastAPI(
         title=settings.app_display_name,
@@ -71,6 +88,8 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
         redoc_url=None,
         openapi_url=None if is_production else "/api/openapi.json",
     )
+    # Ordre d'execution : RequestContext (identifiant, journal, metriques) puis l'origine.
+    app.add_middleware(OriginCheckMiddleware, allowed_origins=settings.allowed_origins())
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")

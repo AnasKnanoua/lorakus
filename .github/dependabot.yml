@@ -62,3 +62,15 @@ updates:
     commit-message:
       prefix: build
       include: scope
+
+  # Image web (Caddy et Node de construction), epinglees par empreinte (ADR 0038).
+  - package-ecosystem: docker
+    directory: /infra/web
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: build
+      include: scope

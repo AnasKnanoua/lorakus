@@ -282,3 +282,38 @@ groups:
           summary: Erreur interne dans l'assistant
           description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror
+
+  # Exposition publique (PR 35) : Caddy, limites par utilisateur, controle d'origine.
+  # La cible lorakus-web n'existe qu'en production (prometheus/production/web.yml).
+  - name: lorakus-web
+    rules:
+      - alert: LorakusWebDown
+        expr: up{job="lorakus-web"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: web
+        annotations:
+          summary: Caddy (app.lorakus.app) est injoignable
+          description: Prometheus ne joint plus Caddy depuis 2 minutes. L'interface et l'API ne sont plus accessibles depuis Internet.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakuswebdown
+
+      - alert: LorakusRateLimited
+        expr: sum(increase(lorakus_rate_limited_total[15m])) > 20
+        labels:
+          severity: warning
+          component: web
+        annotations:
+          summary: Requetes refusees par les limites par utilisateur
+          description: Plus de 20 requetes refusees en 15 minutes. Client en boucle, script ou session volee.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakusratelimited
+
+      - alert: LorakusOriginRefused
+        expr: sum(increase(lorakus_origin_refused_total[15m])) > 5
+        labels:
+          severity: warning
+          component: web
+        annotations:
+          summary: Ecritures refusees car venues d'une autre origine
+          description: Plus de 5 ecritures refusees en 15 minutes par le controle d'origine. Tentative CSRF ou adresse publique mal reglee.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakusoriginrefused

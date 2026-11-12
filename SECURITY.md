@@ -69,7 +69,21 @@ Contraintes de licence (par ligne) : `no_ai` (aucun LLM ni entraînement — ex.
 
 ## 6. Protection de l'API
 
-Validation Pydantic `extra="forbid"`, 10 Mo par upload, 32 ko par JSON, rate limit (Caddy par IP, compteur par utilisateur), CORS fermé au domaine du frontend, HSTS, CSP `default-src 'self'` (embeds listés explicitement en phase 10), `X-Content-Type-Options`, `Referrer-Policy`. Anti-SSRF pour tout téléchargement d'URL : résolution DNS, refus des IP privées, 5 Mo, 10 s.
+Validation Pydantic `extra="forbid"`, 10 Mo par upload (phase 9), corps de requête limité à 1 Mo par Caddy. Pas de CORS : interface et API à la même origine.
+
+Mis en œuvre à la PR 35 (ADR 0038) :
+
+| Mesure | Détail |
+| --- | --- |
+| Exposition | Seul Caddy (non root, lecture seule, sans capacité) publie 80 et 443 ; tout le reste écoute sur `127.0.0.1` ou le réseau Docker interne |
+| En-têtes | HSTS un an, CSP `script-src 'self'` (aucun script en ligne), `frame-ancestors 'none'`, `nosniff`, `no-referrer`, `Permissions-Policy`, sans en-tête `Server`. `style-src 'unsafe-inline'` admis pour Radix |
+| Origine | Écritures sous `/api/` refusées (403) si `Origin` ou `Sec-Fetch-Site` désignent un autre site, sous-domaines compris ; seconde barrière derrière `SameSite=Strict` |
+| Adresse réelle | Caddy réécrit `X-Forwarded-For` ; uvicorn ne le croit que venant de l'adresse fixe de Caddy. Les limites de connexion par IP voient donc les vrais visiteurs |
+| Limites par utilisateur | 300 requêtes par minute dont 60 écritures (429, `Retry-After`), compteurs dans PostgreSQL. Appels IA : 6 par minute, 200 par jour, 2 simultanés, dans le `ModelRouter` ; au-delà, gabarit sans appel payant |
+| Coût de l'IA | Perte maximale bornée par le crédit prépayé sans rechargement (10 $), puis par le plafond mensuel par utilisateur (3 $), le rythme ci-dessus et la coupure générale (`LORAKUS_AI_KILL_SWITCH`). Alertes `LorakusAiSpendHigh` et `LorakusRateLimited` |
+| Double authentification | Obligatoire en production : aucune session sans second facteur confirmé, sessions antérieures refusées, désactivation impossible depuis l'application. Activation et récupération uniquement sur le serveur (`enable-second-factor`, `recover-second-factor`) |
+
+Non couvert à ce stade, prévu : limite par adresse IP des routes sans session autres que la connexion, surveillance externe de l'adresse publique et de l'expiration du certificat (P6), revue de sécurité complète avant toute vente (ROADMAP, Idées). Anti-SSRF pour tout téléchargement d'URL : résolution DNS, refus des IP privées, 5 Mo, 10 s.
 
 ## 7. Sécurité des agents IA
 

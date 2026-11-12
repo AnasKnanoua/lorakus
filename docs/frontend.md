@@ -56,7 +56,7 @@ Les écrans sont capturés dans un vrai navigateur (Chromium sans interface) con
 - Réponses du modèle rendues comme données non fiables : pas de HTML brut, liens limités à `http`, `https` et `mailto`, ouverts sans référent, **aucune image distante** (une image chargerait une adresse choisie par le texte, moyen connu de faire fuiter des données). Testé (`src/components/Markdown.test.tsx`).
 - Session par cookie `__Host-` (`HttpOnly`, même origine) : aucun jeton en `localStorage`. À la déconnexion, tout le cache en mémoire est vidé.
 - Le service worker (`public/sw.js`) ne met **jamais** `/api/` en cache : aucune donnée personnelle sur l'appareil, seulement la coquille de l'application.
-- En-têtes de sécurité (CSP, etc.) : posés par Caddy avec l'exposition publique (PR 35).
+- En-têtes de sécurité : posés par Caddy (`infra/web/Caddyfile`, ADR 0038). CSP `script-src 'self'` : aucun script en ligne ni externe, jamais d'`eval`. Les styles en ligne sont admis (Radix). Toute nouvelle ressource externe (police, image, script) doit être ajoutée à la CSP, ou mieux, embarquée dans le build.
 
 ## Tests
 

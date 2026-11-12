@@ -525,3 +525,66 @@ tests:
               summary: Erreur interne dans l'assistant
               description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
               runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror
+
+  # ------------------------------------------------------------------ exposition (PR 35)
+  - name: Caddy injoignable
+    interval: 1m
+    input_series:
+      - series: 'up{job="lorakus-web", instance="web:8081"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LorakusWebDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: LorakusWebDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: web
+              job: lorakus-web
+              instance: web:8081
+            exp_annotations:
+              summary: Caddy (app.lorakus.app) est injoignable
+              description: Prometheus ne joint plus Caddy depuis 2 minutes. L'interface et l'API ne sont plus accessibles depuis Internet.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakuswebdown
+
+  - name: Rafale refusee par les limites
+    interval: 1m
+    input_series:
+      - series: 'lorakus_rate_limited_total{bucket="api.requests"}'
+        values: '0 0 30 60'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusRateLimited
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: LorakusRateLimited
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: web
+            exp_annotations:
+              summary: Requetes refusees par les limites par utilisateur
+              description: Plus de 20 requetes refusees en 15 minutes. Client en boucle, script ou session volee.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakusratelimited
+
+  - name: Ecritures d'une autre origine
+    interval: 1m
+    input_series:
+      - series: 'lorakus_origin_refused_total'
+        values: '0 2 10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LorakusOriginRefused
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: LorakusOriginRefused
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: web
+            exp_annotations:
+              summary: Ecritures refusees car venues d'une autre origine
+              description: Plus de 5 ecritures refusees en 15 minutes par le controle d'origine. Tentative CSRF ou adresse publique mal reglee.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakusoriginrefused
