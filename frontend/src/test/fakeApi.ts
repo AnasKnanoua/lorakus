@@ -18,6 +18,8 @@ export interface FakeState {
   loggedIn: boolean;
   password: string;
   secondFactor: string | null;
+  /** Production : la double authentification doit etre activee avant toute connexion. */
+  secondFactorSetupRequired: boolean;
   assistantEnabled: boolean;
   conversations: Map<string, { id: string; title: string; messages: FakeMessage[] }>;
   /** Reponse que le prochain message recevra, decoupee en morceaux de flux. */
@@ -66,6 +68,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     loggedIn: false,
     password: "un mot de passe assez long",
     secondFactor: null,
+    secondFactorSetupRequired: false,
     assistantEnabled: true,
     conversations: new Map(),
     nextReply: { chunks: ["Bonjour", " Anas."], status: "ok" },
@@ -89,6 +92,9 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       const b = body as { password: string; second_factor?: string };
       if (b.password !== state.password) {
         return json(401, { detail: "Identifiants invalides." });
+      }
+      if (state.secondFactorSetupRequired) {
+        return json(403, { detail: { code: "second_factor_setup_required", message: "A activer." } });
       }
       if (state.secondFactor && b.second_factor !== state.secondFactor) {
         return json(401, { detail: { code: "second_factor_required", message: "Code requis." } });

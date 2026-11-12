@@ -60,3 +60,15 @@ def start_metrics_server(port: int) -> None:
     # 0.0.0.0 a l'interieur du conteneur uniquement : seul Prometheus, sur le
     # reseau interne de Docker, peut joindre ce port.
     start_http_server(port, addr="0.0.0.0")  # noqa: S104
+
+
+RATE_LIMITED: Final = Counter(
+    "lorakus_rate_limited_total",
+    "Requetes refusees par une limite de debit par utilisateur (bucket : compteur)",
+    ["bucket"],
+)
+
+ORIGIN_REFUSED: Final = Counter(
+    "lorakus_origin_refused_total",
+    "Requetes d'ecriture refusees parce qu'elles venaient d'une autre origine",
+)

@@ -85,3 +85,22 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (2026-11-12) : `docker compose` répond « permission denied » sur `/opt/lorakus/.env` ; le déploiement suivant échouerait.
 - **Cause** : `init-env.sh` lancé avec `sudo` ; le script remplace le fichier, et le nouveau appartient à qui le lance (root).
 - **Correction** : `sudo chown deploy:deploy /opt/lorakus/.env && sudo chmod 600 /opt/lorakus/.env`. Depuis la PR 34, le script refuse root et tout utilisateur autre que le propriétaire du fichier, et donne la bonne commande (`sudo -iu deploy …`).
+
+## Docker publie ses ports en contournant `firewalld`
+
+- **Constat** (2026-11-12, PR 35) : un port publié par Docker (`ports: "80:8080"`) est joignable depuis Internet même si `firewalld` ne l'autorise pas : Docker insère ses propres règles de redirection avant celles de `firewalld`. La liste de sécurité Oracle reste le seul filtre en amont.
+- **Règle** : seul le service `web` (Caddy) publie un port sur toutes les interfaces ; tout autre `ports:` est lié à `127.0.0.1`. `firewalld` autorise tout de même `http` et `https` pour que sa configuration dise la vérité (DEPLOYMENT.md §4.6).
+- **À ne pas faire** : ajouter un `ports:` sans `127.0.0.1:` devant, en croyant que `firewalld` le protège.
+
+## Le premier déploiement d'une nouvelle option de `deploy.sh` passe par l'ancien script
+
+- **Constat** (2026-11-12, PR 35) : la clé SSH de GitHub exécute le `deploy.sh` déjà présent sur le serveur, celui de la version en service. Ce script n'accepte que les arguments qu'il connaissait (trois empreintes avant la PR 35).
+- **Solution** : `deploy.sh status` annonce `LORAKUS_DEPLOY_PROTOCOL` ; `deploy.yml` n'envoie l'empreinte web qu'à un script de protocole 2, sinon il déploie d'abord sans elle (ce qui installe le nouveau script), puis avec elle. Le staging rejoue ces deux passages.
+- **À retenir** : toute nouvelle option de `deploy.sh` doit rester acceptée par l'ancien script, ou suivre le même schéma (numéro de protocole et deux passages).
+
+## « exec /usr/bin/caddy: operation not permitted »
+
+- **Symptôme** (2026-11-12, CI de la PR 35) : le conteneur `web` s'arrête aussitôt ; le test de fumée de l'image échoue sur les deux architectures.
+- **Cause** : l'image officielle de Caddy pose la capacité de fichier `cap_net_bind_service` sur son binaire (`setcap`). Un programme qui porte une capacité absente de l'ensemble autorisé du conteneur (`cap_drop: ALL`) ne peut pas être lancé : le noyau refuse l'`exec`.
+- **Correction** : notre image recopie le binaire sans attribut étendu (`install`) dans `/usr/local/bin` et supprime l'original. Caddy écoute sur 8080 et 8443, il n'a besoin d'aucune capacité.
+- **À retenir** : toute image de base qui utilise `setcap` pose le même problème avec notre durcissement ; le test de fumée, qui lance l'image avec les mêmes options que Compose, le détecte.

@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input";
 const MESSAGES: Record<Exclude<LoginResult, "ok" | "second_factor_required">, string> = {
   invalid: "Adresse ou mot de passe incorrect.",
   too_many_attempts: "Trop de tentatives. Patiente quelques minutes avant de réessayer.",
+  second_factor_setup_required:
+    "La double authentification est obligatoire. Active-la d'abord sur le serveur " +
+    "(commande enable-second-factor), puis reviens te connecter.",
 };
 
 export function LoginScreen() {

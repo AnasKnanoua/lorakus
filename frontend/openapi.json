@@ -1742,7 +1742,7 @@
     },
     "/api/v1/auth/totp/disable": {
       "post": {
-        "description": "Desactive la double authentification et supprime les codes de secours.",
+        "description": "Desactive la double authentification et supprime les codes de secours.\n\nRefuse (409) la ou elle est obligatoire, c'est-a-dire en production.",
         "operationId": "totp_disable_api_v1_auth_totp_disable_post",
         "responses": {
           "204": {

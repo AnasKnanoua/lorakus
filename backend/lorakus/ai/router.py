@@ -8,6 +8,8 @@ Pour chaque demande, dans cet ordre, avant de payer quoi que ce soit :
 4. Fournisseurs autorises pour la classe de donnees : un fournisseur externe ne recoit
    jamais `sensitive`, quoi que dise routing.toml.
 5. Plafond mensuel de l'utilisateur : indisponible s'il est atteint.
+6. Rythme de l'utilisateur (PR 35) : reponses simultanees, appels par minute et par jour ;
+   indisponible au-dela (une rafale ne peut pas vider le budget en quelques secondes).
 
 Puis les cibles de la chaine sont essayees dans l'ordre. Tant qu'aucun texte n'a ete
 transmis, une panne fait passer a la cible suivante ; apres le premier morceau, la
@@ -22,7 +24,7 @@ import uuid
 from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Final, Literal, NoReturn
+from typing import Final, Literal, NoReturn, Protocol
 
 import structlog
 
@@ -54,7 +56,7 @@ log = structlog.get_logger("lorakus.ai")
 BUDGET_WARNING_RATIO: Final = Decimal("0.8")
 
 RefusalReason = Literal["no_ai", "data_class", "too_long"]
-UnavailableReason = Literal["kill_switch", "budget", "no_provider"]
+UnavailableReason = Literal["kill_switch", "budget", "no_provider", "rate_limited"]
 
 
 class AIRefusedError(Exception):
@@ -91,6 +93,12 @@ class ChatResult:
 RouterEvent = TextDelta | ChatResult
 
 
+class CallQuota(Protocol):
+    """Rythme des appels d'un utilisateur. Compte l'appel et dit s'il est autorise."""
+
+    async def allow(self, user_id: uuid.UUID) -> bool: ...
+
+
 def _prompt_tokens(request: ChatRequest) -> int:
     return estimate_tokens(request.system) + sum(
         estimate_tokens(m.content) for m in request.messages
@@ -107,6 +115,8 @@ class ModelRouter:
         monthly_budget_usd: Decimal,
         kill_switch: bool = False,
         breaker: CircuitBreaker | None = None,
+        quota: CallQuota | None = None,
+        max_concurrent_per_user: int | None = None,
     ) -> None:
         self._catalog = catalog
         self._providers = dict(providers)
@@ -114,6 +124,10 @@ class ModelRouter:
         self._budget = monthly_budget_usd
         self._kill_switch = kill_switch
         self._breaker = breaker or CircuitBreaker()
+        self._quota = quota
+        self._max_concurrent = max_concurrent_per_user
+        # Reponses en cours par utilisateur, dans ce processus (une seule API aujourd'hui).
+        self._in_flight: dict[uuid.UUID, int] = {}
 
     def available_targets(self, task: str, data_class: DataClass) -> list[str]:
         """Cibles de la tache utilisables pour cette classe de donnees, dans l'ordre."""
@@ -170,6 +184,40 @@ class ModelRouter:
         if spent >= self._budget:
             self._refuse(task, AIUnavailableError("budget"))
 
+        # Le compteur de reponses en cours d'abord : un refus pour cause de reponse deja en
+        # cours ne consomme pas le quota par minute.
+        in_flight = self._in_flight.get(user_id, 0)
+        if self._max_concurrent is not None and in_flight >= self._max_concurrent:
+            self._refuse(task, AIUnavailableError("rate_limited"))
+        if self._quota is not None and not await self._quota.allow(user_id):
+            self._refuse(task, AIUnavailableError("rate_limited"))
+
+        self._in_flight[user_id] = self._in_flight.get(user_id, 0) + 1
+        stream = self._stream(user_id, task, data_class, request, targets, spent)
+        try:
+            async for event in stream:
+                yield event
+        finally:
+            # Ferme le flux interne tout de suite (client parti) : le disjoncteur et le
+            # fournisseur sont liberes avant que le compteur ne redescende.
+            await stream.aclose()
+            remaining = self._in_flight.get(user_id, 1) - 1
+            if remaining > 0:
+                self._in_flight[user_id] = remaining
+            else:
+                self._in_flight.pop(user_id, None)
+
+    async def _stream(
+        self,
+        user_id: uuid.UUID,
+        task: str,
+        data_class: DataClass,
+        request: ChatRequest,
+        targets: list[str],
+        spent: Decimal,
+    ) -> AsyncGenerator[RouterEvent]:
+        """Essaie les cibles dans l'ordre (contrats decrits dans chat_stream)."""
+        route = self._catalog.route(task)
         bounded = request.model_copy(
             update={"max_output_tokens": min(request.max_output_tokens, route.max_output_tokens)}
         )

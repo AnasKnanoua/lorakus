@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploiement de Lorakus. S'execute SUR le serveur, avec l'utilisateur deploy.
 #
-#   deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE   met en service une version
+#   deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE [EMPREINTE_WEB]
+#                                                                met en service une version
 #   deploy.sh rollback                                           revient a la version precedente
 #   deploy.sh status                                             affiche la version en service
 #   deploy.sh backup                                             sauvegarde (minuteur systemd quotidien)
@@ -12,6 +13,12 @@
 # COMMIT : commit de la branche main (40 caracteres). Il fixe la CONFIGURATION (fichiers Compose,
 #          Prometheus, Grafana...), recuperee depuis le depot public.
 # EMPREINTE : sha256 de l'image publiee sur GHCR. Elle fixe le CODE execute.
+# EMPREINTE_WEB (a partir de la PR 35) : image de Caddy et de l'interface. Une version sans
+#          image web (anterieure) ne demarre pas le service web (profil Compose "web").
+#
+# Protocole : `status` affiche LORAKUS_DEPLOY_PROTOCOL. Le workflow deploy.yml n'envoie
+# l'empreinte web qu'a un serveur dont le script la connait (protocole 2) ; sinon il deploie
+# d'abord sans elle, ce qui installe ce script, puis recommence avec elle.
 #
 # Deroulement d'un deploiement : sauvegarde de la base -> migrations -> demarrage -> test de
 # /api/health/ready. Si une etape echoue, la version precedente est remise en service.
@@ -32,6 +39,8 @@ LOCK="$ROOT/deploy.lock"
 HOST_COMPOSE="$ROOT/compose.host.yml"
 REGISTRY="${LORAKUS_REGISTRY:-ghcr.io/anasknanoua}"
 READY_URL="${LORAKUS_READY_URL:-http://127.0.0.1:8001/api/health/ready}"
+DEPLOY_PROTOCOL=2
+DIGEST_RE='^sha256:[0-9a-f]{64}$'
 
 say() {
   echo "==> $*"
@@ -50,6 +59,10 @@ compose_command() {
     -f "$APP/compose.yml" -f "$APP/compose.observability.yml" -f "$APP/compose.prod.yml")
   if [ -f "$HOST_COMPOSE" ]; then
     COMPOSE_CMD+=(-f "$HOST_COMPOSE")
+  fi
+  # Caddy seulement si la version a une image web (sinon le profil reste inactif).
+  if [ -n "$(release_value "$1" LORAKUS_WEB_IMAGE)" ]; then
+    COMPOSE_CMD+=(--profile web)
   fi
   COMPOSE_CMD+=(--env-file "$ENV_FILE" --env-file "$1")
 }
@@ -88,16 +101,20 @@ checkout_commit() {
 }
 
 release_value() {
+  [ -f "$1" ] || return 0
   sed -n "s/^$2=//p" "$1"
 }
 
 write_release() {
-  local file="$1" commit="$2" api="$3" backup="$4" tmp
+  local file="$1" commit="$2" api="$3" backup="$4" web="${5:-}" tmp
   tmp=$(mktemp "$file.XXXXXX")
   {
     echo "LORAKUS_RELEASE_COMMIT=$commit"
     echo "LORAKUS_API_IMAGE=$api"
     echo "LORAKUS_BACKUP_IMAGE=$backup"
+    if [ -n "$web" ]; then
+      echo "LORAKUS_WEB_IMAGE=$web"
+    fi
     echo "LORAKUS_RELEASED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$tmp"
   chmod 644 "$tmp"
@@ -108,7 +125,8 @@ same_release() {
   [ -f "$1" ] && [ -f "$2" ] \
     && [ "$(release_value "$1" LORAKUS_RELEASE_COMMIT)" = "$(release_value "$2" LORAKUS_RELEASE_COMMIT)" ] \
     && [ "$(release_value "$1" LORAKUS_API_IMAGE)" = "$(release_value "$2" LORAKUS_API_IMAGE)" ] \
-    && [ "$(release_value "$1" LORAKUS_BACKUP_IMAGE)" = "$(release_value "$2" LORAKUS_BACKUP_IMAGE)" ]
+    && [ "$(release_value "$1" LORAKUS_BACKUP_IMAGE)" = "$(release_value "$2" LORAKUS_BACKUP_IMAGE)" ] \
+    && [ "$(release_value "$1" LORAKUS_WEB_IMAGE)" = "$(release_value "$2" LORAKUS_WEB_IMAGE)" ]
 }
 
 wait_ready() {
@@ -159,10 +177,14 @@ restore_current() {
 }
 
 cmd_deploy() {
-  local commit="${1:-}" api_digest="${2:-}" backup_digest="${3:-}"
+  local commit="${1:-}" api_digest="${2:-}" backup_digest="${3:-}" web_digest="${4:-}" web=""
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || fail "commit invalide (40 caracteres hexadecimaux attendus)"
-  [[ "$api_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "empreinte de l'image API invalide"
-  [[ "$backup_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "empreinte de l'image de sauvegarde invalide"
+  [[ "$api_digest" =~ $DIGEST_RE ]] || fail "empreinte de l'image API invalide"
+  [[ "$backup_digest" =~ $DIGEST_RE ]] || fail "empreinte de l'image de sauvegarde invalide"
+  if [ -n "$web_digest" ]; then
+    [[ "$web_digest" =~ $DIGEST_RE ]] || fail "empreinte de l'image web invalide"
+    web="$REGISTRY/lorakus-web@$web_digest"
+  fi
   [ -f "$ENV_FILE" ] || fail "$ENV_FILE absent : lancer d'abord infra/deploy/init-env.sh"
 
   take_lock
@@ -170,25 +192,26 @@ cmd_deploy() {
   checkout_commit "$commit"
   # On relance le script tel qu'il existe dans le commit deploye.
   exec "$APP/infra/deploy/deploy.sh" apply deploy "$commit" \
-    "$REGISTRY/lorakus-api@$api_digest" "$REGISTRY/lorakus-backup@$backup_digest"
+    "$REGISTRY/lorakus-api@$api_digest" "$REGISTRY/lorakus-backup@$backup_digest" "$web"
 }
 
 cmd_rollback() {
   [ -f "$PREVIOUS" ] || fail "aucune version precedente enregistree"
-  local commit api backup
+  local commit api backup web
   commit=$(release_value "$PREVIOUS" LORAKUS_RELEASE_COMMIT)
   api=$(release_value "$PREVIOUS" LORAKUS_API_IMAGE)
   backup=$(release_value "$PREVIOUS" LORAKUS_BACKUP_IMAGE)
+  web=$(release_value "$PREVIOUS" LORAKUS_WEB_IMAGE)
 
   take_lock
   say "Retour a la version precedente : commit $commit"
   checkout_commit "$commit"
-  exec "$APP/infra/deploy/deploy.sh" apply rollback "$commit" "$api" "$backup"
+  exec "$APP/infra/deploy/deploy.sh" apply rollback "$commit" "$api" "$backup" "$web"
 }
 
 # Etape interne, lancee par deploy et rollback une fois la configuration en place.
 cmd_apply() {
-  local mode="${1:-}" commit="${2:-}" api="${3:-}" backup="${4:-}"
+  local mode="${1:-}" commit="${2:-}" api="${3:-}" backup="${4:-}" web="${5:-}"
   [ "${LORAKUS_DEPLOY_LOCKED:-}" = "1" ] || fail "apply est une etape interne : utiliser deploy ou rollback"
   [ "$mode" = "deploy" ] || [ "$mode" = "rollback" ] || fail "mode inconnu : $mode"
 
@@ -197,7 +220,7 @@ cmd_apply() {
   # existante n'est modifiee).
   "$APP/infra/deploy/init-env.sh" --generated-only "$ENV_FILE"
 
-  write_release "$NEXT" "$commit" "$api" "$backup"
+  write_release "$NEXT" "$commit" "$api" "$backup" "$web"
 
   say "Telechargement des images"
   if ! compose "$NEXT" --profile tools pull --quiet; then
@@ -224,6 +247,9 @@ cmd_apply() {
       say "Echec : journaux de la nouvelle version"
       compose "$NEXT" ps -a || true
       compose "$NEXT" logs --no-color --tail 80 api migrate || true
+      if [ -n "$web" ]; then
+        compose "$NEXT" logs --no-color --tail 40 web || true
+      fi
       say "Echec : remise en service de la version en place avant ce deploiement"
       restore_current || fail "le retour automatique a aussi echoue : intervention manuelle necessaire"
       fail "la nouvelle version n'a pas demarre correctement ; la version precedente est de nouveau en service"
@@ -270,6 +296,8 @@ cmd_compose() {
 }
 
 cmd_status() {
+  # Lu par deploy.yml : ce script accepte-t-il l'empreinte de l'image web ?
+  echo "LORAKUS_DEPLOY_PROTOCOL=$DEPLOY_PROTOCOL"
   if [ -f "$RELEASE" ]; then
     echo "--- en service"
     cat "$RELEASE"
@@ -289,8 +317,9 @@ cmd_ssh() {
   read -r -a words <<< "${SSH_ORIGINAL_COMMAND:-}"
   case "${words[0]:-}" in
     deploy)
-      [ "${#words[@]}" -eq 4 ] || fail "usage : deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE"
-      cmd_deploy "${words[1]}" "${words[2]}" "${words[3]}"
+      [ "${#words[@]}" -eq 4 ] || [ "${#words[@]}" -eq 5 ] \
+        || fail "usage : deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE [EMPREINTE_WEB]"
+      cmd_deploy "${words[1]}" "${words[2]}" "${words[3]}" "${words[4]:-}"
       ;;
     rollback)
       [ "${#words[@]}" -eq 1 ] || fail "usage : rollback"
@@ -318,7 +347,7 @@ main() {
     alert-test) cmd_alert_test ;;
     compose) cmd_compose "$@" ;;
     ssh) cmd_ssh ;;
-    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE | rollback | status | backup | alert-test | compose ..." ;;
+    *) fail "usage : deploy.sh deploy COMMIT EMPREINTE_API EMPREINTE_SAUVEGARDE [EMPREINTE_WEB] | rollback | status | backup | alert-test | compose ..." ;;
   esac
 }
 

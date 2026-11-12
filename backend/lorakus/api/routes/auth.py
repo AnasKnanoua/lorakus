@@ -25,7 +25,9 @@ from lorakus.core.identity.service import (
     CurrentUser,
     IdentityService,
     InvalidCredentialsError,
+    SecondFactorMandatoryError,
     SecondFactorRequiredError,
+    SecondFactorSetupRequiredError,
     TooManyAttemptsError,
 )
 
@@ -34,6 +36,18 @@ router = APIRouter(prefix="/v1/auth", tags=["authentification"])
 # Un seul message pour un compte inconnu, inactif ou un mot de passe faux.
 INVALID_CREDENTIALS = "Identifiants invalides."
 TOO_MANY_ATTEMPTS = "Trop de tentatives. Reessayez plus tard."
+# Production : un compte sans double authentification ne peut pas ouvrir de session.
+# Elle s'active sur le serveur (python -m lorakus.cli enable-second-factor).
+SECOND_FACTOR_SETUP_REQUIRED = {
+    "code": "second_factor_setup_required",
+    "message": (
+        "Double authentification obligatoire : activez-la sur le serveur avant de vous connecter."
+    ),
+}
+SECOND_FACTOR_MANDATORY = {
+    "code": "second_factor_mandatory",
+    "message": "La double authentification est obligatoire ici : elle ne peut pas etre desactivee.",
+}
 SECOND_FACTOR_REQUIRED = {
     "code": "second_factor_required",
     "message": "Code de double authentification (ou code de secours) requis.",
@@ -129,6 +143,8 @@ async def login(
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, TOO_MANY_ATTEMPTS) from None
     except SecondFactorRequiredError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, SECOND_FACTOR_REQUIRED) from None
+    except SecondFactorSetupRequiredError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, SECOND_FACTOR_SETUP_REQUIRED) from None
     except InvalidCredentialsError:
         raise _unauthorized() from None
     set_session_cookie(response, issued)
@@ -225,8 +241,14 @@ async def totp_confirm(
 
 @router.post("/totp/disable", status_code=status.HTTP_204_NO_CONTENT)
 async def totp_disable(request: Request, identity: Identity, user: RecentUser) -> None:
-    """Desactive la double authentification et supprime les codes de secours."""
-    await identity.totp_disable(user, client_ip(request))
+    """Desactive la double authentification et supprime les codes de secours.
+
+    Refuse (409) la ou elle est obligatoire, c'est-a-dire en production.
+    """
+    try:
+        await identity.totp_disable(user, client_ip(request))
+    except SecondFactorMandatoryError:
+        raise HTTPException(status.HTTP_409_CONFLICT, SECOND_FACTOR_MANDATORY) from None
 
 
 @router.post("/totp/backup-codes")

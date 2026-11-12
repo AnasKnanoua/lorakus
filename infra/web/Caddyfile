@@ -1,0 +1,98 @@
+# Caddy de Lorakus (PR 35, ADR 0038) : HTTPS, interface (PWA) et relais vers l'API.
+#
+# Variables (compose.prod.yml) :
+#   LORAKUS_PUBLIC_HOST  nom public, ex. app.lorakus.app
+#   LORAKUS_TLS          acme (Let's Encrypt, production) ou internal (CA locale : staging, tests)
+#
+# Caddy tourne sans etre root : il ecoute sur 8080 (HTTP) et 8443 (HTTPS) dans le conteneur,
+# publies sur 80 et 443. Les redirections automatiques sont coupees car elles ajouteraient
+# le port interne (:8443) a l'adresse ; la redirection HTTP -> HTTPS est ecrite plus bas.
+{
+	admin off
+	persist_config off
+	skip_install_trust
+	http_port 8080
+	https_port 8443
+	auto_https disable_redirects
+	servers {
+		# Pas de HTTP/3 : il demanderait d'ouvrir l'UDP 443 pour un gain negligeable ici.
+		protocols h1 h2
+	}
+	# Journaux JSON sur la sortie standard. Caddy masque deja Cookie et Authorization.
+	log {
+		output stdout
+		format json
+	}
+}
+
+(tls_acme) {
+	# Certificat Let's Encrypt automatique et renouvele seul (rien a ecrire).
+}
+
+(tls_internal) {
+	tls internal
+}
+
+# En-tetes de securite de toutes les reponses (docs/frontend.md, SECURITY.md).
+(security_headers) {
+	header {
+		# Un an de HTTPS obligatoire (le domaine .app est deja dans la liste HSTS des navigateurs).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Scripts : uniquement les fichiers du site, aucun script en ligne ni externe.
+		# Styles en ligne admis : Radix (fenetres de dialogue) en injecte pour bloquer le defilement.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		-Server
+		-Via
+	}
+}
+
+{$LORAKUS_PUBLIC_HOST} {
+	import tls_{$LORAKUS_TLS:acme}
+	import security_headers
+	log
+
+	# Corps de requete limite (l'API valide aussi chaque champ). Les envois de fichiers
+	# (phase 9) auront leur propre route et leur propre limite.
+	request_body {
+		max_size 1MB
+	}
+
+	handle /api/* {
+		encode gzip
+		reverse_proxy api:8000 {
+			# Reponses en flux (SSE) : chaque morceau part tout de suite.
+			flush_interval -1
+			# Caddy remplace X-Forwarded-For par l'adresse du visiteur (en-tete du client ignore).
+		}
+	}
+
+	handle {
+		encode zstd gzip
+		root * /srv
+		# Fichiers dont le nom contient l'empreinte : en cache un an. Le reste : revalide.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@shell not path /assets/*
+		header @shell Cache-Control "no-cache"
+		# Application a page unique : toute adresse inconnue renvoie index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+http://{$LORAKUS_PUBLIC_HOST} {
+	# Les validations Let's Encrypt (/.well-known/acme-challenge/) sont traitees avant.
+	redir https://{host}{uri} 308
+}
+
+# Sante et metriques, sur le reseau interne seulement (jamais publie).
+:8081 {
+	respond /healthz 200
+	metrics /metrics
+}

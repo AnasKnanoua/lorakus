@@ -11,6 +11,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Production disparue](production-down.md) | Message healthchecks.io « DOWN », `LorakusHeartbeatFailing` |
 | [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
 | [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError` |
+| [Accès public : Caddy, limites, origine](web.md) | `LorakusWebDown`, `LorakusRateLimited`, `LorakusOriginRefused` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |
 | [Pièges déjà rencontrés](pitfalls.md) | — |
@@ -26,7 +27,7 @@ ssh lorakus-prod
 Puis, sur le serveur, avec l'utilisateur `deploy` (`sudo -iu deploy` si la session s'ouvre sous un autre compte) :
 
 ```bash
-cd /opt/lorakus/app && dc() { docker compose -f compose.yml -f compose.observability.yml -f compose.prod.yml --env-file /opt/lorakus/.env --env-file /opt/lorakus/release.env "$@"; } && dc ps
+cd /opt/lorakus/app && dc() { docker compose -f compose.yml -f compose.observability.yml -f compose.prod.yml --profile web --env-file /opt/lorakus/.env --env-file /opt/lorakus/release.env "$@"; } && dc ps
 ```
 
 `dc` est la commande `docker compose` de la production, avec tous ses fichiers. Elle n'existe que dans la session en cours. Les runbooks l'utilisent partout.

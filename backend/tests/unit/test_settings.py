@@ -26,3 +26,17 @@ def test_password_never_appears_when_url_is_displayed(monkeypatch: pytest.Monkey
 
     assert "tres-secret-123" not in str(url)
     assert "tres-secret-123" not in repr(url)
+
+
+def test_production_always_requires_a_second_factor(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LORAKUS_ENVIRONMENT", "production")
+    monkeypatch.setenv("LORAKUS_REQUIRE_SECOND_FACTOR", "false")
+    assert Settings().require_second_factor is True
+
+
+def test_public_origin_is_an_origin_without_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LORAKUS_PUBLIC_ORIGIN", "https://app.lorakus.app/chemin")
+    with pytest.raises(ValueError, match="public_origin"):
+        Settings()
+    monkeypatch.setenv("LORAKUS_PUBLIC_ORIGIN", "https://app.lorakus.app")
+    assert Settings().allowed_origins() >= {"https://app.lorakus.app"}

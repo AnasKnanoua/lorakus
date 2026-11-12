@@ -379,6 +379,8 @@ export interface paths {
         /**
          * Totp Disable
          * @description Desactive la double authentification et supprime les codes de secours.
+         *
+         *     Refuse (409) la ou elle est obligatoire, c'est-a-dire en production.
          */
         post: operations["totp_disable_api_v1_auth_totp_disable_post"];
         delete?: never;

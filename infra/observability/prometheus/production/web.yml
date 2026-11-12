@@ -1,0 +1,7 @@
+# Cibles de la production seulement, montees par compose.prod.yml dans /etc/prometheus-extra.
+# En developpement, ce dossier n'est pas monte : la cible n'existe pas et rien n'alerte.
+scrape_configs:
+  # Caddy (service web) : sante et metriques HTTP, port interne 8081 jamais publie.
+  - job_name: lorakus-web
+    static_configs:
+      - targets: ["web:8081"]

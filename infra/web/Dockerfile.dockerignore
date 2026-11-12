@@ -1,0 +1,6 @@
+# Contexte de construction de l'image web (racine du depot) : seulement ce qu'elle utilise.
+*
+!frontend/
+!infra/web/Caddyfile
+frontend/node_modules/
+frontend/dist/

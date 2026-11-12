@@ -4,5 +4,66 @@ services:
   api:
     ports:
       # 127.0.0.1 : joignable depuis le serveur seulement (test de sante du deploiement,
-      # acces par tunnel SSH). Rien n'est expose a Internet avant la phase 3.
+      # acces par tunnel SSH). Le public passe par Caddy (service web).
       - "127.0.0.1:8001:8000"
+    environment:
+      # Seule origine admise pour les ecritures (en-tete Origin, PR 35).
+      LORAKUS_PUBLIC_ORIGIN: https://${LORAKUS_PUBLIC_HOST:-app.lorakus.app}
+      # uvicorn ne croit X-Forwarded-For que s'il vient de l'adresse fixe de Caddy.
+      FORWARDED_ALLOW_IPS: 172.31.250.2
+    networks: [internal, edge]
+
+  # Caddy : HTTPS et interface (ADR 0038). Seul service publie sur Internet.
+  # Profil "web" : deploy.sh ne l'active que si la version deployee a une image web
+  # (les versions anterieures a la PR 35 n'en ont pas).
+  web:
+    image: ${LORAKUS_WEB_IMAGE:-lorakus-web:dev}
+    profiles: ["web"]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=16m", "/config:size=1m,uid=10002,gid=10002"]
+    environment:
+      LORAKUS_PUBLIC_HOST: ${LORAKUS_PUBLIC_HOST:-app.lorakus.app}
+      LORAKUS_TLS: ${LORAKUS_TLS:-acme}
+    volumes:
+      # Certificats et cle du compte Let's Encrypt : conserves d'un deploiement a l'autre
+      # (en recreer a chaque fois heurterait les limites de Let's Encrypt).
+      - caddy-data:/data
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      edge:
+        ipv4_address: 172.31.250.2
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  prometheus:
+    # Rejoint le reseau de Caddy pour lire ses metriques (alerte LorakusWebDown).
+    networks: [internal, edge]
+    volumes:
+      # Cibles propres a la production (scrape_config_files de prometheus.yml).
+      - ./infra/observability/prometheus/production:/etc/prometheus-extra:ro
+
+networks:
+  # Reseau de Caddy, a adresses fixes : l'API sait quelle adresse est celle du proxy.
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/28
+
+volumes:
+  caddy-data:
