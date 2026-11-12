@@ -55,6 +55,7 @@ Contraintes de licence (par ligne) : `no_ai` (aucun LLM ni entraînement — ex.
 | Journal d'audit | `core_audit_events` : connexions (réussies, échouées, refusées), déconnexions, changements de mot de passe, double authentification, clés d'API. `lorakus_app` n'y écrit que par `audit_record()` et n'a ni `INSERT` direct, ni `UPDATE`, ni `DELETE`, ni `TRUNCATE` (`make db-check`) ; chacun ne lit que ses événements ; aucun secret dans les détails |
 | Événements et jobs (PR 29) | Outbox `core_outbox` : publication dans la transaction de l'appelant, pour l'utilisateur courant seulement (RLS) ; le worker livre chaque événement dans une transaction liée à son utilisateur ; l'application ne modifie la file que par les fonctions `outbox_*`. Charges utiles : des identifiants, jamais de données personnelles. **Exception à la RLS forcée** : les quatre tables `procrastinate_*` (file de jobs, sans colonne utilisateur), car la RLS masque le détail d'erreur dont Procrastinate a besoin pour son verrou anti-doublon ; un test vérifie qu'aucune autre table n'y échappe |
 | Outils et spécialistes (PR 30) | Toute action passe par `ToolRuntime` : arguments validés par schéma, `write` et `sensitive` en attente d'une confirmation à usage unique (10 minutes, arguments figés), `sensitive` avec ré-authentification de moins de 10 minutes, chaque demande et exécution auditée. Un spécialiste ne fait que suggérer des actions ; son rapport est refusé s'il contient une donnée plus sensible que sa classe maximale ; trace `core_agent_runs` en ajout seul |
+| Moteur IA (PR 32) | Seul `ModelRouter` appelle un fournisseur ; le SDK n'est importé que par son adaptateur (import-linter et test). Avant tout appel : refus de `no_ai`, de `sensitive` vers un fournisseur externe (dans le code, quelle que soit la configuration), d'un prompt trop long, coupure générale `LORAKUS_AI_KILL_SWITCH`, plafond mensuel par utilisateur. Journal `core_ai_usage` en ajout seul (ni `UPDATE`, ni `DELETE`, ni `TRUNCATE` pour `lorakus_app`) ; aucun contenu de conversation dans les journaux ni dans les métriques. Erreurs du fournisseur traduites sans leur cause (aucune requête ni en-tête, donc aucune clé, ne remonte). Le faux fournisseur n'est jamais enregistré en staging ni en production (test). Clé Anthropic : au seul service `api` (PR 33) ; plafond global matériel : crédit prépayé sans rechargement automatique (D-D) |
 | Secours | `python -m lorakus.cli recover-second-factor` sur le serveur : désactive la double authentification d'un compte et ferme ses sessions (téléphone et codes perdus) |
 
 ## 5. Secrets
@@ -102,8 +103,8 @@ Format de rapport (template d'issue `security-finding`) : description, preuve re
 
 ## 11. Incidents
 
-1. **Détecter** : alerte Grafana/Uptime Kuma, rapport ou anomalie.
-2. **Contenir** : révoquer sessions et clés, couper l'egress IA (`AI_KILL_SWITCH=1`), mettre en maintenance.
+1. **Détecter** : alerte Prometheus sur Discord, sentinelle healthchecks.io, rapport ou anomalie.
+2. **Contenir** : révoquer sessions et clés, couper tout appel IA (`LORAKUS_AI_KILL_SWITCH=true` dans `/opt/lorakus/.env`, puis redémarrage de l'API), mettre en maintenance.
 3. **Diagnostiquer** : traces, logs, audit.
 4. **Corriger** : correctif via PR, revue, déploiement.
 5. **Restaurer** : sauvegarde si nécessaire ([`docs/runbooks/restore.md`](docs/runbooks/restore.md)).

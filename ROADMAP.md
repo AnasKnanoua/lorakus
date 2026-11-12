@@ -77,10 +77,21 @@ Scénarios d'acceptation :
 ### P3 — Majordome, IA et mémoire (4,5 semaines)
 
 - **Composants** : `AIProvider`, `ModelRouter`, budgets ; mémoire ; conversations SSE ; frontend React (design system, login, chat, `/memory`, PWA) ; **orchestrateur (parallélisme, délais, cache, disjoncteur), routage à trois paliers** ; observabilité palier 2 (traces Tempo, journaux Loki). Le filtre de confidentialité n'est pas nécessaire ici : aucun spécialiste sensible avant P10.
-- **Dépend de** : D-D (budget IA). Adresse : `app.lorakus.app` (D-G tranchée).
+- **Dépend de** : D-D (tranchée le 2026-11-12 : 10 $ prépayés, plafond 3 $ par utilisateur et par mois, Haiku 5.5). Adresse : `app.lorakus.app` (D-G tranchée).
 - **Tests** : evals Promptfoo sur `FakeProvider` ; orchestrateur (délais, disjoncteur, cache) ; trace complète d'une question.
 - **Terminée quand** : une question multi-spécialistes (factices) obtient une réponse en moins de 5 s avec trace complète ; utilisé 5 jours de suite.
 - **Risque** : qualité perçue des réponses.
+- **Découpage (validé le 2026-11-12)**. D'abord le chemin le plus court vers une vraie conversation depuis le téléphone (étape A), puis le reste de la phase (étape B).
+  - **PR 32 — Moteur IA** : port `AIProvider` (chat en streaming, capacités), adaptateur Anthropic, `FakeProvider`, `ModelRouter` (`routing.toml`, `pricing.toml`), refus structurels (`no_ai`, `sensitive` vers l'extérieur, prompt trop long, coupure générale), plafond mensuel par utilisateur, disjoncteur, journal `core_ai_usage` en ajout seul, métriques. *Critères* : aucune valeur `sensitive` vers un fournisseur externe, même si la configuration l'autorise ; plafond vérifié sur PostgreSQL ; SDK importé par les seuls adaptateurs (import-linter et test) ; faux fournisseur impossible en staging et en production.
+  - **PR 33 — Module `assistant`** : conversations et messages (RLS forcée), envoi en SSE, historique, prompt système versionné, réponse par gabarit si le fournisseur tombe ou si le budget est atteint, alertes IA et runbook. Clé Anthropic sur le serveur. *Déploiement.*
+  - **PR 34 — Frontend** : Vite, React, TypeScript, design system clair et sombre, connexion avec double authentification, chat en streaming, PWA installable, CI du frontend.
+  - **PR 35 — Exposition** : image `lorakus-web` (Caddy et PWA), TLS, CSP, contrôle de `Origin`, adresse IP réelle derrière le proxy, limites par utilisateur, double authentification exigée en production, staging adapté. DNS et pare-feu. *Déploiement.*
+  - **PR 36 — Mémoire v1** : faits `verified`, `proposed`, `inferred`, proposition après conversation, page `/memory`.
+  - **PR 37 — Embeddings locaux** : `fastembed`, recherche hybride, mémoire du serveur mesurée.
+  - **PR 38 — Outils dans le chat** : cartes de confirmation branchées sur `ToolRuntime`.
+  - **PR 39 — Orchestrateur** : parallélisme, délais, disjoncteur, cache, routage à trois paliers, trace « pourquoi m'as-tu dit ça ? ».
+  - **PR 40 — Observabilité palier 2** : traces OpenTelemetry, Tempo, Loki.
+  - **PR 41 — Clôture** : evals Promptfoo et corpus d'injections en CI, export et suppression des conversations, v0.3.0.
 
 ### P4 — Planning, academic, projects, Sergent v0 (4 semaines)
 

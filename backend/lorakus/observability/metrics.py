@@ -17,6 +17,43 @@ HTTP_REQUEST_DURATION: Final = Histogram(
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
 )
 
+# --- Moteur IA (PR 32). Aucune etiquette ne porte d'identifiant d'utilisateur ni de contenu.
+AI_REQUESTS: Final = Counter(
+    "lorakus_ai_requests_total",
+    "Appels aux fournisseurs d'IA (outcome : ok, error, interrupted)",
+    ["task", "provider", "model", "outcome"],
+)
+
+AI_REFUSALS: Final = Counter(
+    "lorakus_ai_refusals_total",
+    "Demandes IA refusees avant tout appel (budget, coupure, classe de donnees...)",
+    ["task", "reason"],
+)
+
+AI_TOKENS: Final = Counter(
+    "lorakus_ai_tokens_total",
+    "Tokens factures (kind : input, output, cache_read, cache_write)",
+    ["provider", "model", "kind"],
+)
+
+AI_COST: Final = Counter(
+    "lorakus_ai_cost_usd_total",
+    "Cout estime des appels IA, en dollars (prix de pricing.toml)",
+    ["provider", "model"],
+)
+
+AI_FIRST_TOKEN: Final = Histogram(
+    "lorakus_ai_first_token_seconds",
+    "Delai avant le premier morceau de reponse",
+    ["provider", "model"],
+    buckets=(0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0),
+)
+
+AI_USAGE_RECORD_FAILURES: Final = Counter(
+    "lorakus_ai_usage_record_failures_total",
+    "Consommations IA non enregistrees en base (le plafond mensuel les ignore)",
+)
+
 
 def start_metrics_server(port: int) -> None:
     """Expose /metrics sur un port dedie, qui ne sera jamais publie sur Internet."""

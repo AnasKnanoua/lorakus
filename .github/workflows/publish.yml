@@ -93,10 +93,10 @@ jobs:
           tar -xzf "trivy_${TRIVY_VERSION}_${TRIVY_ASSET}.tar.gz" trivy
 
       - name: Vulnerabilites critiques corrigeables (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress "$REF"
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml "$REF"
 
       - name: Vulnerabilites hautes (rapport, non bloquant)
-        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress "$REF"
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml "$REF"
 
       - name: Publier l'image de cette architecture (main uniquement)
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

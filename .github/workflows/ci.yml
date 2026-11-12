@@ -93,7 +93,7 @@ jobs:
       - name: Verifier demarrage, utilisateur, journaux JSON et metriques
         run: |
           docker run -d --name api-ci -p 127.0.0.1:8000:8000 -p 127.0.0.1:9464:9464 lorakus-api:ci
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:8000/api/health; then echo; break; fi
             sleep 1
           done
@@ -116,16 +116,16 @@ jobs:
           tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
 
       - name: Vulnerabilites critiques corrigeables (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress lorakus-api:ci
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-api:ci
 
       - name: Vulnerabilites hautes (rapport, non bloquant)
-        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress lorakus-api:ci
+        run: ./trivy image --exit-code 0 --severity HIGH --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-api:ci
 
       - name: Construire l'image de sauvegarde
         run: docker build -t lorakus-backup:ci infra/backup
 
       - name: Vulnerabilites critiques corrigeables de l'image de sauvegarde (bloquant)
-        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress lorakus-backup:ci
+        run: ./trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress --secret-config infra/ci/trivy-secret.yaml lorakus-backup:ci
 
       - name: Creer un .env jetable pour la pile complete
         run: |
@@ -143,4 +143,6 @@ jobs:
 
       - name: Arreter la pile
         if: always()
-        run: make down
+        # Si une etape precedente a echoue avant la creation du .env, la pile n'a jamais
+        # demarre : rien a arreter, et make down echouerait sur le .env absent.
+        run: if [ -f .env ]; then make down; else echo "Pile jamais demarree, rien a arreter."; fi

@@ -94,11 +94,11 @@ Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 so
 
 ## 4. AI Engine
 
-- **Port `AIProvider`** : `chat` (streaming, appels d'outils), `structured` (sortie validée par un modèle Pydantic), `embed`, `capabilities`.
+- **Port `AIProvider`** (`backend/lorakus/ai/port.py`) : `chat` (streaming) et `capabilities` depuis la PR 32 ; appels d'outils, `structured` (sortie validée par un modèle Pydantic) et `embed` arrivent avec leurs premiers utilisateurs (PR 36 à 38).
 - **Adaptateurs** : Anthropic, Gemini (deux configurations : free tier et payant), OpenAI-compatible (Ollama, NVIDIA NIM, vLLM), `FakeProvider` pour les tests.
 - **Embeddings des données personnelles** : locaux (`fastembed`, modèle multilingue compact) — aucune donnée personnelle ne sort pour être vectorisée.
-- **`ModelRouter`** : choisit une chaîne `[primaire, fallback…]` selon la tâche, la classe de données et les contraintes de licence (`routing.yaml`), applique budget, retries, circuit breaker et cache ; refuse structurellement tout appel externe sur `sensitive` ou `no_ai`.
-- **Coûts** : `pricing.yaml` daté, compteurs par fournisseur et par utilisateur, alerte à 80 % du budget, mode dégradé explicite à 100 %.
+- **`ModelRouter`** (`backend/lorakus/ai/router.py`) : choisit une chaîne `[primaire, repli…]` selon la tâche, la classe de données et les contraintes de licence (`config/routing.toml`), applique le plafond mensuel, le disjoncteur et la coupure générale ; refuse structurellement tout appel externe sur `sensitive` et tout appel sur `no_ai`. Après le premier morceau de réponse, il ne change plus de modèle. Cache de réponses : avec les tâches `structured` (ADR 0007, amendement du 2026-11-12).
+- **Coûts** : `config/pricing.toml` daté, journal `core_ai_usage` par utilisateur (ajout seul, RLS), métriques `lorakus_ai_*` par fournisseur et modèle, avertissement à 80 % du plafond, plus aucun appel à 100 % (réponse par gabarit).
 - **Sécurité** : profil `ingest` (lit du contenu externe, aucun outil, sortie structurée) et profil `assistant` (outils, jamais de contenu externe brut).
 
 ## 5. Modules
@@ -163,7 +163,7 @@ Détails dans [`SECURITY.md`](SECURITY.md).
 
 ## 11. Déploiement
 
-Production sur une instance Oracle Ampere A1, staging léger et sentinelle externe sur Azure (ADR 0036), Docker Compose, images multi-architectures publiées sur GHCR, déploiement en production après approbation, sauvegardes chiffrées hors Oracle. Voir [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Production sur une instance Oracle Ampere A1 (ADR 0036), staging éphémère dans la CI et sentinelle externe healthchecks.io (ADR 0037), Docker Compose, images multi-architectures publiées sur GHCR, déploiement en production après approbation, sauvegardes chiffrées hors Oracle. Voir [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## 12. Glossaire
 

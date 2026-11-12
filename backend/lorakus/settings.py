@@ -1,5 +1,6 @@
 """Configuration de Lorakus, lue depuis les variables d'environnement."""
 
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -63,6 +64,16 @@ class Settings(BaseSettings):
     # hexadecimal (64 caracteres). Obligatoire en staging et en production. Elle n'est
     # PAS dans les sauvegardes : la perdre rend les secrets TOTP illisibles.
     field_encryption_key: SecretStr = SecretStr("")
+
+    # --- Moteur IA (PR 32, ADR 0007) ---
+    # Cle de l'API Anthropic ; vide = fournisseur absent (reponses par gabarit). Fournie au
+    # seul service api, comme toute cle d'IA.
+    anthropic_api_key: SecretStr = SecretStr("")
+    # Coupe tout appel IA sortant (incident, SECURITY.md §11) : reponses par gabarit.
+    ai_kill_switch: bool = False
+    # Plafond de depense IA par utilisateur et par mois civil (UTC), en dollars (D-D).
+    # Alerte dans la reponse a 80 %, plus aucun appel a 100 %.
+    ai_monthly_budget_usd: Decimal = Field(default=Decimal("3.00"), ge=0, le=100)
 
     def app_database_url(self) -> URL:
         """URL de connexion de l'application (role lorakus_app)."""

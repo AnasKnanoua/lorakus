@@ -1,0 +1,25 @@
+# Prix en dollars US par million de tokens. A revoir a chaque changement de tarif (ADR 0007).
+# Chaque cible de routing.toml doit avoir un prix : sinon l'API ne demarre pas.
+# Valeurs entre guillemets : lues en Decimal, sans erreur d'arrondi des nombres flottants.
+
+checked_on = 2026-11-12
+
+[models."anthropic:claude-haiku-5-5"]
+source = "https://www.anthropic.com/claude/haiku"
+input = "0.10"
+output = "0.50"
+cache_read = "0.01"
+cache_write = "0.125"
+# Au-dela de 100 000 tokens de prompt (cache compris), toute la requete passe au palier superieur.
+long_prompt_threshold = 100000
+long_input = "0.50"
+long_output = "2.50"
+long_cache_read = "0.05"
+long_cache_write = "0.625"
+
+[models."fake:echo"]
+source = "local"
+input = "0"
+output = "0"
+cache_read = "0"
+cache_write = "0"
