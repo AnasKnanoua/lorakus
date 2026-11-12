@@ -1,0 +1,23 @@
+# Routage des appels IA (ADR 0007). Lu au demarrage : une erreur empeche l'API de demarrer.
+#
+# [providers.<nom>]
+#   max_data_class : classe de donnees la plus sensible que ce fournisseur peut recevoir.
+#   Quoi qu'en dise ce fichier, un fournisseur externe ne recoit JAMAIS `sensitive`
+#   (refus dans le code, verifie aussi au chargement).
+#
+# [tasks.<tache>]
+#   chain : cibles "fournisseur:modele", essayees dans l'ordre. Une cible dont le fournisseur
+#   n'est pas configure (cle absente, ou `fake` hors developpement) est ignoree.
+#   max_input_tokens : prompt estime au-dela duquel la requete est refusee AVANT tout appel.
+#   Garder tres en dessous de 100 000 : au-dela, Haiku 5.5 passe au tarif superieur.
+
+[providers.anthropic]
+max_data_class = "personal"   # API payante (pas d'offre gratuite) : D-D, ADR 0007
+
+[providers.fake]
+max_data_class = "sensitive"  # local, aucune donnee ne sort ; jamais en staging ni en production
+
+[tasks.chat]
+chain = ["anthropic:claude-haiku-5-5", "fake:echo"]
+max_input_tokens = 50000
+max_output_tokens = 1024

@@ -12,7 +12,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0004](docs/adr/0004-job-queue.md) | File de jobs Procrastinate derrière le port `JobQueue` | Accepté (amendé 2026-11-08) | Si la maintenance du projet faiblit |
 | [0005](docs/adr/0005-frontend.md) | Frontend SPA + PWA en React | Validé (2026-11-08) | — |
 | [0006](docs/adr/0006-ai-abstraction.md) | Abstraction IA maison | Accepté | Phase 15 |
-| [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08) | À chaque changement de tarif |
+| [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08 et 2026-11-12, D-D) | À chaque changement de tarif |
 | [0008](docs/adr/0008-multi-tenancy-rls.md) | Multi-tenant dans les fondations (`user_id` + RLS) | Validé | Ouverture à d'autres utilisateurs |
 | [0009](docs/adr/0009-compose-before-k3s.md) | Docker Compose avant k3s ; hébergement Always Free | Validé (D-A, 2026-11-08), hébergement amendé par 0036 | Changement d'hébergeur |
 | [0010](docs/adr/0010-observability.md) | OpenTelemetry → Grafana LGTM self-hosted | Validé (exigence) / Accepté (outils) | Phase 6 (mesure RAM) |
@@ -48,7 +48,6 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 
 | Id | Question | Recommandation | Bloque |
 | --- | --- | --- | --- |
-| D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | Phase 3 |
 | D-E | Place du bien-être numérique | Collecte en phase 8, interventions en phase 12 | Phase 8 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
 
@@ -70,5 +69,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Alertes d'exploitation sur Discord, notifications produit sur Telegram (ADR 0035) | 2026-11-09 |
 | — | Pas de VM Azure : staging éphémère dans la CI, sentinelle healthchecks.io ; crédit Azure gardé (ADR 0037) | 2026-11-11 |
 | — | Loki reporté en P3, avec les traces (amendement de l'ADR 0010) | 2026-11-11 |
+| D-D | Budget IA : 10 $ prépayés sans rechargement automatique ; plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en phase 3 (amendement de l'ADR 0007) | 2026-11-12 |
+| — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

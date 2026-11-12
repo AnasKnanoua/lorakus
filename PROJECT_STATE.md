@@ -2,9 +2,9 @@
 
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
-- **Version** : v0.1.0 (2026-11-11)
-- **Phase** : P2 terminée le 2026-11-12 (v0.2.0) ; prochaine : P3 — Majordome, IA et mémoire (premier usage visible : discuter avec Lorakus)
-- **Dernière mise à jour** : 2026-11-11
+- **Version** : v0.2.0 (2026-11-12)
+- **Phase** : P3 — Majordome, IA et mémoire, en cours depuis le 2026-11-12 (premier usage visible : discuter avec Lorakus depuis le téléphone)
+- **Dernière mise à jour** : 2026-11-12
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; 6 services sains, 4 cibles Prometheus actives, sauvegarde quotidienne vers B2. PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -25,20 +25,13 @@
 - PR n°19 (Runbooks) : `docs/runbooks/` (API, sauvegarde, disque, serveur, déploiement, restauration, pièges connus), lien vers le runbook dans chaque alerte Discord (vérifié en CI), `deploy.sh alert-test`, décision d'une clé B2 par machine.
 - PR n°20 (Staging et sentinelle, ADR 0037), déployée le 2026-11-11 : premier passage réel du staging vert sur runner ARM (mise à jour, retour arrière, sauvegarde, restauration complète sur PostgreSQL 18) ; disparition simulée (Alertmanager arrêté) → message healthchecks.io « DOWN » sur Discord en 8 minutes ; raccourcis `make pr`, `make merge`, `make deploy`.
 - **Phase 1 close le 2026-11-11, version v0.1.0.**
+- P2, PR 22 à 31 : squelette du Core et `release-please`, identité et RLS forcée, double authentification, clés d'API, journal d'audit, système de modules, événements (outbox), jobs (Procrastinate) et service `worker`, outils et spécialistes ; correctifs PR 24 et 28. Détail dans `ROADMAP.md` (P2) et `CHANGELOG.md`.
+- **Phase 2 close le 2026-11-12, version v0.2.0.**
 
-## En cours (P2)
+## En cours (P3)
 
-- **Gel de la conception jusqu'à la v0.5** : nouvelles idées dans la section « Idées » de `ROADMAP.md`.
-- Découpage en PR 22 à 29 et critères de fin validés le 2026-11-11 (`ROADMAP.md`, P2).
-
-- PR 30 — Outils et spécialistes (PR 30 et 31 regroupées, décision du 2026-11-12) : `ToolSpec` (read, write, sensitive), `ToolRuntime` (validation, confirmation à usage unique de 10 minutes, ré-authentification pour une action sensible, audit), `SpecialistProfile` et contrat `SpecialistRequest`/`SpecialistReport` (ADR 0026), service `agents` avec délai et trace `core_agent_runs` en ajout seul ; trois spécialistes factices en test ; limite mémoire de Grafana portée à 384 Mo (247 Mo mesurés sur 256).
-- PR 29 (déployée) — Événements et jobs : outbox avec livraison au moins une fois (handlers non rejoués), port `JobQueue` avec Procrastinate (seul l'adaptateur l'importe), service `worker` (limite 256 Mo, test de santé par battement de cœur), 5 alertes et un runbook.
-- Correctif (PR 28, déployé) : la clé de chiffrement allait au service `postgres` au lieu de `api` ; le staging a refusé les PR 25 et 26 (production restée sur la PR 24, sans dommage). Garde-fou sur la répartition des secrets, journaux de la version refusée affichés par `deploy.sh`.
-- PR 26 (fusionnée sous le n°27) — Système de modules : manifeste validé, registre (découverte par entry points, compatibilité, dépendances), activation et configuration par utilisateur, routes des modules protégées, santé, gabarit et `make new-module`, garde-fou RLS générique.
-- PR 25 (fusionnée ; déployée avec le correctif) — Double authentification, clés d'API, audit : TOTP chiffré et anti-rejeu, codes de secours, ré-authentification pour les actions sensibles, clés d'API à portée et expiration, journal d'audit en ajout seul, commande `recover-second-factor` ; `deploy.sh` ajoute seul les nouveaux secrets internes (`init-env.sh --generated-only`).
-- PR 24 (fusionnée et déployée) — Correctif : sauvegarde avant migration avec l'image de la nouvelle version.
-- PR 23 (fusionnée et déployée, propriétaire créé) — Identité et RLS : comptes, mots de passe Argon2id, sessions par cookie `__Host-`, connexion limitée, changement de mot de passe, commande `create-owner`, RLS forcée avec politiques par rôle, fonctions `auth_*` ; tests d'isolation en `lorakus_app` ; `make deploy` attend la publication des images.
-- PR 22 (fusionnée et déployée) — Squelette du Core et versions : `lorakus/core/`, `lorakus_modules/`, contrats import-linter dans `make lint`, `release-please` lancé depuis le poste (`make release-pr`, `make release`).
+- Découpage en PR 32 à 41 et critères validés le 2026-11-12 (`ROADMAP.md`, P3). Étape A, chemin le plus court vers une conversation : PR 32 (moteur IA), 33 (module `assistant`), 34 (frontend), 35 (exposition sur `app.lorakus.app`).
+- PR 32 — Moteur IA : port `AIProvider`, adaptateur Anthropic (SDK 2.3.0), `FakeProvider` (développement et tests seulement), `ModelRouter` avec `routing.toml` et `pricing.toml`, refus structurels (`no_ai`, `sensitive` vers l'extérieur, prompt trop long, `LORAKUS_AI_KILL_SWITCH`), plafond mensuel par utilisateur, disjoncteur, journal `core_ai_usage` (migration 0007, RLS forcée, ajout seul), six métriques `lorakus_ai_*`. Aucun déploiement nécessaire : sans clé, la production n'a aucun fournisseur actif ; la migration partira avec la PR 33.
 
 À faire quand c'est pratique, hors phase : clés B2 par machine (`DEPLOYMENT.md` §7.2).
 
@@ -46,12 +39,13 @@
 
 | Id | Sujet | Recommandation | Bloque |
 | --- | --- | --- | --- |
-| D-D | Budget IA mensuel | 10 $ prépayés, plafond 5 $/mois | P3 |
 | D-E | Place du bien-être numérique | Collecte en P8, interventions en P12 | P8 |
 | D-F | `planning` dans le Core (ADR 0018) | Oui | P4 |
 
 ## Décisions prises récemment
 
+- 2026-11-12 — D-D : 10 $ prépayés chez Anthropic sans rechargement automatique, plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en P3 ; repli par gabarit (amendement de l'ADR 0007). Prix vérifiés le jour même.
+- 2026-11-12 — Découpage de la P3 (PR 32 à 41) ; ouverture publique de `app.lorakus.app` à la PR 35, double authentification obligatoire pour se connecter en production.
 - 2026-11-12 — Mémoire mesurée sur `lorakus-prod` avec le worker : 1,7 Go utilisés sur 5,6 Go, worker 64 Mo (limite 256), Grafana 247 Mo (limite portée de 256 à 384).
 - 2026-11-12 — PR 30 et 31 regroupées pour clore la P2 plus vite ; la P3 commence par l'écran de conversation.
 

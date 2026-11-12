@@ -9,7 +9,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
-from lorakus.core.agents import models as _agent_models  # noqa: F401 (tables enregistrees)
+from lorakus.ai import models as _ai_models  # noqa: F401 (tables enregistrees)
+from lorakus.core.agents import models as _agent_models  # noqa: F401
 from lorakus.core.events import models as _event_models  # noqa: F401
 from lorakus.core.identity import models as _identity_models  # noqa: F401
 from lorakus.core.modules import models as _module_models  # noqa: F401

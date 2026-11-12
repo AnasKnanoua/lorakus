@@ -5,6 +5,7 @@ description = "Lorakus : backend (Core platform et modules)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.20.1",
+    "anthropic>=2.3.0",
     "argon2-cffi>=25.1.0",
     "cryptography>=50.0.2",
     "fastapi>=0.162.2",
@@ -107,11 +108,29 @@ source_modules = ["lorakus.api", "lorakus.cli", "lorakus.core.events", "lorakus.
 forbidden_modules = ["procrastinate"]
 
 [[tool.importlinter.contracts]]
-name = "Couches du Core : api, cli, worker -> core -> infrastructure -> reglages"
+name = "Couches : api, cli, worker -> core -> moteur IA -> infrastructure -> reglages"
 type = "layers"
 layers = [
     "lorakus.api | lorakus.cli | lorakus.worker",
     "lorakus.core",
+    "lorakus.ai",
     "lorakus.db | lorakus.observability",
     "lorakus.settings",
 ]
+
+# Seule la racine de composition (lorakus.api) choisit les adaptateurs ; le Core et les
+# modules ne voient que le ModelRouter et le port (MODULE_SYSTEM.md §1, regle 1).
+[[tool.importlinter.contracts]]
+name = "Ni le Core ni les modules n'importent les adaptateurs d'IA"
+type = "forbidden"
+source_modules = ["lorakus.core", "lorakus.cli", "lorakus.worker", "lorakus_modules"]
+forbidden_modules = ["lorakus.ai.providers"]
+
+# Dans le moteur IA, seuls les adaptateurs touchent un SDK de fournisseur. Le test
+# tests/unit/test_ai_boundaries.py verifie la meme regle pour tout fichier, meme nouveau.
+[[tool.importlinter.contracts]]
+name = "Seuls les adaptateurs importent un SDK d'IA"
+type = "forbidden"
+source_modules = ["lorakus.ai.port", "lorakus.ai.router", "lorakus.ai.catalog", "lorakus.ai.usage", "lorakus.ai.breaker", "lorakus.ai.testing", "lorakus.core", "lorakus.api", "lorakus_modules"]
+forbidden_modules = ["anthropic"]
+allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas appeler le SDK

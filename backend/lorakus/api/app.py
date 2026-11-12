@@ -6,6 +6,10 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 
+from lorakus.ai.catalog import Catalog
+from lorakus.ai.providers import build_providers
+from lorakus.ai.router import ModelRouter
+from lorakus.ai.usage import UsageStore
 from lorakus.api.modules import mount_module_routes
 from lorakus.api.routes import auth, health, modules, tools
 from lorakus.core.agents.service import AgentService
@@ -32,6 +36,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.modules = ModuleService(database, app.state.registry)
     app.state.tools = ToolRuntime(database, app.state.modules)
     app.state.agents = AgentService(database, app.state.modules)
+    app.state.ai = ModelRouter(
+        app.state.ai_catalog,
+        build_providers(settings),
+        UsageStore(database),
+        monthly_budget_usd=settings.ai_monthly_budget_usd,
+        kill_switch=settings.ai_kill_switch,
+    )
     try:
         yield
     finally:
@@ -66,5 +77,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
     app.state.registry = registry if registry is not None else ModuleRegistry.from_entry_points()
+    # Routage et prix verifies ici : une configuration IA invalide empeche le demarrage.
+    app.state.ai_catalog = Catalog.load()
     mount_module_routes(app, app.state.registry)
     return app
