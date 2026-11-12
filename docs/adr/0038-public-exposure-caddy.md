@@ -17,7 +17,7 @@ La PR 35 rend Lorakus utilisable depuis le téléphone sur `https://app.lorakus.
 - En-têtes : HSTS un an, CSP `script-src 'self'` sans script en ligne, `frame-ancestors 'none'`, `nosniff`, `no-referrer`, `Permissions-Policy` restrictive, en-tête `Server` retiré. `style-src` admet `'unsafe-inline'` : Radix injecte une balise `<style>` pour bloquer le défilement des fenêtres de dialogue ; le risque d'une injection de style est faible tant que les scripts restent stricts.
 - Corps de requête limité à 1 Mo.
 
-**Adresse réelle** : Caddy remplace `X-Forwarded-For` par l'adresse du visiteur. Caddy a une adresse fixe (`172.31.250.2`) sur un réseau Docker dédié (`edge`) ; uvicorn ne croit l'en-tête que venant d'elle (`FORWARDED_ALLOW_IPS`).
+**Adresse réelle** : Caddy remplace `X-Forwarded-For` par l'adresse du visiteur. Caddy a une adresse fixe (`172.31.250.2`) sur un réseau Docker dédié (`edge`, `172.31.250.0/24`), hors de la plage d'attribution automatique (`ip_range` `.128/25`) pour qu'aucun autre conteneur ne la prenne ; uvicorn ne croit l'en-tête que venant d'elle (`FORWARDED_ALLOW_IPS`).
 
 **Origine** : toute écriture (POST, PUT, PATCH, DELETE) sous `/api/` qui porte `Origin` ou `Sec-Fetch-Site` doit venir de `LORAKUS_PUBLIC_ORIGIN` ; sinon 403 `origin_refused`. Les clients sans navigateur n'envoient pas ces en-têtes et passent : ils ne peuvent pas utiliser le cookie d'un autre. Seconde barrière derrière `SameSite=Strict`.
 

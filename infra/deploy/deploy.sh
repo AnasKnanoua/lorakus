@@ -241,19 +241,21 @@ cmd_apply() {
   fi
 
   if ! activate "$mode" "$NEXT"; then
-    rm -f "$NEXT"
     if [ -f "$RELEASE" ]; then
       # Avant de la remplacer : ce que la version refusee a dit (sinon ses journaux disparaissent).
+      # release.next.env est encore la : compose en a besoin pour lire ces journaux.
       say "Echec : journaux de la nouvelle version"
       compose "$NEXT" ps -a || true
       compose "$NEXT" logs --no-color --tail 80 api migrate || true
       if [ -n "$web" ]; then
         compose "$NEXT" logs --no-color --tail 40 web || true
       fi
+      rm -f "$NEXT"
       say "Echec : remise en service de la version en place avant ce deploiement"
       restore_current || fail "le retour automatique a aussi echoue : intervention manuelle necessaire"
       fail "la nouvelle version n'a pas demarre correctement ; la version precedente est de nouveau en service"
     fi
+    rm -f "$NEXT"
     fail "premier deploiement en echec : voir les journaux avec docker compose logs"
   fi
 
