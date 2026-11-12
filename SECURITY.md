@@ -110,6 +110,14 @@ Table append-only `core_audit_events`. Obligatoire : connexions et échecs, chan
 
 Format de rapport (template d'issue `security-finding`) : description, preuve reproductible, sévérité CVSS 4.0, impact, reproduction, recommandation, statut (`open`, `fixed`, `accepted-risk`). Une vulnérabilité `high` ou plus bloque la promotion vers la production.
 
+### 9.1 Alertes de dépendances acceptées
+
+Une alerte n'est fermée sans correctif que si la faille est inatteignable chez nous, avec la preuve, et réexaminée à la mise à jour suivante de la dépendance.
+
+| Date | Alerte | Pourquoi elle est acceptée | Fin prévue |
+| --- | --- | --- | --- |
+| 2026-11-12 | Dependabot n°1, `minimatch` 10.2.6 et 5.1.9 (npm, gravité moyenne) : déni de service par des motifs de fichiers construits pour exploser | Outils de développement seulement (ESLint, typescript-eslint, `@redocly/openapi-core` pour générer le client). Ils ne lisent que les motifs de nos propres fichiers de configuration, jamais une donnée d'un visiteur ; `minimatch` n'est ni dans l'application livrée (vérifié dans `dist/`) ni dans aucune image. Aucune version corrigée dans les branches 10 et 5 ; forcer la branche 11 sous ces outils risquerait de les casser pour un gain nul. Fermée avec le motif `tolerable_risk` | Dès que Dependabot propose ESLint ou typescript-eslint avec `minimatch` 11 |
+
 ## 10. Vie privée et contrôle
 
 - Export JSON et suppression par période depuis `/settings/data`.
