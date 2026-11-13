@@ -7,7 +7,7 @@ import { AssistantDisabledError } from "@/api/assistant";
 import { Orb } from "@/components/Orb";
 import { cn } from "@/lib/cn";
 import { conversationsQuery } from "@/lib/queries";
-import { useSwipeToClose } from "@/lib/useSwipeToClose";
+import { useSwipeToClose, useSwipeToOpen } from "@/lib/useSwipeToClose";
 
 import { EnableAssistant } from "./EnableAssistant";
 import { LayoutContext } from "./layout";
@@ -36,6 +36,9 @@ export function ChatLayout() {
   const disabled = conversations.error instanceof AssistantDisabledError;
   const swipe = useSwipeToClose(() => {
     setDrawerOpen(false);
+  });
+  const swipeOpen = useSwipeToOpen(() => {
+    setDrawerOpen(true);
   });
 
   const setSidebar = useCallback((value: boolean) => {
@@ -68,10 +71,10 @@ export function ChatLayout() {
           inert={collapsed}
           className={cn(
             "vt-sidebar hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-[var(--ease-out-soft)] lg:block",
-            collapsed ? "w-0" : "w-[264px]",
+            collapsed ? "w-0" : "w-[280px]",
           )}
         >
-          <div className="h-full w-[264px]">
+          <div className="h-full w-[280px]">
             <Sidebar
               onCollapse={() => {
                 setSidebar(true);
@@ -85,7 +88,7 @@ export function ChatLayout() {
             <Dialog.Overlay className="scrim fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px] lg:hidden" />
             <Dialog.Content
               aria-describedby={undefined}
-              className="drawer fixed inset-y-0 left-0 z-50 w-[86%] max-w-[300px] shadow-float lg:hidden"
+              className="drawer fixed inset-y-0 left-0 z-50 w-[86%] max-w-[320px] shadow-float lg:hidden"
               {...swipe}
             >
               <Dialog.Title className="sr-only">Conversations</Dialog.Title>
@@ -98,7 +101,7 @@ export function ChatLayout() {
           </Dialog.Portal>
         </Dialog.Root>
 
-        <main className="vt-page relative flex min-w-0 flex-1 flex-col">
+        <main className="vt-page relative flex min-w-0 flex-1 flex-col" {...swipeOpen}>
           {conversations.isPending ? (
             <div className="flex flex-1 items-center justify-center" aria-busy="true">
               <Orb thinking className="size-8" />

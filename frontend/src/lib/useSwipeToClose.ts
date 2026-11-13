@@ -50,3 +50,30 @@ export function useSwipeToClose(onClose: () => void) {
     },
   };
 }
+
+/**
+ * Glisser vers la droite sur la zone principale pour ouvrir le panneau lateral (telephone), comme
+ * dans Gemini. Ignore : grand ecran, geste plutot vertical, geste lent, et les zones qui defilent
+ * horizontalement elles-memes (code, tableaux, filtres).
+ */
+export function useSwipeToOpen(onOpen: () => void) {
+  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  return {
+    onTouchStart(event: TouchEvent<HTMLElement>) {
+      const touch = event.touches[0];
+      const target = event.target as Element;
+      const ignored = target.closest("pre, table, input, textarea, [data-swipe-ignore]") !== null;
+      const wide = window.matchMedia("(min-width: 1024px)").matches;
+      start.current = touch && !ignored && !wide ? { x: touch.clientX, y: touch.clientY, t: performance.now() } : null;
+    },
+    onTouchEnd(event: TouchEvent<HTMLElement>) {
+      const touch = event.changedTouches[0];
+      const from = start.current;
+      start.current = null;
+      if (!from || !touch) return;
+      const dx = touch.clientX - from.x;
+      const dy = Math.abs(touch.clientY - from.y);
+      if (dx > 64 && dy < dx * 0.6 && performance.now() - from.t < 700) onOpen();
+    },
+  };
+}
