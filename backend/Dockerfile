@@ -56,10 +56,12 @@ RUN mkdir -p /migrations/lorakus_modules \
 # ---------------------------------------------------------------- runtime
 FROM ${PYTHON_IMAGE} AS runtime
 
+# ORT_DISABLE_TELEMETRY : aucune telemetrie d'ONNX Runtime vers Microsoft (onnx_embedder.py).
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:${PATH}" \
-    LORAKUS_METRICS_PORT=9464
+    LORAKUS_METRICS_PORT=9464 \
+    ORT_DISABLE_TELEMETRY=1
 
 # Utilisateur dedie, sans shell ni repertoire personnel.
 RUN groupadd --system --gid 10001 lorakus \

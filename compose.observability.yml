@@ -80,7 +80,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384m
+          # 325 Mo mesures le 2026-11-13 (85 % de l'ancienne limite de 384 Mo) : marge refaite.
+          memory: 512m
 
 
   alertmanager:

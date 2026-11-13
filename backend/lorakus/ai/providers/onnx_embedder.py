@@ -17,6 +17,7 @@ restent bornes, et la boucle d'evenements n'est jamais bloquee (calcul dans un t
 
 import asyncio
 import hashlib
+import os
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -24,6 +25,14 @@ from typing import Any, Final, cast
 
 import numpy as np
 import numpy.typing as npt
+
+# Telemetrie d'ONNX Runtime coupee AVANT son import. La version Linux embarque un collecteur
+# Microsoft (1DS) qui met des evenements d'usage en file pour les envoyer ; l'API a un acces
+# sortant (fournisseur d'IA). disable_telemetry_events() apres l'import arrive trop tard : un
+# evenement est deja en file (mesure le 2026-11-13, docs/runbooks/pitfalls.md). Valeur forcee :
+# une variable externe ne peut pas la reactiver. Aussi posee dans l'image (backend/Dockerfile).
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
+
 import onnxruntime  # pyright: ignore[reportMissingTypeStubs]
 from tokenizers import Tokenizer
 

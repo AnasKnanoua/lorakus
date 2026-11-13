@@ -8,6 +8,8 @@ marque `model` quand LORAKUS_EMBEDDING_MODEL_DIR pointe vers ses fichiers.
 
 import math
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -207,3 +209,36 @@ async def test_real_model_ranks_the_relevant_fact_first() -> None:
     scores = [cosine(question, f) for f in facts]
 
     assert scores.index(max(scores)) == 0
+
+
+# ------------------------------------------------------------------ telemetrie
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "identity.onnx"
+BACKEND = Path(__file__).resolve().parents[2]
+
+
+def _session_files(home: Path, import_lorakus_first: bool) -> list[Path]:
+    """Ouvre une session ONNX dans un processus neuf ; renvoie les fichiers de telemetrie crees."""
+    code = (
+        ("import lorakus.ai.providers.onnx_embedder\n" if import_lorakus_first else "")
+        + "import onnxruntime\n"
+        + f"onnxruntime.InferenceSession({str(FIXTURE)!r}, providers=['CPUExecutionProvider'])\n"
+    )
+    # Environnement minimal : surtout pas l'ORT_DISABLE_TELEMETRY de ce processus de test.
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home)}
+    subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code], cwd=BACKEND, env=env, check=True, capture_output=True
+    )
+    return [p for p in home.rglob("*") if p.is_file()]
+
+
+def test_onnx_runtime_telemetry_never_starts(tmp_path: Path) -> None:
+    """Notre adaptateur coupe la telemetrie avant l'import d'ONNX Runtime (pitfalls.md)."""
+    control = tmp_path / "control"
+    control.mkdir()
+    if not _session_files(control, import_lorakus_first=False):
+        pytest.skip("cette version d'ONNX Runtime ne demarre plus de telemetrie : test sans objet")
+
+    guarded = tmp_path / "guarded"
+    guarded.mkdir()
+
+    assert _session_files(guarded, import_lorakus_first=True) == []
