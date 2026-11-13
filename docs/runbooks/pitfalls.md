@@ -131,3 +131,16 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Mesuré** (copie de travail, petit modèle ONNX) : sans réglage, `~/.cache/Microsoft/DeveloperTools/.onnxruntime/` contient `deviceid` et une base `onnxruntime.db` avec un événement en file. `onnxruntime.disable_telemetry_events()` appelé après l'import arrive **trop tard** (l'événement est déjà en file). Avec `ORT_DISABLE_TELEMETRY=1` posée **avant** l'import, rien n'est créé.
 - **Correction** : `onnx_embedder.py` force `ORT_DISABLE_TELEMETRY=1` avant d'importer ONNX Runtime, et l'image pose la même variable (`backend/Dockerfile`). `tests/unit/test_embeddings.py::test_onnx_runtime_telemetry_never_starts` ouvre une session dans un processus neuf et vérifie qu'aucun fichier de télémétrie n'est créé (témoin sans protection inclus).
 - **À retenir** : toute bibliothèque native ajoutée à l'API peut avoir sa propre télémétrie. Lire ses chaînes (`strings … | grep -i telemetry`) et ses variables d'environnement avant de l'adopter.
+
+## Le staging échoue quand on redéploie la version déjà en production
+
+- **Symptôme** (2026-11-13) : un second `make deploy` juste après un déploiement réussi échoue dans le job `staging`, à l'étape « 3/6 Retour arrière » : `ECHEC : aucune version precedente enregistree`. La production n'est pas touchée (un staging en échec bloque le job `production`).
+- **Cause** : la version en production et la nouvelle version sont le même commit. `deploy.sh` complète alors la version en service sans en faire une version précédente (comportement voulu, voir « Le retour arrière ramène l'étape intermédiaire… ») ; sur l'hôte jetable, le retour arrière n'avait donc rien à retrouver.
+- **Correction** : `staging-test.sh` reconnaît le redéploiement du même commit, saute le retour arrière (vérifié au déploiement de cette version) et vérifie qu'aucune version précédente n'a été créée ; le résumé du job l'indique. Mise à jour, sauvegarde et restauration restent vérifiées.
+- **À retenir** : après un `make deploy` réussi, inutile de le relancer ; `make prod-status` montre la version en service.
+
+## `dc: invalid option -- 'T'` sur le serveur
+
+- **Symptôme** : une commande des runbooks qui commence par `dc` affiche l'aide d'un programme inconnu.
+- **Cause** : `dc` n'est défini que dans la session ouverte par le bloc « Session » de `docs/runbooks/README.md`. Sans lui, le shell lance `dc`, la calculatrice de GNU installée sur Oracle Linux.
+- **Correction** : coller d'abord le bloc « Session » (après `sudo -iu deploy`), puis la commande. Pour une commande isolée, `/opt/lorakus/app/infra/deploy/deploy.sh compose …` fait la même chose sans session.

@@ -5,7 +5,8 @@
 #   1. installe la version precedente (celle de la production), puis y ecrit une donnee temoin ;
 #   2. deploie la nouvelle version par-dessus (sauvegarde avant migration, migrations, sante),
 #      puis verifie l'acces public par Caddy (HTTPS avec un certificat local, origine, en-tetes) ;
-#   3. retour arriere, puis redeploiement de la nouvelle version ;
+#   3. retour arriere, puis redeploiement de la nouvelle version (sans objet quand on redeploie
+#      la version deja en production : il n'y a pas de version precedente a retrouver) ;
 #   4. sauvegarde quotidienne et alerte de test ;
 #   5. restauration de la derniere sauvegarde selon docs/runbooks/restore.md, donnee temoin verifiee.
 #
@@ -164,15 +165,25 @@ check_public_access
 [ "$(marker)" = "ecrite-avant-la-mise-a-jour" ] || fail "donnee temoin perdue pendant la mise a jour"
 
 step "3/6 Retour arriere puis redeploiement"
-"$DEPLOY" rollback
-expect_release "$PREV_COMMIT"
-if [ -z "${PREV_WEB_DIGEST:-}" ]; then
-  # Version d'avant l'image web : Caddy doit avoir disparu avec le retour arriere.
-  [ -z "$(docker ps -q --filter name=lorakus-web-1)" ] || fail "Caddy tourne encore apres le retour arriere"
+if [ "$PREV_COMMIT" = "$NEW_COMMIT" ]; then
+  # Redeploiement de la version deja en production (make deploy relance, reparation) : deploy.sh
+  # complete la version en service sans creer de version precedente (meme commit). Le retour
+  # arriere n'a donc rien a retrouver ; il a ete verifie au deploiement de cette version.
+  echo "Version deja en production : redeploiement, retour arriere sans objet"
+  if [ -f "$LORAKUS_ROOT/release.previous.env" ]; then
+    fail "un redeploiement du meme commit a cree une version precedente"
+  fi
+else
+  "$DEPLOY" rollback
+  expect_release "$PREV_COMMIT"
+  if [ -z "${PREV_WEB_DIGEST:-}" ]; then
+    # Version d'avant l'image web : Caddy doit avoir disparu avec le retour arriere.
+    [ -z "$(docker ps -q --filter name=lorakus-web-1)" ] || fail "Caddy tourne encore apres le retour arriere"
+  fi
+  deploy_new
+  expect_release "$NEW_COMMIT"
+  check_public_access
 fi
-deploy_new
-expect_release "$NEW_COMMIT"
-check_public_access
 
 step "4/6 Sauvegarde quotidienne et alerte de test"
 before=$(backups | wc -l)
