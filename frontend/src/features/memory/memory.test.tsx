@@ -41,6 +41,49 @@ function known(id: string, content: string): FakeFact {
 }
 
 describe("mémoire", () => {
+  it("filtre par catégorie et recherche sans tenir compte des accents", async () => {
+    installFakeApi({
+      loggedIn: true,
+      facts: [
+        known("f1", "Joue aux échecs"),
+        { ...known("f2", "Étudie à METU"), category: "studies" },
+        known("f3", "Préfère réviser le soir"),
+      ],
+    });
+    renderApp("/memoire");
+    const user = userEvent.setup();
+    await screen.findByText("Joue aux échecs");
+
+    const filters = within(screen.getByRole("group", { name: "Filtrer par catégorie" }));
+    await user.click(filters.getByRole("button", { name: /^Études/ }));
+    expect(filters.getByRole("button", { name: /^Études/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Joue aux échecs")).toBeNull();
+    expect(screen.getByText("Étudie à METU")).toBeVisible();
+
+    await user.click(filters.getByRole("button", { name: /^Tout/ }));
+    const search = screen.getByRole("searchbox", { name: "Rechercher dans la mémoire" });
+    await user.type(search, "echecs");
+    await waitFor(() => {
+      expect(screen.queryByText("Étudie à METU")).toBeNull();
+    });
+    expect(screen.getByText("Joue aux échecs")).toBeVisible();
+
+    await user.clear(search);
+    await user.type(search, "introuvable");
+    expect(await screen.findByText("Aucun souvenir ne correspond.")).toBeVisible();
+  });
+
+  it("replie une catégorie", async () => {
+    installFakeApi({ loggedIn: true, facts: [known("f1", "Joue aux échecs")] });
+    renderApp("/memoire");
+    const user = userEvent.setup();
+    const header = await screen.findByRole("button", { name: /^Préférences/, expanded: true });
+
+    await user.click(header);
+
+    expect(header).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("signale les propositions en attente depuis le chat", async () => {
     installFakeApi({
       loggedIn: true,
@@ -72,7 +115,9 @@ describe("mémoire", () => {
     await waitFor(() => {
       expect(state.facts[0]?.status).toBe("verified");
     });
-    expect(await screen.findByText("Aucune proposition en attente.")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /À confirmer/ })).toBeNull();
+    });
     expect(
       screen.getByRole("button", {
         name: "Supprimer : Préfère réviser le soir",
@@ -125,7 +170,8 @@ describe("mémoire", () => {
     renderApp("/memoire");
     const user = userEvent.setup();
 
-    await user.type(await screen.findByLabelText("Texte du souvenir"), "joue aux échecs");
+    await user.click(await screen.findByRole("button", { name: "Ajouter un souvenir" }));
+    await user.type(screen.getByLabelText("Texte du souvenir"), "joue aux échecs");
     await user.click(screen.getByRole("button", { name: "Ajouter" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Ce souvenir existe déjà.");
 
@@ -143,6 +189,7 @@ describe("mémoire", () => {
     const state = installFakeApi({ loggedIn: true });
     renderApp("/memoire");
 
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Réglages de la mémoire" }));
     const toggle = await screen.findByRole("switch", {
       name: "Proposer des souvenirs après mes conversations",
     });
@@ -168,7 +215,8 @@ describe("mémoire", () => {
     renderApp("/memoire");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Tout oublier" }));
+    await user.click(await screen.findByRole("button", { name: "Réglages de la mémoire" }));
+    await user.click(screen.getByRole("button", { name: "Tout oublier" }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Tout oublier" }));
     await user.type(await within(dialog).findByLabelText("Mot de passe"), state.password);

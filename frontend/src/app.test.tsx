@@ -105,7 +105,7 @@ describe("conversation", () => {
       expect(log).toHaveTextContent("Bonjour Anas.");
     });
     expect(log).toHaveTextContent("Quel jour sommes-nous ?");
-    const nav = screen.getAllByRole("navigation", { name: "Conversations" })[0];
+    const nav = screen.getAllByRole("navigation", { name: "Navigation principale" })[0];
     expect(nav).toBeDefined();
     expect(await within(nav as HTMLElement).findByRole("link", { name: "Quel jour sommes-nous ?" })).toBeVisible();
     const sent = api.requests.find((r) => r.path.endsWith("/messages"));

@@ -1,8 +1,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Check, Pencil, Trash2, X } from "lucide-react";
-import { useId, useState } from "react";
+import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useDeferredValue, useId, useState } from "react";
 
 import {
   CATEGORIES,
@@ -15,102 +15,210 @@ import {
   rejectFact,
   setProposalsEnabled,
   updateFact,
+  type Category,
   type Fact,
 } from "@/api/memory";
+import { Collapsible } from "@/components/Collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/features/chat/ConfirmDialog";
 import { TopBar } from "@/features/chat/layout";
+import { cn } from "@/lib/cn";
+import { withViewTransition } from "@/lib/motion";
 import { factsQuery, memorySettingsQuery } from "@/lib/queries";
 
 import { FactEditor, messageFor } from "./FactEditor";
 
+type Filter = Category | "all";
+
+/** Normalise pour la recherche : casse et accents ignores (« etudes » trouve « Études »). */
+function fold(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
 /**
- * Page Memoire : ce que Lorakus sait de l'utilisateur. Rien n'y entre sans son accord :
- * les propositions issues des conversations attendent sa decision.
+ * Page Memoire (docs/frontend.md, « Mémoire »). Pensee pour 3 comme pour 200 souvenirs :
+ * propositions en tete seulement s'il y en a ; puis une barre de recherche et de filtres qui
+ * reste en haut ; des lignes discretes groupees par categorie repliable ; les reglages et
+ * « Tout oublier » ranges en bas, replies.
  */
 export function MemoryScreen() {
   const facts = useQuery(factsQuery);
   const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["memory"] });
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [adding, setAdding] = useState(false);
+  const search = fold(useDeferredValue(query).trim());
+
+  // Chaque changement fait glisser les lignes vers leur nouvelle place (View Transitions).
+  const refresh = () => withViewTransition(() => queryClient.invalidateQueries({ queryKey: ["memory"] }));
   const pending = facts.data?.filter((f) => f.status === "proposed") ?? [];
   const known = facts.data?.filter((f) => f.status === "verified") ?? [];
+  const counts = new Map<Category, number>();
+  for (const fact of known) counts.set(fact.category, (counts.get(fact.category) ?? 0) + 1);
+  const visible = known.filter(
+    (f) => (filter === "all" || f.category === filter) && (!search || fold(f.content).includes(search)),
+  );
+  const narrowed = filter !== "all" || search !== "";
 
   return (
     <>
       <TopBar>
-        <h1 className="truncate text-[0.9375rem] font-semibold">Mémoire</h1>
+        <h1 className="truncate text-[0.9375rem] font-semibold">
+          Mémoire
+          {known.length > 0 && <span className="ml-2 font-normal text-ink-faint tabular-nums">{known.length}</span>}
+        </h1>
       </TopBar>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pt-4 pb-16 sm:px-6">
-          <p className="text-ink-muted">
-            Lorakus ne retient rien sans ton accord. Après tes conversations, il te propose ce qu'il a compris de toi :
-            tu confirmes, corriges ou refuses. Seuls les souvenirs confirmés lui servent.
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="page-enter mx-auto flex max-w-2xl flex-col px-4 pb-16 sm:px-6">
+          <p className="pb-5 text-sm text-ink-faint">
+            Rien n'est retenu sans ton accord. Lorakus te propose ce qu'il comprend de toi ; seuls les souvenirs
+            confirmés lui servent.
           </p>
 
-          <ProposalsSetting />
-
           {facts.isError && (
-            <p role="alert" className="text-danger">
+            <p role="alert" className="pb-4 text-danger">
               Impossible de charger la mémoire. Réessaie plus tard.
             </p>
           )}
 
-          <section aria-labelledby="pending-title" className="flex flex-col gap-3">
-            <h2 id="pending-title" className="text-lg font-semibold">
-              À confirmer {pending.length > 0 && <span className="text-accent">({pending.length})</span>}
-            </h2>
-            {pending.length === 0 ? (
-              <p className="text-ink-faint">Aucune proposition en attente.</p>
-            ) : (
-              <ul className="flex flex-col gap-3">
+          {pending.length > 0 && (
+            <section aria-labelledby="pending-title" className="pb-6">
+              <h2 id="pending-title" className="pb-2 text-sm font-semibold">
+                À confirmer <span className="text-accent tabular-nums">{pending.length}</span>
+              </h2>
+              <ul className="flex flex-col gap-2">
                 {pending.map((fact) => (
-                  <ProposalCard key={fact.id} fact={fact} onDone={refresh} />
+                  <ProposalRow key={fact.id} fact={fact} onDone={refresh} />
                 ))}
               </ul>
+            </section>
+          )}
+
+          <section aria-labelledby="known-title">
+            <h2 id="known-title" className="sr-only">
+              Ce que Lorakus sait de toi
+            </h2>
+            {/* Barre d'outils collee en haut pendant le defilement. */}
+            <div className="sticky top-0 z-10 -mx-1 bg-background/90 px-1 pt-1 pb-2 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <label className="relative min-w-0 flex-1">
+                  <span className="sr-only">Rechercher dans la mémoire</span>
+                  <Search
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint"
+                  />
+                  <Input
+                    type="search"
+                    value={query}
+                    placeholder="Rechercher"
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                    }}
+                    className="h-10 rounded-full pl-9 text-[0.9375rem]"
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  variant={adding ? "outline" : "primary"}
+                  aria-expanded={adding}
+                  aria-label={adding ? "Fermer l'ajout" : "Ajouter un souvenir"}
+                  onClick={() => {
+                    setAdding((value) => !value);
+                  }}
+                  className="h-10 rounded-full"
+                >
+                  {adding ? <X aria-hidden="true" /> : <Plus aria-hidden="true" />}
+                  {adding ? "Fermer" : "Ajouter"}
+                </Button>
+              </div>
+              {known.length > 0 && (
+                <div role="group" aria-label="Filtrer par catégorie" className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1">
+                  <Chip active={filter === "all"} onClick={() => { setFilter("all"); }} label="Tout" count={known.length} />
+                  {CATEGORIES.filter((c) => counts.has(c)).map((c) => (
+                    <Chip
+                      key={c}
+                      active={filter === c}
+                      onClick={() => { setFilter(filter === c ? "all" : c); }}
+                      label={CATEGORY_LABELS[c]}
+                      count={counts.get(c) ?? 0}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="collapsible" data-open={adding} inert={!adding}>
+              <div className="min-h-0">
+                <div className="mb-3 rounded-2xl bg-raised p-3">
+                  <FactEditor
+                    key={known.length}
+                    submitLabel="Ajouter"
+                    initialCategory={filter === "all" ? "preference" : filter}
+                    onSubmit={async (content, category) => {
+                      await addFact(content, category);
+                      await refresh();
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {known.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-faint">
+                Aucun souvenir pour l'instant. Parle de toi à Lorakus, ou ajoute-en un.
+              </p>
+            ) : narrowed ? (
+              visible.length === 0 ? (
+                <p className="py-6 text-center text-sm text-ink-faint">Aucun souvenir ne correspond.</p>
+              ) : (
+                <ul className="pt-1">
+                  {visible.map((fact) => (
+                    <FactRow key={fact.id} fact={fact} onDone={refresh} showCategory={filter === "all"} />
+                  ))}
+                </ul>
+              )
+            ) : (
+              CATEGORIES.filter((c) => counts.has(c)).map((category) => (
+                <Collapsible key={category} title={CATEGORY_LABELS[category]} count={counts.get(category)} className="pt-2">
+                  <ul>
+                    {known
+                      .filter((f) => f.category === category)
+                      .map((fact) => (
+                        <FactRow key={fact.id} fact={fact} onDone={refresh} />
+                      ))}
+                  </ul>
+                </Collapsible>
+              ))
             )}
           </section>
 
-          <section aria-labelledby="known-title" className="flex flex-col gap-4">
-            <h2 id="known-title" className="text-lg font-semibold">
-              Ce que Lorakus sait de toi
-            </h2>
-            {known.length === 0 && <p className="text-ink-faint">Rien pour l'instant.</p>}
-            {CATEGORIES.map((category) => {
-              const items = known.filter((f) => f.category === category);
-              if (items.length === 0) {
-                return null;
-              }
-              return (
-                <div key={category}>
-                  <h3 className="pb-1.5 text-xs font-medium tracking-wide text-ink-faint uppercase">
-                    {CATEGORY_LABELS[category]}
-                  </h3>
-                  <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
-                    {items.map((fact) => (
-                      <KnownFact key={fact.id} fact={fact} onDone={refresh} />
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-            <div className="rounded-2xl border border-dashed border-line p-4">
-              <h3 className="pb-2 text-sm font-medium">Ajouter un souvenir</h3>
-              <FactEditor
-                key={known.length}
-                submitLabel="Ajouter"
-                onSubmit={async (content, category) => {
-                  await addFact(content, category);
-                  await refresh();
-                }}
-              />
+          <Collapsible title="Réglages de la mémoire" defaultOpen={false} className="mt-10 border-t border-line/60 pt-3">
+            <div className="flex flex-col gap-4 pt-2 pb-1">
+              <ProposalsSetting />
+              <ForgetAll disabled={(facts.data?.length ?? 0) === 0} onDone={refresh} />
             </div>
-          </section>
-
-          <ForgetAll disabled={(facts.data?.length ?? 0) === 0} onDone={refresh} />
+          </Collapsible>
         </div>
       </div>
     </>
+  );
+}
+
+function Chip({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.8125rem] transition-colors duration-150",
+        active ? "bg-ink text-background" : "bg-raised text-ink-muted hover:text-ink",
+      )}
+    >
+      {label}
+      <span className={cn("tabular-nums", active ? "opacity-70" : "text-ink-faint")}>{count}</span>
+    </button>
   );
 }
 
@@ -120,14 +228,14 @@ function ProposalsSetting() {
   const [failed, setFailed] = useState(false);
   const enabled = setting.data ?? true;
   return (
-    <div className="flex items-start gap-4 rounded-2xl border border-line bg-surface p-4">
+    <div className="flex items-start gap-4">
       <div className="flex-1">
-        <p id="proposals-label" className="font-medium">
+        <p id="proposals-label" className="text-[0.9375rem] font-medium">
           Proposer des souvenirs après mes conversations
         </p>
-        <p className="mt-1 text-sm text-ink-muted">
-          Quelques minutes après ton dernier message, Lorakus relit tes messages (jamais ses réponses) et te propose au
-          plus cinq souvenirs.
+        <p className="mt-0.5 text-sm text-ink-faint">
+          Quelques minutes après ton dernier message, Lorakus relit tes messages (jamais ses réponses) et te propose
+          au plus cinq souvenirs.
         </p>
         {failed && (
           <p role="alert" className="mt-1 text-sm text-danger">
@@ -144,27 +252,30 @@ function ProposalsSetting() {
         onClick={() => {
           setFailed(false);
           setProposalsEnabled(!enabled)
-            .then(() =>
-              queryClient.invalidateQueries({
-                queryKey: ["memory", "settings"],
-              }),
-            )
+            .then(() => queryClient.invalidateQueries({ queryKey: ["memory", "settings"] }))
             .catch(() => {
               setFailed(true);
             });
         }}
-        className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors ${enabled ? "bg-accent" : "bg-line"}`}
+        className={cn(
+          "relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors duration-200",
+          enabled ? "bg-accent" : "bg-line",
+        )}
       >
         <span
           aria-hidden="true"
-          className={`absolute top-1 left-1 size-5 rounded-full bg-background transition-transform ${enabled ? "translate-x-5" : ""}`}
+          className={cn(
+            "absolute top-0.5 left-0.5 size-5 rounded-full bg-background shadow-sm transition-transform duration-200 ease-[var(--ease-out-soft)]",
+            enabled && "translate-x-4",
+          )}
         />
       </button>
     </div>
   );
 }
 
-function ProposalCard({ fact, onDone }: { fact: Fact; onDone: () => Promise<void> }) {
+/** Proposition : seul element mis en avant de la page, avec ce que l'utilisateur a dit. */
+function ProposalRow({ fact, onDone }: { fact: Fact; onDone: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = (action: () => Promise<void>) => {
@@ -176,7 +287,10 @@ function ProposalCard({ fact, onDone }: { fact: Fact; onDone: () => Promise<void
       });
   };
   return (
-    <li className="rounded-2xl border border-line bg-raised p-4">
+    <li
+      style={{ viewTransitionName: `fact-${fact.id}` }}
+      className="vt-fact rounded-xl border-l-2 border-accent bg-raised py-3 pr-3 pl-3.5"
+    >
       {editing ? (
         <FactEditor
           initialContent={fact.content}
@@ -192,8 +306,8 @@ function ProposalCard({ fact, onDone }: { fact: Fact; onDone: () => Promise<void
         />
       ) : (
         <>
-          <p className="font-medium">{fact.content}</p>
-          <p className="mt-1 text-sm text-ink-faint">
+          <p className="text-[0.9375rem] leading-snug">{fact.content}</p>
+          <p className="mt-1 line-clamp-2 text-[0.8125rem] text-ink-faint">
             {CATEGORY_LABELS[fact.category]}
             {fact.evidence && <> · Tu as dit : « {fact.evidence} »</>}
             {fact.from_conversation && (
@@ -209,33 +323,16 @@ function ProposalCard({ fact, onDone }: { fact: Fact; onDone: () => Promise<void
               </>
             )}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                run(() => confirmFact(fact.id));
-              }}
-            >
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <Button size="sm" onClick={() => { run(() => confirmFact(fact.id)); }} className="h-8">
               <Check aria-hidden="true" />
               Confirmer
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditing(true);
-              }}
-            >
+            <Button size="sm" variant="quiet" onClick={() => { setEditing(true); }} className="h-8">
               <Pencil aria-hidden="true" />
               Corriger
             </Button>
-            <Button
-              size="sm"
-              variant="quiet"
-              onClick={() => {
-                run(() => rejectFact(fact.id));
-              }}
-            >
+            <Button size="sm" variant="quiet" onClick={() => { run(() => rejectFact(fact.id)); }} className="h-8">
               <X aria-hidden="true" />
               Refuser
             </Button>
@@ -251,48 +348,45 @@ function ProposalCard({ fact, onDone }: { fact: Fact; onDone: () => Promise<void
   );
 }
 
-function KnownFact({ fact, onDone }: { fact: Fact; onDone: () => Promise<void> }) {
+/**
+ * Souvenir confirme : une ligne sans cadre. Les actions apparaissent au survol ou au focus sur
+ * ordinateur, et restent visibles (discretes) sur un ecran tactile.
+ */
+function FactRow({ fact, onDone, showCategory = false }: { fact: Fact; onDone: () => Promise<void>; showCategory?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   return (
-    <li className="px-4 py-3">
+    <li style={{ viewTransitionName: `fact-${fact.id}` }} className="vt-fact group/row">
       {editing ? (
-        <FactEditor
-          initialContent={fact.content}
-          initialCategory={fact.category}
-          submitLabel="Enregistrer"
-          onCancel={() => {
-            setEditing(false);
-          }}
-          onSubmit={async (content, category) => {
-            await updateFact(fact.id, content, category);
-            setEditing(false);
-            await onDone();
-          }}
-        />
+        <div className="my-1 rounded-xl bg-raised p-3">
+          <FactEditor
+            initialContent={fact.content}
+            initialCategory={fact.category}
+            submitLabel="Enregistrer"
+            onCancel={() => {
+              setEditing(false);
+            }}
+            onSubmit={async (content, category) => {
+              await updateFact(fact.id, content, category);
+              setEditing(false);
+              await onDone();
+            }}
+          />
+        </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1">{fact.content}</p>
-          <Button
-            variant="quiet"
-            size="icon-sm"
-            aria-label={`Modifier : ${fact.content}`}
-            onClick={() => {
-              setEditing(true);
-            }}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="quiet"
-            size="icon-sm"
-            aria-label={`Supprimer : ${fact.content}`}
-            onClick={() => {
-              setDeleting(true);
-            }}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+        <div className="-mx-2 flex min-h-11 items-center gap-1 rounded-lg px-2 transition-colors duration-150 hover:bg-hover/60">
+          <p className="min-w-0 flex-1 py-2 text-[0.9375rem] leading-snug">
+            {fact.content}
+            {showCategory && <span className="ml-2 text-xs text-ink-faint">{CATEGORY_LABELS[fact.category]}</span>}
+          </p>
+          <div className="row-actions flex shrink-0">
+            <Button variant="quiet" size="icon-sm" aria-label={`Modifier : ${fact.content}`} onClick={() => { setEditing(true); }}>
+              <Pencil aria-hidden="true" />
+            </Button>
+            <Button variant="quiet" size="icon-sm" aria-label={`Supprimer : ${fact.content}`} onClick={() => { setDeleting(true); }}>
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       )}
       <ConfirmDialog
@@ -342,9 +436,14 @@ function ForgetAll({ disabled, onDone }: { disabled: boolean; onDone: () => Prom
   }
 
   return (
-    <section className="border-t border-line pt-6">
+    <div className="flex items-center gap-4">
+      <div className="flex-1">
+        <p className="text-[0.9375rem] font-medium">Tout oublier</p>
+        <p className="mt-0.5 text-sm text-ink-faint">Efface définitivement tous les souvenirs et propositions.</p>
+      </div>
       <Button
         variant="outline"
+        size="sm"
         disabled={disabled}
         onClick={() => {
           setNeedsProof(false);
@@ -363,7 +462,7 @@ function ForgetAll({ disabled, onDone }: { disabled: boolean; onDone: () => Prom
           <Dialog.Overlay className="scrim fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px]" />
           <Dialog.Content
             role="alertdialog"
-            className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md animate-fade-up rounded-3xl border border-line bg-raised p-6 shadow-float sm:top-1/3 sm:bottom-auto"
+            className="sheet fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-3xl border border-line bg-raised p-6 shadow-float sm:top-1/3 sm:bottom-auto"
           >
             <Dialog.Title className="text-lg font-semibold">Tout oublier ?</Dialog.Title>
             <Dialog.Description className="mt-2 text-ink-muted">
@@ -422,6 +521,6 @@ function ForgetAll({ disabled, onDone }: { disabled: boolean; onDone: () => Prom
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </div>
   );
 }

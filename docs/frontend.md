@@ -20,7 +20,7 @@ pnpm installe les dépendances et refuse toute version publiée depuis moins de 
 | `/connexion` | Connexion, avec le code de double authentification si le compte l'exige |
 | `/` | Accueil : la question et le champ de saisie au centre de la zone principale (barre latérale exclue) |
 | `/c/<id>` | Conversation : messages enregistrés, réponse en direct, champ de saisie en bas, suppression |
-| `/memoire` | Mémoire (ADR 0039) : propositions à confirmer, corriger ou refuser (avec l'extrait du message cité), souvenirs confirmés par catégorie, ajout, réglage des propositions, « Tout oublier » avec ré-authentification |
+| `/memoire` | Mémoire (ADR 0039) : propositions en tête (seulement s'il y en a), recherche (sans accents ni casse) et filtres par catégorie collés en haut, souvenirs en lignes discrètes groupées par catégorie repliable, ajout dans un panneau qui s'ouvre, réglages et « Tout oublier » repliés en bas |
 
 Au premier envoi depuis l'accueil, le champ de saisie **glisse** du centre vers le bas pendant que la conversation apparaît en fondu : les deux écrans donnent au champ le même nom de transition (`view-transition-name: composer`) et le routeur navigue avec les View Transitions du navigateur. Les autres changements d'écran font un fondu bref. Un navigateur sans View Transitions affiche directement le nouvel écran.
 
@@ -44,11 +44,27 @@ Jetons centralisés dans `src/styles.css` (variables CSS exposées à Tailwind) 
 
 `features/chat/Composer.tsx`, deux variantes (`hero` au centre, `docked` en bas). Entrée envoie et Maj+Entrée va à la ligne sur ordinateur ; sur écran tactile, Entrée va à la ligne et l'envoi passe par le bouton. Pendant qu'une réponse s'écrit, on peut préparer la suite sans l'envoyer. Les emplacements `leading` et `trailing` accueilleront les futurs outils (pièce jointe, micro, choix du modèle) : rien n'y est affiché tant que la fonction n'existe pas. Sur Android, `interactive-widget=resizes-content` garde le champ au-dessus du clavier.
 
-## Barre latérale
+## Navigation
 
-Marque, « Nouvelle conversation » (icône jade), « Mémoire » (avec le nombre de propositions en attente), conversations récentes (titre complet au survol), profil et déconnexion. Repliable sur ordinateur (préférence d'affichage gardée dans le navigateur, aucune donnée personnelle) ; sur téléphone, panneau coulissant par-dessus l'écran.
+L'application doit rester aussi simple avec vingt fonctionnalités qu'avec trois. La barre latérale a trois étages fixes :
+
+1. **Actions et destinations** : « Nouvelle conversation », puis les destinations déclarées dans `src/navigation.ts`, seul endroit à modifier pour en ajouter une. Groupe `assistant` (Mémoire ; puis Aujourd'hui, Tâches, Agenda) toujours visible, cinq entrées au plus ; groupe `tools` (services secondaires, modules) dans une section repliable, absente tant qu'elle est vide. Un badge discret signale ce qui attend l'utilisateur (propositions de souvenirs).
+2. **Conversations** : seule partie qui défile, groupées par ancienneté (Aujourd'hui, Hier, 7 derniers jours, 30 derniers jours, Plus ancien), 25 affichées puis « Afficher plus ».
+3. **Profil** : avatar, adresse, déconnexion ; les futurs réglages et la gestion du compte iront dans ce coin, jamais dans la liste.
+
+Lignes de 36 px, texte de 14 px, une seule couleur d'accent (l'icône de « Nouvelle conversation »). Repliable sur ordinateur (préférence d'affichage gardée dans le navigateur, aucune donnée personnelle) ; sur téléphone, panneau coulissant qui se ferme aussi en le glissant vers la gauche (geste vertical ignoré : la liste défile normalement).
 
 Tant que des propositions attendent, la barre du haut de chaque écran (sauf la page Mémoire) affiche une mention discrète « N souvenirs à confirmer », qui mène à la page.
+
+## Mouvement
+
+Principe : la structure reste en place, seul le contenu change. Animations courtes (120 à 300 ms), sur `transform` et `opacity` seulement (fluides à 60 images par seconde), courbe `--ease-out-soft`. Avec « réduire les animations » du système, tout s'affiche immédiatement.
+
+- **Changement d'écran** : View Transitions du navigateur. La barre latérale (`vt-sidebar`) ne bouge pas ; la zone principale (`vt-page`) s'efface en 120 ms puis revient en glissant de 6 px. De l'accueil à la conversation, le champ de saisie glisse en plus du centre vers le bas.
+- **Souvenirs** : après un ajout, une confirmation, une correction ou une suppression, `withViewTransition` (`src/lib/motion.ts`) fait glisser chaque ligne (nommée `fact-<id>`) vers sa nouvelle place.
+- **Sections repliables** (`components/Collapsible.tsx`) : la hauteur s'ouvre par `grid-template-rows` (0fr vers 1fr), sans mesure ni bibliothèque ; le contenu fermé est inerte.
+- **Panneau et fenêtres** : le panneau entre en 280 ms et sort en 200 ms ; les fenêtres de confirmation montent légèrement.
+- **Actions d'une ligne** : visibles au survol ou au focus avec une souris, toujours visibles sur écran tactile.
 
 ## Vérification visuelle
 

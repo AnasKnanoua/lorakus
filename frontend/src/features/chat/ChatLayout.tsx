@@ -7,6 +7,7 @@ import { AssistantDisabledError } from "@/api/assistant";
 import { Orb } from "@/components/Orb";
 import { cn } from "@/lib/cn";
 import { conversationsQuery } from "@/lib/queries";
+import { useSwipeToClose } from "@/lib/useSwipeToClose";
 
 import { EnableAssistant } from "./EnableAssistant";
 import { LayoutContext } from "./layout";
@@ -33,6 +34,9 @@ export function ChatLayout() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const conversations = useQuery(conversationsQuery);
   const disabled = conversations.error instanceof AssistantDisabledError;
+  const swipe = useSwipeToClose(() => {
+    setDrawerOpen(false);
+  });
 
   const setSidebar = useCallback((value: boolean) => {
     setCollapsed(value);
@@ -63,7 +67,7 @@ export function ChatLayout() {
           aria-hidden={collapsed}
           inert={collapsed}
           className={cn(
-            "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-[var(--ease-out-soft)] lg:block",
+            "vt-sidebar hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-[var(--ease-out-soft)] lg:block",
             collapsed ? "w-0" : "w-[264px]",
           )}
         >
@@ -82,6 +86,7 @@ export function ChatLayout() {
             <Dialog.Content
               aria-describedby={undefined}
               className="drawer fixed inset-y-0 left-0 z-50 w-[86%] max-w-[300px] shadow-float lg:hidden"
+              {...swipe}
             >
               <Dialog.Title className="sr-only">Conversations</Dialog.Title>
               <Sidebar
@@ -93,7 +98,7 @@ export function ChatLayout() {
           </Dialog.Portal>
         </Dialog.Root>
 
-        <main className="relative flex min-w-0 flex-1 flex-col">
+        <main className="vt-page relative flex min-w-0 flex-1 flex-col">
           {conversations.isPending ? (
             <div className="flex flex-1 items-center justify-center" aria-busy="true">
               <Orb thinking className="size-8" />
