@@ -1,18 +1,32 @@
 import { useRef, type TouchEvent } from "react";
 
 /**
- * Glisser vers la gauche pour fermer un panneau lateral (telephone). Le panneau suit le doigt ;
- * au lacher, il se ferme s'il a ete tire de plus d'un tiers de sa largeur ou d'un geste vif,
- * sinon il revient en place. Un mouvement surtout vertical (defilement) est ignore.
+ * Glisser vers la gauche pour fermer un panneau lateral (telephone). Le panneau suit le doigt,
+ * et le voile derriere lui s'eclaircit d'autant ; au lacher, il se ferme s'il a ete tire de
+ * plus d'un tiers de sa largeur ou d'un geste vif, sinon il revient en place. Un mouvement
+ * surtout vertical (defilement) est ignore.
+ *
+ * Fermeture : le panneau GARDE la position ou le doigt l'a laisse. L'animation de sortie
+ * (drawer-out, sans etape de depart) part de cette position jusqu'a -100 %. Remettre d'abord
+ * la position a zero faisait revenir le panneau avant qu'il ne reparte (fermer, rouvrir,
+ * fermer : 2026-11-13).
  */
 export function useSwipeToClose(onClose: () => void) {
   const start = useRef<{ x: number; y: number; t: number } | null>(null);
   const horizontal = useRef<boolean | null>(null);
   const offset = useRef(0);
 
+  /** Voile (Radix Dialog.Overlay) rendu juste avant le panneau dans le meme portail. */
+  function scrimOf(panel: HTMLElement): HTMLElement | null {
+    const previous = panel.previousElementSibling;
+    return previous instanceof HTMLElement && previous.classList.contains("scrim") ? previous : null;
+  }
+
   function reset(panel: HTMLElement) {
     panel.style.transform = "";
     panel.dataset.dragging = "false";
+    const scrim = scrimOf(panel);
+    if (scrim) scrim.style.opacity = "";
     start.current = null;
     horizontal.current = null;
     offset.current = 0;
@@ -32,9 +46,12 @@ export function useSwipeToClose(onClose: () => void) {
         horizontal.current = Math.abs(dx) > Math.abs(dy);
       }
       if (!horizontal.current) return;
+      const panel = event.currentTarget;
       offset.current = Math.min(0, dx);
-      event.currentTarget.dataset.dragging = "true";
-      event.currentTarget.style.transform = `translateX(${String(offset.current)}px)`;
+      panel.dataset.dragging = "true";
+      panel.style.transform = `translateX(${String(offset.current)}px)`;
+      const scrim = scrimOf(panel);
+      if (scrim) scrim.style.opacity = String(Math.max(0, 1 + offset.current / panel.offsetWidth));
     },
     onTouchEnd(event: TouchEvent<HTMLElement>) {
       const panel = event.currentTarget;
@@ -45,8 +62,16 @@ export function useSwipeToClose(onClose: () => void) {
       const elapsed = Math.max(1, performance.now() - start.current.t);
       const fast = -offset.current / elapsed > 0.5; // plus de 0,5 px par ms
       const far = -offset.current > panel.offsetWidth / 3;
-      reset(panel);
-      if (fast || far) onClose();
+      if (fast || far) {
+        // Position et voile gardes : la sortie continue le geste au lieu de repartir de zero.
+        panel.dataset.dragging = "false";
+        start.current = null;
+        horizontal.current = null;
+        offset.current = 0;
+        onClose();
+        return;
+      }
+      reset(panel); // pas assez loin : retour en place, en douceur (transition de .drawer)
     },
   };
 }

@@ -282,7 +282,8 @@
   animation: drawer-in 280ms var(--ease-out-soft);
 }
 .drawer[data-state="closed"] {
-  animation: drawer-out 200ms cubic-bezier(0.4, 0, 1, 1);
+  /* Pas de courbe d'acceleration : apres un glissement du doigt, la sortie garde sa vitesse. */
+  animation: drawer-out 200ms cubic-bezier(0.2, 0.6, 0.4, 1);
 }
 /* Pendant un glissement du doigt, le panneau suit sans retard ; au lacher, il revient en douceur. */
 .drawer[data-dragging="true"] {
