@@ -21,3 +21,11 @@ max_data_class = "sensitive"  # local, aucune donnee ne sort ; jamais en staging
 chain = ["anthropic:claude-haiku-5-5", "fake:echo"]
 max_input_tokens = 50000
 max_output_tokens = 1024
+
+# Propositions de faits pour la memoire (PR 36) : sortie JSON courte, messages de
+# l'utilisateur seulement. Le faux fournisseur n'y repond jamais en JSON : en developpement
+# sans cle, aucune proposition (comportement voulu).
+[tasks."memory.extract"]
+chain = ["anthropic:claude-haiku-5-5", "fake:echo"]
+max_input_tokens = 8000
+max_output_tokens = 600

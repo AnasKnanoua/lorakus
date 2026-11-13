@@ -13,6 +13,7 @@ import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
 import { ConversationScreen } from "@/features/chat/ConversationScreen";
 import { NewConversationScreen } from "@/features/chat/NewConversationScreen";
+import { MemoryScreen } from "@/features/memory/MemoryScreen";
 import { meQuery } from "@/lib/queries";
 
 interface RouterContext {
@@ -64,9 +65,15 @@ const conversationRoute = createRoute({
   component: ConversationRoute,
 });
 
+const memoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/memoire",
+  component: MemoryScreen,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

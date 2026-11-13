@@ -14,6 +14,18 @@ export interface FakeMessage {
   created_at: string;
 }
 
+export interface FakeFact {
+  id: string;
+  content: string;
+  category: "identity" | "preference" | "project" | "habit" | "studies" | "other";
+  status: "proposed" | "verified";
+  source_kind: "manual" | "conversation";
+  evidence: string | null;
+  from_conversation: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+}
+
 export interface FakeState {
   loggedIn: boolean;
   password: string;
@@ -29,6 +41,10 @@ export interface FakeState {
   /** Si defini, le flux s'arrete apres les morceaux de texte jusqu'a ce que la promesse aboutisse. */
   holdReply: Promise<void> | null;
   requests: { method: string; path: string; body: unknown }[];
+  facts: FakeFact[];
+  proposalsEnabled: boolean;
+  /** Derniere preuve d'identite trop ancienne : « tout oublier » repond 403. */
+  reauthStale: boolean;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -75,6 +91,9 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     failNextSend: false,
     holdReply: null,
     requests: [],
+    facts: [],
+    proposalsEnabled: true,
+    reauthStale: false,
     ...overrides,
   };
   let counter = 0;
@@ -178,6 +197,74 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
         state.holdReply,
         () => conversation.messages.push(saved),
       );
+    }
+    // --- memoire (PR 36)
+    if (path === "/api/v1/memory/facts" && request.method === "GET") {
+      return json(200, state.facts);
+    }
+    if (path === "/api/v1/memory/facts" && request.method === "POST") {
+      const b = body as { content: string; category: FakeFact["category"] };
+      if (state.facts.some((f) => f.content.toLowerCase() === b.content.toLowerCase())) {
+        return json(409, { detail: { code: "duplicate", message: "Ce fait existe deja." } });
+      }
+      const created: FakeFact = {
+        id: nextId(),
+        content: b.content,
+        category: b.category,
+        status: "verified",
+        source_kind: "manual",
+        evidence: null,
+        from_conversation: null,
+        created_at: NOW,
+        confirmed_at: NOW,
+      };
+      state.facts.unshift(created);
+      return json(201, created);
+    }
+    const factMatch = /^\/api\/v1\/memory\/facts\/([^/]+)(\/confirm|\/reject)?$/.exec(path);
+    if (factMatch) {
+      const fact = state.facts.find((f) => f.id === factMatch[1]);
+      if (!fact) {
+        return json(404, { detail: "Fait introuvable." });
+      }
+      const edit = (body ?? {}) as { content?: string | null; category?: FakeFact["category"] | null };
+      if (factMatch[2] === "/confirm") {
+        fact.content = edit.content ?? fact.content;
+        fact.category = edit.category ?? fact.category;
+        fact.status = "verified";
+        fact.confirmed_at = NOW;
+        return json(200, fact);
+      }
+      if (factMatch[2] === "/reject" || request.method === "DELETE") {
+        state.facts = state.facts.filter((f) => f.id !== fact.id);
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === "PATCH") {
+        fact.content = edit.content ?? fact.content;
+        fact.category = edit.category ?? fact.category;
+        return json(200, fact);
+      }
+    }
+    if (path === "/api/v1/memory/settings") {
+      if (request.method === "PUT") {
+        state.proposalsEnabled = (body as { propose_after_conversations: boolean }).propose_after_conversations;
+      }
+      return json(200, { propose_after_conversations: state.proposalsEnabled });
+    }
+    if (path === "/api/v1/memory/forget-all") {
+      if (state.reauthStale) {
+        return json(403, { detail: "Confirmez votre identite." });
+      }
+      const deleted = state.facts.length;
+      state.facts = [];
+      return json(200, { deleted });
+    }
+    if (path === "/api/v1/auth/reauth") {
+      const ok = (body as { password: string }).password === state.password;
+      if (ok) {
+        state.reauthStale = false;
+      }
+      return new Response(null, { status: ok ? 204 : 401 });
     }
     return json(404, { detail: `route inconnue du faux backend : ${request.method} ${path}` });
   };

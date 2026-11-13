@@ -72,3 +72,10 @@ ORIGIN_REFUSED: Final = Counter(
     "lorakus_origin_refused_total",
     "Requetes d'ecriture refusees parce qu'elles venaient d'une autre origine",
 )
+
+# --- Memoire (PR 36). Aucune etiquette ne porte de contenu ni d'identifiant.
+MEMORY_PROPOSALS: Final = Counter(
+    "lorakus_memory_proposals_total",
+    "Propositions de faits : enregistrees (proposed) ou ecartees, avec la raison",
+    ["outcome"],
+)

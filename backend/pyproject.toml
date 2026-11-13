@@ -63,6 +63,7 @@ select = [
 "tests/**" = ["S101", "S105", "S106"]  # assert et faux mots de passe sont normaux dans les tests
 "alembic/versions/**" = ["F401"]      # le modele importe sqlalchemy meme si une migration ne l'utilise pas
 "lorakus_modules/*/prompts.py" = ["E501"]  # texte envoye au modele : pas de coupure artificielle
+"lorakus/core/*/prompts.py" = ["E501"]
 
 # --- Pyright : vérification des types --------------------------------------
 [tool.pyright]

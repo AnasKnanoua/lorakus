@@ -84,7 +84,8 @@ Le DDD complet (agrégats, repositories systématiques) n'est appliqué que là 
 | `audit` | Journal append-only des actions sensibles | `Audit.record` | 2 |
 | `storage` | Fichiers (pièces jointes, médias, imports, exports) derrière le port `BlobStore` : disque local puis stockage compatible S3 (ADR 0024) | `BlobStore` | 3 |
 | `agents` | Registre des spécialistes, contrat question/rapport, orchestrateur, filtre de confidentialité, préparations, file d'approbation, traçabilité `core_agent_runs` (ADR 0025 à 0028) | `SpecialistProfile`, `Orchestrator` | 2 → 5 |
-| `memory` | Faits typés (`verified`, `proposed`, `inferred`), épisodes, recherche hybride (plein texte + vecteurs locaux) | `Memory.remember`, `Memory.retrieve` | 3 |
+| `memory` | Faits typés (`verified`, `proposed`, `inferred`) avec provenance, propositions vérifiées après les conversations, confirmation par l'utilisateur (ADR 0039) ; épisodes et recherche hybride (plein texte + vecteurs locaux) en PR 37 | `MemoryService` (`verified_for_prompt`, `propose_from_messages`), dépendance `get_memory` | 3 |
+| `background` | Travaux courts différés dans le processus de l'API, regroupés par clé (ex. analyse d'une conversation quelques minutes après le dernier message) | `DebouncedTasks`, dépendance `get_background` | 3 |
 | `planning` | Tâches génériques, créneaux d'agenda, planificateur de journée et de semaine | `Tasks`, `Agenda`, `Planner` | 4 |
 | `signals` | Réception des signaux des modules, `InterventionPolicy` (niveaux 0–3, budget, quiet hours, cooldown, dédup, groupement, backoff), canaux (Web Push, Telegram, puis notifications locales Android) | `Signals.emit` | 5 |
 | `context` | `PersonalContext` : créneau courant et suivant, deadlines proches, quiet hours, budget restant ; puis état numérique et sportif fournis par les modules | `ContextProvider` (implémenté par les modules) | 5 → 7 |
@@ -131,7 +132,7 @@ Les règles de couplage et le contrat de manifeste sont dans [`MODULE_SYSTEM.md`
 
 ## 7. Flux principaux
 
-1. **Chat** : PWA → SSE → `assistant` → `Memory.retrieve` → `ModelRouter.chat` avec les outils autorisés → boucle d'outils via `tools` (permission, confirmation, audit) → réponse streamée → job de mémorisation (faits proposés).
+1. **Chat** : PWA → SSE → `assistant` → faits confirmés (`MemoryService.verified_for_prompt`) → `ModelRouter.chat` avec les outils autorisés → boucle d'outils via `tools` (permission, confirmation, audit) → réponse streamée → analyse différée des messages de l'utilisateur (faits proposés, ADR 0039).
 2. **Signal → intervention** : un module émet `Signals.emit(Signal)` → `InterventionPolicy` consulte `context` → applique niveau, budget, cooldown → au plus une notification, éventuellement avec une pièce jointe fournie par un port (`InspirationProvider`) → feedback de l'utilisateur enregistré.
 3. **Calendrier** : job `calendars.sync` (30 min) → lecture ICS → créneaux dans l'`Agenda` → le planificateur et le briefing les voient.
 4. **Appareil** (phase 7) : Sensors sessionise localement → lot signé toutes les 15 min → `device_ingest` → événement `device.usage_batch` / `device.health_batch` → modules propriétaires.
