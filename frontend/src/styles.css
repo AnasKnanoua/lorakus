@@ -249,10 +249,18 @@
 
 /* Panneau des conversations sur telephone (Radix attend la fin de l'animation de sortie). */
 .drawer[data-state="open"] {
-  animation: drawer-in 240ms var(--ease-out-soft);
+  animation: drawer-in 280ms var(--ease-out-soft);
 }
 .drawer[data-state="closed"] {
-  animation: drawer-out 180ms ease-in;
+  animation: drawer-out 200ms cubic-bezier(0.4, 0, 1, 1);
+}
+/* Pendant un glissement du doigt, le panneau suit sans retard ; au lacher, il revient en douceur. */
+.drawer[data-dragging="true"] {
+  transition: none;
+}
+.drawer {
+  transition: transform 220ms var(--ease-out-soft);
+  touch-action: pan-y;
 }
 .scrim[data-state="open"] {
   animation: fade-in 200ms ease-out;
@@ -272,6 +280,100 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 220ms;
+}
+
+/*
+ * Navigation entre les ecrans (philosophie : la structure reste, le contenu change).
+ * La barre laterale porte son propre nom de transition : elle ne bouge pas pendant la
+ * navigation. Seule la zone principale (page) s'efface puis revient en glissant de 6 px.
+ */
+.vt-sidebar {
+  view-transition-name: sidebar;
+}
+.vt-page {
+  view-transition-name: page;
+}
+::view-transition-group(sidebar) {
+  animation: none;
+}
+::view-transition-old(page) {
+  animation: page-out 120ms ease-in both;
+}
+::view-transition-new(page) {
+  animation: page-in 260ms var(--ease-out-soft) 60ms both;
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* Souvenirs ajoutes, deplaces ou supprimes : ils glissent vers leur place (withViewTransition). */
+.vt-fact {
+  view-transition-class: fact;
+}
+::view-transition-group(*.fact) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-out-soft);
+}
+
+/* Section repliable (components/Collapsible.tsx) : la hauteur suit le contenu, sans mesure. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms var(--ease-out-soft),
+    opacity 180ms ease-out;
+}
+.collapsible > * {
+  overflow: hidden;
+}
+.collapsible[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* Actions d'une ligne : visibles au survol ou au focus avec une souris, toujours sur ecran tactile. */
+@media (hover: hover) and (pointer: fine) {
+  .row-actions {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+  .group\/row:hover .row-actions,
+  .row-actions:focus-within {
+    opacity: 1;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fenetres de confirmation : montent depuis le bas sur telephone, apparaissent sur ordinateur. */
+.sheet[data-state="open"] {
+  animation: fade-up 260ms var(--ease-out-soft);
+}
+.sheet[data-state="closed"] {
+  animation: fade-in 140ms ease-in reverse;
+}
+
+/* Contenu d'un ecran au premier affichage (sans View Transitions : navigateurs anciens). */
+.page-enter {
+  animation: fade-up 300ms var(--ease-out-soft) both;
+}
+@supports (view-transition-name: none) {
+  .page-enter {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
