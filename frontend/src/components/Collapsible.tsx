@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
@@ -35,16 +35,17 @@ export function Collapsible({
           setOpen((value) => !value);
         }}
         className={cn(
-          "group flex w-full items-center gap-1.5 rounded-lg py-1.5 text-left text-xs font-medium text-ink-faint transition-colors hover:text-ink",
+          "group flex h-9 w-full items-center gap-2 rounded-lg text-left text-sm font-medium text-ink-faint transition-colors hover:text-ink",
           headerClassName,
         )}
       >
-        <ChevronRight
+        <span>{title}</span>
+        {count !== undefined && <span className="font-normal tabular-nums opacity-70">{count}</span>}
+        <span className="flex-1" />
+        <ChevronDown
           aria-hidden="true"
-          className={cn("size-3.5 shrink-0 transition-transform duration-200", open && "rotate-90")}
+          className={cn("size-4 shrink-0 transition-transform duration-200", !open && "-rotate-90")}
         />
-        <span className="flex-1">{title}</span>
-        {count !== undefined && <span className="tabular-nums">{count}</span>}
       </button>
       <div id={id} className="collapsible" data-open={open} inert={!open}>
         <div className="min-h-0">{children}</div>

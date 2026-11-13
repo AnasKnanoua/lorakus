@@ -63,18 +63,17 @@ export function MemoryScreen() {
 
   return (
     <>
-      <TopBar>
-        <h1 className="truncate text-[0.9375rem] font-semibold">
-          Mémoire
-          {known.length > 0 && <span className="ml-2 font-normal text-ink-faint tabular-nums">{known.length}</span>}
-        </h1>
-      </TopBar>
+      <TopBar />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="page-enter mx-auto flex max-w-2xl flex-col px-4 pb-16 sm:px-6">
-          <p className="pb-5 text-sm text-ink-faint">
-            Rien n'est retenu sans ton accord. Lorakus te propose ce qu'il comprend de toi ; seuls les souvenirs
-            confirmés lui servent.
-          </p>
+        <div className="page-enter mx-auto flex max-w-2xl flex-col px-5 pb-16 sm:px-6">
+          {/* Titre de page dans le contenu, comme sur toutes les pages : grand, serre, une phrase. */}
+          <header className="pt-2 pb-6">
+            <h1 className="text-2xl font-semibold">Mémoire</h1>
+            <p className="mt-1 text-sm text-ink-faint">
+              Seuls les souvenirs que tu confirmes servent à Lorakus.
+              {known.length > 0 && " Touche-en un pour le modifier."}
+            </p>
+          </header>
 
           {facts.isError && (
             <p role="alert" className="pb-4 text-danger">
@@ -84,8 +83,8 @@ export function MemoryScreen() {
 
           {pending.length > 0 && (
             <section aria-labelledby="pending-title" className="pb-6">
-              <h2 id="pending-title" className="pb-2 text-sm font-semibold">
-                À confirmer <span className="text-accent tabular-nums">{pending.length}</span>
+              <h2 id="pending-title" className="flex h-9 items-center gap-2 text-sm font-medium text-ink">
+                À confirmer <span className="font-normal text-accent tabular-nums">{pending.length}</span>
               </h2>
               <ul className="flex flex-col gap-2">
                 {pending.map((fact) => (
@@ -99,14 +98,14 @@ export function MemoryScreen() {
             <h2 id="known-title" className="sr-only">
               Ce que Lorakus sait de toi
             </h2>
-            {/* Barre d'outils collee en haut pendant le defilement. */}
-            <div className="sticky top-0 z-10 -mx-1 bg-background/90 px-1 pt-1 pb-2 backdrop-blur-md">
+            {/* Barre d'outils collee en haut pendant le defilement : recherche, ajout, filtres. */}
+            <div className="sticky top-0 z-10 -mx-1 bg-background px-1 pt-1 pb-3">
               <div className="flex items-center gap-2">
                 <label className="relative min-w-0 flex-1">
                   <span className="sr-only">Rechercher dans la mémoire</span>
                   <Search
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint"
+                    className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-faint"
                   />
                   <Input
                     type="search"
@@ -115,33 +114,39 @@ export function MemoryScreen() {
                     onChange={(event) => {
                       setQuery(event.target.value);
                     }}
-                    className="h-10 rounded-full pl-9 text-[0.9375rem]"
+                    className="h-10 border-transparent pl-10 text-base"
                   />
                 </label>
                 <Button
-                  size="sm"
-                  variant={adding ? "outline" : "primary"}
+                  size="icon"
+                  variant="secondary"
                   aria-expanded={adding}
                   aria-label={adding ? "Fermer l'ajout" : "Ajouter un souvenir"}
+                  title={adding ? "Fermer" : "Ajouter un souvenir"}
                   onClick={() => {
                     setAdding((value) => !value);
                   }}
-                  className="h-10 rounded-full"
                 >
-                  {adding ? <X aria-hidden="true" /> : <Plus aria-hidden="true" />}
-                  {adding ? "Fermer" : "Ajouter"}
+                  <Plus aria-hidden="true" className={cn("transition-transform duration-200", adding && "rotate-45")} />
                 </Button>
               </div>
-              {known.length > 0 && (
-                <div role="group" aria-label="Filtrer par catégorie" className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1">
-                  <Chip active={filter === "all"} onClick={() => { setFilter("all"); }} label="Tout" count={known.length} />
+              {counts.size > 1 && (
+                <div role="group" aria-label="Filtrer par catégorie" className="mt-3 flex flex-wrap gap-1.5">
+                  <Chip
+                    active={filter === "all"}
+                    onClick={() => {
+                      setFilter("all");
+                    }}
+                    label="Tout"
+                  />
                   {CATEGORIES.filter((c) => counts.has(c)).map((c) => (
                     <Chip
                       key={c}
                       active={filter === c}
-                      onClick={() => { setFilter(filter === c ? "all" : c); }}
+                      onClick={() => {
+                        setFilter(filter === c ? "all" : c);
+                      }}
                       label={CATEGORY_LABELS[c]}
-                      count={counts.get(c) ?? 0}
                     />
                   ))}
                 </div>
@@ -150,7 +155,7 @@ export function MemoryScreen() {
 
             <div className="collapsible" data-open={adding} inert={!adding}>
               <div className="min-h-0">
-                <div className="mb-3 rounded-2xl bg-raised p-3">
+                <div className="mb-4 rounded-2xl bg-raised p-3">
                   <FactEditor
                     key={known.length}
                     submitLabel="Ajouter"
@@ -180,7 +185,7 @@ export function MemoryScreen() {
               )
             ) : (
               CATEGORIES.filter((c) => counts.has(c)).map((category) => (
-                <Collapsible key={category} title={CATEGORY_LABELS[category]} count={counts.get(category)} className="pt-2">
+                <Collapsible key={category} title={CATEGORY_LABELS[category]} count={counts.get(category)} className="pt-3">
                   <ul>
                     {known
                       .filter((f) => f.category === category)
@@ -193,7 +198,7 @@ export function MemoryScreen() {
             )}
           </section>
 
-          <Collapsible title="Réglages de la mémoire" defaultOpen={false} className="mt-10 border-t border-line/60 pt-3">
+          <Collapsible title="Réglages de la mémoire" defaultOpen={false} className="mt-12">
             <div className="flex flex-col gap-4 pt-2 pb-1">
               <ProposalsSetting />
               <ForgetAll disabled={(facts.data?.length ?? 0) === 0} onDone={refresh} />
@@ -205,19 +210,19 @@ export function MemoryScreen() {
   );
 }
 
-function Chip({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+/** Filtre : texte seul, fond plein uniquement pour le filtre actif (pas de compteur repete). */
+function Chip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.8125rem] transition-colors duration-150",
-        active ? "bg-ink text-background" : "bg-raised text-ink-muted hover:text-ink",
+        "h-8 rounded-full px-3 text-sm transition-colors duration-150",
+        active ? "bg-ink font-medium text-background" : "bg-raised text-ink-muted hover:bg-hover hover:text-ink",
       )}
     >
       {label}
-      <span className={cn("tabular-nums", active ? "opacity-70" : "text-ink-faint")}>{count}</span>
     </button>
   );
 }
@@ -230,7 +235,7 @@ function ProposalsSetting() {
   return (
     <div className="flex items-start gap-4">
       <div className="flex-1">
-        <p id="proposals-label" className="text-[0.9375rem] font-medium">
+        <p id="proposals-label" className="text-base font-medium">
           Proposer des souvenirs après mes conversations
         </p>
         <p className="mt-0.5 text-sm text-ink-faint">
@@ -289,7 +294,7 @@ function ProposalRow({ fact, onDone }: { fact: Fact; onDone: () => Promise<void>
   return (
     <li
       style={{ viewTransitionName: `fact-${fact.id}` }}
-      className="vt-fact rounded-xl border-l-2 border-accent bg-raised py-3 pr-3 pl-3.5"
+      className="vt-fact rounded-2xl bg-raised p-4"
     >
       {editing ? (
         <FactEditor
@@ -306,8 +311,8 @@ function ProposalRow({ fact, onDone }: { fact: Fact; onDone: () => Promise<void>
         />
       ) : (
         <>
-          <p className="text-[0.9375rem] leading-snug">{fact.content}</p>
-          <p className="mt-1 line-clamp-2 text-[0.8125rem] text-ink-faint">
+          <p className="text-md">{fact.content}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-ink-faint">
             {CATEGORY_LABELS[fact.category]}
             {fact.evidence && <> · Tu as dit : « {fact.evidence} »</>}
             {fact.from_conversation && (
@@ -323,16 +328,16 @@ function ProposalRow({ fact, onDone }: { fact: Fact; onDone: () => Promise<void>
               </>
             )}
           </p>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <Button size="sm" onClick={() => { run(() => confirmFact(fact.id)); }} className="h-8">
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Button size="sm" onClick={() => { run(() => confirmFact(fact.id)); }}>
               <Check aria-hidden="true" />
               Confirmer
             </Button>
-            <Button size="sm" variant="quiet" onClick={() => { setEditing(true); }} className="h-8">
+            <Button size="sm" variant="quiet" onClick={() => { setEditing(true); }}>
               <Pencil aria-hidden="true" />
               Corriger
             </Button>
-            <Button size="sm" variant="quiet" onClick={() => { run(() => rejectFact(fact.id)); }} className="h-8">
+            <Button size="sm" variant="quiet" onClick={() => { run(() => rejectFact(fact.id)); }}>
               <X aria-hidden="true" />
               Refuser
             </Button>
@@ -349,16 +354,24 @@ function ProposalRow({ fact, onDone }: { fact: Fact; onDone: () => Promise<void>
 }
 
 /**
- * Souvenir confirme : une ligne sans cadre. Les actions apparaissent au survol ou au focus sur
- * ordinateur, et restent visibles (discretes) sur un ecran tactile.
+ * Souvenir confirme : une ligne de texte, sans cadre ni icones permanentes. Toucher la ligne
+ * l'ouvre en edition (modifier, supprimer) ; sur ordinateur, un crayon apparait au survol.
  */
-function FactRow({ fact, onDone, showCategory = false }: { fact: Fact; onDone: () => Promise<void>; showCategory?: boolean }) {
+function FactRow({
+  fact,
+  onDone,
+  showCategory = false,
+}: {
+  fact: Fact;
+  onDone: () => Promise<void>;
+  showCategory?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   return (
-    <li style={{ viewTransitionName: `fact-${fact.id}` }} className="vt-fact group/row">
+    <li style={{ viewTransitionName: `fact-${fact.id}` }} className="vt-fact">
       {editing ? (
-        <div className="my-1 rounded-xl bg-raised p-3">
+        <div className="my-1 rounded-2xl bg-raised p-3">
           <FactEditor
             initialContent={fact.content}
             initialCategory={fact.category}
@@ -371,23 +384,36 @@ function FactRow({ fact, onDone, showCategory = false }: { fact: Fact; onDone: (
               setEditing(false);
               await onDone();
             }}
+            extraAction={
+              <Button
+                variant="danger-quiet"
+                size="sm"
+                aria-label={`Supprimer : ${fact.content}`}
+                onClick={() => {
+                  setDeleting(true);
+                }}
+              >
+                <Trash2 aria-hidden="true" />
+                Supprimer
+              </Button>
+            }
           />
         </div>
       ) : (
-        <div className="-mx-2 flex min-h-11 items-center gap-1 rounded-lg px-2 transition-colors duration-150 hover:bg-hover/60">
-          <p className="min-w-0 flex-1 py-2 text-[0.9375rem] leading-snug">
+        <button
+          type="button"
+          aria-label={`Modifier : ${fact.content}`}
+          onClick={() => {
+            setEditing(true);
+          }}
+          className="group/row -mx-3 flex min-h-12 w-[calc(100%+1.5rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150 hover:bg-hover/70"
+        >
+          <span className="min-w-0 flex-1 text-md text-ink">
             {fact.content}
-            {showCategory && <span className="ml-2 text-xs text-ink-faint">{CATEGORY_LABELS[fact.category]}</span>}
-          </p>
-          <div className="row-actions flex shrink-0">
-            <Button variant="quiet" size="icon-sm" aria-label={`Modifier : ${fact.content}`} onClick={() => { setEditing(true); }}>
-              <Pencil aria-hidden="true" />
-            </Button>
-            <Button variant="quiet" size="icon-sm" aria-label={`Supprimer : ${fact.content}`} onClick={() => { setDeleting(true); }}>
-              <Trash2 aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
+            {showCategory && <span className="ml-2 text-sm text-ink-faint">{CATEGORY_LABELS[fact.category]}</span>}
+          </span>
+          <Pencil aria-hidden="true" className="row-actions size-4 shrink-0 text-ink-faint" />
+        </button>
       )}
       <ConfirmDialog
         open={deleting}
@@ -438,7 +464,7 @@ function ForgetAll({ disabled, onDone }: { disabled: boolean; onDone: () => Prom
   return (
     <div className="flex items-center gap-4">
       <div className="flex-1">
-        <p className="text-[0.9375rem] font-medium">Tout oublier</p>
+        <p className="text-base font-medium">Tout oublier</p>
         <p className="mt-0.5 text-sm text-ink-faint">Efface définitivement tous les souvenirs et propositions.</p>
       </div>
       <Button

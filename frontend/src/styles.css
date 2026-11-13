@@ -7,7 +7,9 @@
  * Contrastes calcules (WCAG 2.x) : texte >= 4,9:1 partout, voir docs/frontend.md.
  */
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+/* Inter avec l'axe de taille optique : dessin serre et net aux grandes tailles (titres),
+   plus ouvert aux petites (listes). */
+@import "@fontsource-variable/inter/opsz.css";
 
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
@@ -19,7 +21,7 @@
   --hover: #e6e9ee;
   --line: #dce0e7;
   --ink: #121722;
-  --ink-muted: #555f6e;
+  --ink-muted: #3f4855;
   --ink-faint: #5f6978;
   --accent: #0e7563; /* jade, version claire */
   --accent-ink: #ffffff;
@@ -43,9 +45,12 @@
     --raised: #161b23;
     --hover: #1a2029;
     --line: #232a35;
-    --ink: #e6eaf0;
-    --ink-muted: #9aa4b4;
-    --ink-faint: #8a94a4;
+    /* Trois niveaux de texte : principal, secondaire (listes, descriptions), discret (titres de
+       section, metadonnees). Le secondaire est plus clair qu'avant : un gris trop sombre sur
+       l'encre de nuit fatiguait la lecture des listes. */
+    --ink: #eceef2;
+    --ink-muted: #b6bdc8;
+    --ink-faint: #8b94a3;
     --accent: #4fd9bd; /* jade lumineux : la couleur de Lorakus */
     --accent-ink: #04201a;
     --accent-soft: #10302a;
@@ -81,6 +86,31 @@
   --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
   --shadow-float: var(--elevation-float);
+  /*
+   * Echelle typographique (docs/frontend.md, « Système de design »). Tailles en rem, interlignes
+   * fixes pour un rythme vertical regulier ; l'approche se resserre avec la taille.
+   *   xs 12  meta minuscule (badges)         lg  18  titre de panneau, marque
+   *   sm 13  meta, titres de section          xl  22  titre de fenetre
+   *   base 15 interface (listes, boutons)     2xl 28  titre de page
+   *   md 16  saisie, contenu principal
+   */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.5rem;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.015em;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.125rem;
+  --text-2xl--letter-spacing: -0.022em;
   /* Lecture : 16 px, interligne 1,75 (confort des longues reponses). */
   --text-reading: 1rem;
   --text-reading--line-height: 1.75;
@@ -99,8 +129,8 @@
     background: var(--background);
     color: var(--ink);
     font-family: var(--font-sans);
-    /* Chiffres et formes d'Inter les plus lisibles en interface. */
-    font-feature-settings: "cv11", "ss01";
+    /* Taille optique automatique (axe opsz) ; formes par defaut d'Inter, les plus neutres. */
+    font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -339,15 +369,21 @@
   opacity: 1;
 }
 
-/* Actions d'une ligne : visibles au survol ou au focus avec une souris, toujours sur ecran tactile. */
-@media (hover: hover) and (pointer: fine) {
+/*
+ * Indice d'action d'une ligne (crayon) : visible au survol ou au focus clavier seulement. Sur
+ * ecran tactile, la ligne entiere se touche ; aucune icone ne se repete dans la liste.
+ */
+.row-actions {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.group\/row:hover .row-actions,
+.group\/row:focus-visible .row-actions {
+  opacity: 1;
+}
+@media (hover: none) {
   .row-actions {
-    opacity: 0;
-    transition: opacity 150ms ease-out;
-  }
-  .group\/row:hover .row-actions,
-  .row-actions:focus-within {
-    opacity: 1;
+    display: none;
   }
 }
 

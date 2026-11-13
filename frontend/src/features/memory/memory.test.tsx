@@ -73,6 +73,29 @@ describe("mémoire", () => {
     expect(await screen.findByText("Aucun souvenir ne correspond.")).toBeVisible();
   });
 
+  it("supprime un souvenir depuis son édition, après confirmation", async () => {
+    const state = installFakeApi({ loggedIn: true, facts: [known("f1", "Joue aux échecs")] });
+    renderApp("/memoire");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Modifier : Joue aux échecs" }));
+    await user.click(screen.getByRole("button", { name: "Supprimer : Joue aux échecs" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Supprimer" }));
+
+    await waitFor(() => {
+      expect(state.facts).toEqual([]);
+    });
+  });
+
+  it("n'affiche les filtres qu'à partir de deux catégories, sans compteur répété", async () => {
+    installFakeApi({ loggedIn: true, facts: [known("f1", "Joue aux échecs"), known("f2", "Aime le thé")] });
+    renderApp("/memoire");
+    await screen.findByText("Joue aux échecs");
+
+    expect(screen.queryByRole("group", { name: "Filtrer par catégorie" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Mémoire", level: 1 })).toBeVisible();
+  });
+
   it("replie une catégorie", async () => {
     installFakeApi({ loggedIn: true, facts: [known("f1", "Joue aux échecs")] });
     renderApp("/memoire");
@@ -120,7 +143,7 @@ describe("mémoire", () => {
     });
     expect(
       screen.getByRole("button", {
-        name: "Supprimer : Préfère réviser le soir",
+        name: "Modifier : Préfère réviser le soir",
       }),
     ).toBeVisible();
   });

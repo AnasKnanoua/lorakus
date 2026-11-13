@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { ApiError, errorCode } from "@/api/client";
 import { CATEGORIES, CATEGORY_LABELS, type Category } from "@/api/memory";
@@ -14,12 +14,15 @@ export function FactEditor({
   submitLabel,
   onSubmit,
   onCancel,
+  extraAction,
 }: {
   initialContent?: string;
   initialCategory?: Category;
   submitLabel: string;
   onSubmit: (content: string, category: Category) => Promise<void>;
   onCancel?: () => void;
+  /** Action supplementaire a gauche (ex. Supprimer, quand on modifie un souvenir). */
+  extraAction?: ReactNode;
 }) {
   const [content, setContent] = useState(initialContent);
   const [category, setCategory] = useState<Category>(initialCategory);
@@ -69,7 +72,7 @@ export function FactEditor({
           onChange={(event) => {
             setCategory(event.target.value as Category);
           }}
-          className="h-9 rounded-lg border border-line bg-raised px-2 text-sm text-ink"
+          className="h-8 rounded-lg border-0 bg-hover px-2.5 text-sm text-ink"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -77,6 +80,7 @@ export function FactEditor({
             </option>
           ))}
         </select>
+        {extraAction}
         <div className="flex-1" />
         {onCancel && (
           <Button variant="quiet" size="sm" onClick={onCancel}>
