@@ -7,7 +7,7 @@ Préparer la session : [README](README.md#session).
 ## Symptôme
 
 - `LorakusApiDown` : Prometheus ne collecte plus les métriques de l'API depuis 2 minutes. Mesuré le 2026-11-10 : alerte Discord 2 min 21 s après l'arrêt de l'API.
-- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 600 Mo pour une limite de 768 Mo ; environ 450 Mo est normal avec le modèle d'embeddings chargé).
+- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 650 Mo pour une limite de 768 Mo ; environ 545 Mo au repos est normal avec le modèle d'embeddings chargé, mesuré le 2026-11-13).
 
 ## Vérifications
 

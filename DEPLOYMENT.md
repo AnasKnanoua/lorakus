@@ -224,10 +224,12 @@ Sans clé, l'assistant répond par son message de secours ; la clé ne va qu'au 
 
 ### Mémoire du modèle d'embeddings (PR 37a)
 
-Mesure à faire après le premier déploiement de la PR 37a, sur le serveur en tant que `deploy` (raccourci `dc` : `docs/runbooks/README.md`) :
+Mesure faite après le déploiement de la PR 37a, sur le serveur en tant que `deploy` (raccourci `dc` : `docs/runbooks/README.md`) :
 
 ```bash
 dc run --rm -T --no-deps api python -m lorakus.ai.providers.check </dev/null && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
-La première commande lance un conteneur jetable de la même image (jamais `dc exec` dans `api` : une seconde copie du modèle sous la même limite de 768 Mo pourrait faire tuer l'API) et affiche la mémoire de ce seul conteneur ; la seconde donne la mémoire réelle du conteneur `api`, modèle compris. Reporter les chiffres dans `PROJECT_STATE.md`, puis resserrer la limite de l'API (`compose.yml`, 768 Mo) et le seuil de `LorakusApiHighMemory` (600 Mo) en gardant au moins 30 % de marge.
+La première commande lance un conteneur jetable de la même image (jamais `dc exec` dans `api` : une seconde copie du modèle sous la même limite de 768 Mo pourrait faire tuer l'API) et affiche la mémoire de ce seul conteneur ; la seconde donne la mémoire réelle du conteneur `api`, modèle compris. À refaire à chaque changement de modèle : reporter les chiffres ici et dans `PROJECT_STATE.md`, puis ajuster la limite de l'API (`compose.yml`) et le seuil de `LorakusApiHighMemory` en gardant au moins 30 % de marge au repos.
+
+Mesures du 2026-11-13 (`oracleworker`, ARM) : chargement 1,66 s ; le modèle ajoute environ 407 Mo à un processus (123 → 530 Mo) ; API au repos 545 Mo sur 768 ; question 33 ms en médiane et 38 ms au 95e centile ; 32 faits en 623 ms ; hôte 2,4 Go utilisés et 3,2 Go disponibles sur 5,6. Conséquences : limite de l'API gardée à 768 Mo (la baisser laisserait moins de 30 % de marge), `LorakusApiHighMemory` à 650 Mo ; Grafana, à 325 Mo pour 384, passe à 512 Mo.

@@ -47,14 +47,14 @@ groups:
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/api-down.md
 
       - alert: LorakusApiHighMemory
-        expr: process_resident_memory_bytes{job="lorakus-api"} > 600 * 1024 * 1024
+        expr: process_resident_memory_bytes{job="lorakus-api"} > 650 * 1024 * 1024
         for: 10m
         labels:
           severity: warning
           component: api
         annotations:
           summary: L'API Lorakus consomme beaucoup de memoire
-          description: L'API depasse 600 Mo depuis 10 minutes (limite du conteneur 768 Mo).
+          description: L'API depasse 650 Mo depuis 10 minutes (limite du conteneur 768 Mo ; environ 545 Mo au repos avec le modele d'embeddings).
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/api-down.md
 
   - name: lorakus-worker
