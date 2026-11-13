@@ -12,6 +12,9 @@ dc logs --since 1h api </dev/null | grep -E '"event": "ai_(call|refused|provider
 
 # Dépense du mois par jour, tous utilisateurs confondus.
 dc exec -T postgres psql -U lorakus_admin -d lorakus -c "select date_trunc('day', created_at) as jour, count(*) as appels, sum(cost_usd) as dollars from lorakus.core_ai_usage where created_at >= date_trunc('month', now()) group by 1 order by 1" </dev/null
+
+# Consommation totale par tâche depuis le début, avec le coût moyen d'un appel.
+dc exec -T postgres psql -U lorakus_admin -d lorakus -c "select task, count(*) as appels, sum(input_tokens) as entree, sum(output_tokens) as sortie, round(sum(cost_usd), 4) as dollars, round(avg(cost_usd) * 1000, 3) as millidollars_par_appel, min(created_at)::date as depuis from lorakus.core_ai_usage group by task order by task" </dev/null
 ```
 
 ## Couper toute l'IA (incident)
