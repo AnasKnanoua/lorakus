@@ -20,6 +20,7 @@ pnpm installe les dépendances et refuse toute version publiée depuis moins de 
 | `/connexion` | Connexion, avec le code de double authentification si le compte l'exige |
 | `/` | Accueil : la question et le champ de saisie au centre de la zone principale (barre latérale exclue) |
 | `/c/<id>` | Conversation : messages enregistrés, réponse en direct, champ de saisie en bas, suppression |
+| `/memoire` | Mémoire (ADR 0039) : propositions à confirmer, corriger ou refuser (avec l'extrait du message cité), souvenirs confirmés par catégorie, ajout, réglage des propositions, « Tout oublier » avec ré-authentification |
 
 Au premier envoi depuis l'accueil, le champ de saisie **glisse** du centre vers le bas pendant que la conversation apparaît en fondu : les deux écrans donnent au champ le même nom de transition (`view-transition-name: composer`) et le routeur navigue avec les View Transitions du navigateur. Les autres changements d'écran font un fondu bref. Un navigateur sans View Transitions affiche directement le nouvel écran.
 
@@ -45,7 +46,9 @@ Jetons centralisés dans `src/styles.css` (variables CSS exposées à Tailwind) 
 
 ## Barre latérale
 
-Marque, « Nouvelle conversation » (icône jade), conversations récentes (titre complet au survol), profil et déconnexion. Repliable sur ordinateur (préférence d'affichage gardée dans le navigateur, aucune donnée personnelle) ; sur téléphone, panneau coulissant par-dessus l'écran.
+Marque, « Nouvelle conversation » (icône jade), « Mémoire » (avec le nombre de propositions en attente), conversations récentes (titre complet au survol), profil et déconnexion. Repliable sur ordinateur (préférence d'affichage gardée dans le navigateur, aucune donnée personnelle) ; sur téléphone, panneau coulissant par-dessus l'écran.
+
+Tant que des propositions attendent, la barre du haut de chaque écran (sauf la page Mémoire) affiche une mention discrète « N souvenirs à confirmer », qui mène à la page.
 
 ## Vérification visuelle
 

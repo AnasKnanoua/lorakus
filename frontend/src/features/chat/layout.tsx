@@ -1,9 +1,11 @@
-import { Link } from "@tanstack/react-router";
-import { Menu, PanelLeftOpen, SquarePen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Brain, Menu, PanelLeftOpen, SquarePen } from "lucide-react";
 import { createContext, useContext, type ReactNode } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { factsQuery } from "@/lib/queries";
 
 /** Etat partage de la mise en page : panneau mobile et barre laterale repliee (ordinateur). */
 export interface LayoutState {
@@ -51,6 +53,7 @@ export function TopBar({ children, actions }: { children?: ReactNode; actions?: 
         </div>
       )}
       <div className={cn("min-w-0 flex-1 px-1")}>{children}</div>
+      <PendingMemoryChip />
       {actions}
       <Link
         to="/"
@@ -60,5 +63,24 @@ export function TopBar({ children, actions }: { children?: ReactNode; actions?: 
         <SquarePen aria-hidden="true" />
       </Link>
     </header>
+  );
+}
+
+/** Mention discrete : des souvenirs proposes attendent une decision (sauf sur la page Memoire). */
+function PendingMemoryChip() {
+  const facts = useQuery(factsQuery);
+  const onMemoryPage = useRouterState({ select: (state) => state.location.pathname === "/memoire" });
+  const pending = facts.data?.filter((f) => f.status === "proposed").length ?? 0;
+  if (pending === 0 || onMemoryPage) {
+    return null;
+  }
+  return (
+    <Link
+      to="/memoire"
+      className="flex h-8 items-center gap-1.5 rounded-full border border-line bg-raised px-3 text-[0.8125rem] text-ink-muted transition-colors hover:text-ink"
+    >
+      <Brain aria-hidden="true" className="size-3.5 text-accent" />
+      {pending === 1 ? "1 souvenir à confirmer" : `${String(pending)} souvenirs à confirmer`}
+    </Link>
   );
 }

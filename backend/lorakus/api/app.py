@@ -13,9 +13,11 @@ from lorakus.ai.usage import UsageStore
 from lorakus.api.auth import RequestLimits
 from lorakus.api.modules import mount_module_routes
 from lorakus.api.origin import OriginCheckMiddleware
-from lorakus.api.routes import auth, health, modules, tools
+from lorakus.api.routes import auth, health, memory, modules, tools
 from lorakus.core.agents.service import AgentService
+from lorakus.core.background import DebouncedTasks
 from lorakus.core.identity.service import IdentityService
+from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.modules.service import ModuleService
 from lorakus.core.ratelimit.service import AICallQuota, Limit, RateLimiter
@@ -57,9 +59,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         ),
         max_concurrent_per_user=settings.ai_concurrent_calls,
     )
+    app.state.memory = MemoryService(database, app.state.ai)
+    app.state.background = DebouncedTasks()
     try:
         yield
     finally:
+        await app.state.background.close()
         await database.close()
 
 
@@ -95,6 +100,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
+    app.include_router(memory.router, prefix="/api")
     app.state.registry = registry if registry is not None else ModuleRegistry.from_entry_points()
     # Routage et prix verifies ici : une configuration IA invalide empeche le demarrage.
     app.state.ai_catalog = Catalog.load()

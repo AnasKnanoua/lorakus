@@ -409,6 +409,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/memory/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Facts
+         * @description Tous les faits : propositions en attente et faits confirmes, les plus recents d'abord.
+         */
+        get: operations["list_facts_api_v1_memory_facts_get"];
+        put?: never;
+        /**
+         * Add Fact
+         * @description Ajoute un fait saisi a la main (confirme d'emblee).
+         */
+        post: operations["add_fact_api_v1_memory_facts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memory/facts/{fact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Fact
+         * @description Supprime un fait (sans trace de son contenu).
+         */
+        delete: operations["delete_fact_api_v1_memory_facts__fact_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Fact
+         * @description Corrige le texte ou la categorie d'un fait, sans changer son statut.
+         */
+        patch: operations["update_fact_api_v1_memory_facts__fact_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/memory/facts/{fact_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Fact
+         * @description Confirme une proposition, avec une correction facultative.
+         */
+        post: operations["confirm_fact_api_v1_memory_facts__fact_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memory/facts/{fact_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Fact
+         * @description Refuse une proposition : effacee, et jamais reproposee.
+         */
+        post: operations["reject_fact_api_v1_memory_facts__fact_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memory/forget-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forget All
+         * @description Efface toute la memoire (re-authentification de moins de 10 minutes exigee).
+         */
+        post: operations["forget_all_api_v1_memory_forget_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memory/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings Route */
+        get: operations["get_settings_route_api_v1_memory_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_memory_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/modules": {
         parameters: {
             query?: never;
@@ -706,6 +832,58 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** FactEdit */
+        FactEdit: {
+            /** Category */
+            category?: ("identity" | "preference" | "project" | "habit" | "studies" | "other") | null;
+            /** Content */
+            content?: string | null;
+        };
+        /** FactIn */
+        FactIn: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "identity" | "preference" | "project" | "habit" | "studies" | "other";
+            /** Content */
+            content: string;
+        };
+        /** FactOut */
+        FactOut: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "identity" | "preference" | "project" | "habit" | "studies" | "other";
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Evidence */
+            evidence: string | null;
+            /** From Conversation */
+            from_conversation: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source Kind */
+            source_kind: string;
+            /** Status */
+            status: string;
+        };
+        /** ForgetOut */
+        ForgetOut: {
+            /** Deleted */
+            deleted: number;
+        };
         /** FrontendResponse */
         FrontendResponse: {
             /** Icon */
@@ -853,6 +1031,16 @@ export interface components {
             password: string;
             /** Second Factor */
             second_factor?: string | null;
+        };
+        /** SettingsIn */
+        SettingsIn: {
+            /** Propose After Conversations */
+            propose_after_conversations: boolean;
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Propose After Conversations */
+            propose_after_conversations: boolean;
         };
         /** SpecialistInfo */
         SpecialistInfo: {
@@ -1556,6 +1744,260 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TotpSetupResponse"];
+                };
+            };
+        };
+    };
+    list_facts_api_v1_memory_facts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"][];
+                };
+            };
+        };
+    };
+    add_fact_api_v1_memory_facts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_fact_api_v1_memory_facts__fact_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_fact_api_v1_memory_facts__fact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_fact_api_v1_memory_facts__fact_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_fact_api_v1_memory_facts__fact_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_all_api_v1_memory_forget_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForgetOut"];
+                };
+            };
+        };
+    };
+    get_settings_route_api_v1_memory_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_memory_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

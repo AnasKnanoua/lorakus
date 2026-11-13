@@ -22,9 +22,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from lorakus.ai.router import ModelRouter
 from lorakus.api.ai import get_ai
 from lorakus.api.auth import current_user
+from lorakus.api.memory import get_background, get_memory
+from lorakus.core.background import DebouncedTasks
 from lorakus.core.identity.service import CurrentUser
+from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
 from lorakus.db.database import Database
+from lorakus.settings import get_settings
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.service import (
     MAX_MESSAGE_CHARS,
@@ -41,8 +45,20 @@ User = Annotated[CurrentUser, Depends(current_user)]
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "Conversation introuvable.")
 
 
-def _service(request: Request, ai: Annotated[ModelRouter, Depends(get_ai)]) -> AssistantService:
-    return AssistantService(cast(Database, request.app.state.database), ai)
+def _service(
+    request: Request,
+    ai: Annotated[ModelRouter, Depends(get_ai)],
+    memory: Annotated[MemoryService, Depends(get_memory)],
+    background: Annotated[DebouncedTasks, Depends(get_background)],
+) -> AssistantService:
+    settings = get_settings()
+    return AssistantService(
+        cast(Database, request.app.state.database),
+        ai,
+        memory=memory,
+        background=background,
+        memory_delay_s=settings.memory_proposal_delay_seconds,
+    )
 
 
 Service = Annotated[AssistantService, Depends(_service)]

@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, PanelLeftClose, SquarePen } from "lucide-react";
+import { Brain, LogOut, PanelLeftClose, SquarePen } from "lucide-react";
 
 import { logout } from "@/api/auth";
 import { Orb } from "@/components/Orb";
 import { Button } from "@/components/ui/button";
-import { conversationsQuery, meQuery } from "@/lib/queries";
+import { conversationsQuery, factsQuery, meQuery } from "@/lib/queries";
 
 /**
  * Barre laterale : marque, nouvelle conversation, conversations recentes, profil.
@@ -14,6 +14,8 @@ import { conversationsQuery, meQuery } from "@/lib/queries";
 export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; onCollapse?: () => void }) {
   const conversations = useQuery(conversationsQuery);
   const me = useQuery(meQuery);
+  const facts = useQuery(factsQuery);
+  const pending = facts.data?.filter((f) => f.status === "proposed").length ?? 0;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const email = me.data?.email ?? "";
@@ -44,6 +46,21 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
         >
           <SquarePen aria-hidden="true" className="size-[18px] text-accent" />
           Nouvelle conversation
+        </Link>
+        <Link
+          to="/memoire"
+          onClick={onNavigate}
+          className="group flex h-10 items-center gap-2.5 rounded-xl px-3 text-[0.9375rem] font-medium text-ink transition-colors hover:bg-hover"
+          activeProps={{ className: "bg-hover", "aria-current": "page" }}
+        >
+          <Brain aria-hidden="true" className="size-[18px] text-accent" />
+          <span className="flex-1">Mémoire</span>
+          {pending > 0 && (
+            <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-ink">
+              {pending}
+              <span className="sr-only"> à confirmer</span>
+            </span>
+          )}
         </Link>
       </div>
 

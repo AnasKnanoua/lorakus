@@ -29,6 +29,8 @@ from lorakus.ai.router import (
     ChatResult,
     ModelRouter,
 )
+from lorakus.core.background import DebouncedTasks
+from lorakus.core.memory.service import MemoryService, SourceMessage
 from lorakus.db.database import Database
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.models import AssistantConversation, AssistantMessage
@@ -40,6 +42,11 @@ TASK: Final = "chat"
 HISTORY_TOKENS: Final = 6000  # environ 0,0006 $ d'entree par message avec Haiku 5.5
 MAX_MESSAGE_CHARS: Final = 8000
 TITLE_CHARS: Final = 60
+# Messages de l'utilisateur soumis au plus a une analyse de la memoire (les plus recents).
+MEMORY_MESSAGES: Final = 20
+# Raisons pour lesquelles les messages analyses sont consideres comme traites. Sinon (moteur IA
+# indisponible, reponse invalide, propositions en attente au maximum), ils le seront plus tard.
+_MEMORY_DONE: Final = frozenset({"ok", "empty", "disabled"})
 DEFAULT_TITLE: Final = "Nouvelle conversation"
 
 MessageStatus = Literal["ok", "interrupted", "fallback"]
@@ -154,10 +161,17 @@ class AssistantService:
         database: Database,
         ai: ModelRouter,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        *,
+        memory: MemoryService | None = None,
+        background: DebouncedTasks | None = None,
+        memory_delay_s: float = 180,
     ) -> None:
         self._db = database
         self._ai = ai
         self._clock = clock
+        self._memory = memory
+        self._background = background
+        self._memory_delay_s = memory_delay_s
 
     # ------------------------------------------------------------ conversations
     async def list_conversations(
@@ -250,11 +264,68 @@ class AssistantService:
 
         now_local = self._clock().astimezone(ZoneInfo(config.timezone))
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
+        facts = await self._memory.verified_for_prompt(user_id) if self._memory else []
         request = ChatRequest(
-            system=system_prompt(config.display_name, now_local, config.timezone),
+            system=system_prompt(config.display_name, now_local, config.timezone, facts),
             messages=messages,
         )
+        self._schedule_memory(user_id, conversation_id)
         return Turn(user_id=user_id, conversation_id=conversation_id, request=request)
+
+    # ------------------------------------------------------------------ memoire
+    def _schedule_memory(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> None:
+        """Analyse differee : un nouveau message de la conversation repousse l'analyse."""
+        if self._memory is None or self._background is None:
+            return
+        self._background.schedule(
+            f"memory:{conversation_id}",
+            self._memory_delay_s,
+            lambda: self.propose_memory(user_id, conversation_id),
+        )
+
+    async def propose_memory(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> str:
+        """Propose des faits a partir des messages de l'utilisateur pas encore analyses.
+
+        Seuls les messages de l'utilisateur sont lus, jamais les reponses de l'assistant.
+        Renvoie la raison de l'issue (journalisee par le service de memoire).
+        """
+        if self._memory is None:
+            return "disabled"
+        async with self._db.transaction(user_id) as session:
+            conversation = await session.get(AssistantConversation, conversation_id)
+            if conversation is None:
+                return "gone"  # supprimee entre-temps
+            query = select(
+                AssistantMessage.id, AssistantMessage.content, AssistantMessage.created_at
+            ).where(
+                AssistantMessage.conversation_id == conversation_id,
+                AssistantMessage.role == "user",
+            )
+            if conversation.memory_scanned_until is not None:
+                query = query.where(AssistantMessage.created_at > conversation.memory_scanned_until)
+            rows = list(
+                await session.execute(
+                    query.order_by(
+                        AssistantMessage.created_at.desc(), AssistantMessage.id.desc()
+                    ).limit(MEMORY_MESSAGES)
+                )
+            )
+        if not rows:
+            return "empty"
+        rows.reverse()
+        outcome = await self._memory.propose_from_messages(
+            user_id,
+            source_ref=f"conversation:{conversation_id}",
+            messages=[SourceMessage(id=row.id, text=row.content) for row in rows],
+        )
+        if outcome.reason in _MEMORY_DONE:
+            async with self._db.transaction(user_id) as session:
+                await session.execute(
+                    update(AssistantConversation)
+                    .where(AssistantConversation.id == conversation_id)
+                    .values(memory_scanned_until=rows[-1].created_at)
+                )
+        return outcome.reason
 
     async def play(self, turn: Turn) -> AsyncGenerator[ReplyEvent]:
         """Reponse en flux, puis Done. Toujours enregistree, meme si le client part."""

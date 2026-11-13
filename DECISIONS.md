@@ -72,5 +72,6 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | D-D | Budget IA : 10 $ prépayés sans rechargement automatique ; plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en phase 3 (amendement de l'ADR 0007) | 2026-11-12 |
 | — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |
+| — | Mémoire v1 : rien n'est retenu sans confirmation, seuls les messages de l'utilisateur sont analysés, extrait vérifié mot pour mot, propositions activées par défaut (ADR 0039) | 2026-11-12 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

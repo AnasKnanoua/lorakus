@@ -93,6 +93,7 @@ Non couvert à ce stade, prévu : limite par adresse IP des routes sans session 
 4. Au plus 8 itérations d'outils par tour ; budgets de tokens et de coût.
 5. Contenus suspects marqués et signalés, jamais bloqués silencieusement.
 6. Corpus d'injections Promptfoo exécuté en CI.
+7. Mémoire (ADR 0039) : seuls les messages de l'utilisateur sont analysés ; chaque fait proposé doit citer un extrait retrouvé mot pour mot ; rien n'est retenu sans sa confirmation ; les faits entrent dans le prompt comme des données, une ligne chacun, dans un bloc qu'un fait ne peut pas refermer.
 
 ## 8. Audit
 
@@ -121,6 +122,7 @@ Une alerte n'est fermée sans correctif que si la faille est inatteignable chez 
 ## 10. Vie privée et contrôle
 
 - Export JSON et suppression par période depuis `/settings/data`.
+- Mémoire (`/memoire`) : chaque souvenir se modifie ou se supprime ; « Tout oublier » efface tout après ré-authentification ; un souvenir supprimé ne laisse aucune trace de son contenu (le journal d'audit ne garde que son identifiant) ; les propositions se désactivent, et les messages écrits pendant ce temps ne sont jamais analysés.
 - Rétention par défaut : conversations brutes 12 mois (résumés conservés), sessions d'apps 90 jours (agrégats 2 ans), santé 2 ans, audit 12 mois.
 - Pause globale de la collecte et des interventions (PWA, puis tuile Android).
 - Ouverture à d'autres utilisateurs : consentement explicite pour la santé (RGPD art. 9), analyse d'impact, déclarations Google Play — à traiter avant toute ouverture.

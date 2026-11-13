@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     # Reponses IA simultanees par utilisateur (dans ce processus).
     ai_concurrent_calls: int = Field(default=2, ge=1)
 
+    # --- Memoire (PR 36) ---
+    # Delai entre le dernier message d'une conversation et l'analyse qui propose des faits :
+    # plusieurs messages proches ne coutent qu'une analyse.
+    memory_proposal_delay_seconds: float = Field(default=180, ge=0, le=3600)
+
     @model_validator(mode="after")
     def _production_rules(self) -> "Settings":
         """Regles qu'aucune variable ne peut assouplir hors developpement."""

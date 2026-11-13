@@ -409,6 +409,173 @@
         "title": "Fact",
         "type": "object"
       },
+      "FactEdit": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "identity",
+                  "preference",
+                  "project",
+                  "habit",
+                  "studies",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 350,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "title": "FactEdit",
+        "type": "object"
+      },
+      "FactIn": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "identity",
+              "preference",
+              "project",
+              "habit",
+              "studies",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 350,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "category"
+        ],
+        "title": "FactIn",
+        "type": "object"
+      },
+      "FactOut": {
+        "properties": {
+          "category": {
+            "enum": [
+              "identity",
+              "preference",
+              "project",
+              "habit",
+              "studies",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "from_conversation": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Conversation"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "category",
+          "status",
+          "source_kind",
+          "evidence",
+          "from_conversation",
+          "created_at",
+          "confirmed_at"
+        ],
+        "title": "FactOut",
+        "type": "object"
+      },
+      "ForgetOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "ForgetOut",
+        "type": "object"
+      },
       "FrontendResponse": {
         "properties": {
           "icon": {
@@ -777,6 +944,33 @@
           "password"
         ],
         "title": "ReauthRequest",
+        "type": "object"
+      },
+      "SettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "propose_after_conversations": {
+            "title": "Propose After Conversations",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "propose_after_conversations"
+        ],
+        "title": "SettingsIn",
+        "type": "object"
+      },
+      "SettingsOut": {
+        "properties": {
+          "propose_after_conversations": {
+            "title": "Propose After Conversations",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "propose_after_conversations"
+        ],
+        "title": "SettingsOut",
         "type": "object"
       },
       "SpecialistInfo": {
@@ -1774,6 +1968,341 @@
         "summary": "Totp Setup",
         "tags": [
           "authentification"
+        ]
+      }
+    },
+    "/api/v1/memory/facts": {
+      "get": {
+        "description": "Tous les faits : propositions en attente et faits confirmes, les plus recents d'abord.",
+        "operationId": "list_facts_api_v1_memory_facts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FactOut"
+                  },
+                  "title": "Response List Facts Api V1 Memory Facts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Facts",
+        "tags": [
+          "memoire"
+        ]
+      },
+      "post": {
+        "description": "Ajoute un fait saisi a la main (confirme d'emblee).",
+        "operationId": "add_fact_api_v1_memory_facts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Fact",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
+    "/api/v1/memory/facts/{fact_id}": {
+      "delete": {
+        "description": "Supprime un fait (sans trace de son contenu).",
+        "operationId": "delete_fact_api_v1_memory_facts__fact_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Fact",
+        "tags": [
+          "memoire"
+        ]
+      },
+      "patch": {
+        "description": "Corrige le texte ou la categorie d'un fait, sans changer son statut.",
+        "operationId": "update_fact_api_v1_memory_facts__fact_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Fact",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
+    "/api/v1/memory/facts/{fact_id}/confirm": {
+      "post": {
+        "description": "Confirme une proposition, avec une correction facultative.",
+        "operationId": "confirm_fact_api_v1_memory_facts__fact_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/FactEdit"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Fact",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
+    "/api/v1/memory/facts/{fact_id}/reject": {
+      "post": {
+        "description": "Refuse une proposition : effacee, et jamais reproposee.",
+        "operationId": "reject_fact_api_v1_memory_facts__fact_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Fact",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
+    "/api/v1/memory/forget-all": {
+      "post": {
+        "description": "Efface toute la memoire (re-authentification de moins de 10 minutes exigee).",
+        "operationId": "forget_all_api_v1_memory_forget_all_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget All",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
+    "/api/v1/memory/settings": {
+      "get": {
+        "operationId": "get_settings_route_api_v1_memory_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings Route",
+        "tags": [
+          "memoire"
+        ]
+      },
+      "put": {
+        "operationId": "put_settings_api_v1_memory_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Settings",
+        "tags": [
+          "memoire"
         ]
       }
     },

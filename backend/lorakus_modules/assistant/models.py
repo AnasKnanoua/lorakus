@@ -36,6 +36,10 @@ class AssistantConversation(Base):
     title: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Point de reprise de la memoire : messages de l'utilisateur deja analyses (PR 36).
+    memory_scanned_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class AssistantMessage(Base):
