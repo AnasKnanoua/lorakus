@@ -7,7 +7,7 @@ Préparer la session : [README](README.md#session).
 ## Symptôme
 
 - `LorakusApiDown` : Prometheus ne collecte plus les métriques de l'API depuis 2 minutes. Mesuré le 2026-11-10 : alerte Discord 2 min 21 s après l'arrêt de l'API.
-- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 300 Mo pour une limite de 384 Mo).
+- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 600 Mo pour une limite de 768 Mo ; environ 450 Mo est normal avec le modèle d'embeddings chargé).
 
 ## Vérifications
 
@@ -27,7 +27,8 @@ docker inspect -f '{{.State.Status}} redémarrages={{.RestartCount}} OOM={{.Stat
 | Constat | Cause |
 | --- | --- |
 | Conteneur `api` arrêté ou en boucle de redémarrage, juste après un déploiement | Version défectueuse (le test de santé du déploiement aurait dû la refuser : à signaler dans la note d'incident) |
-| `OOM=true` ou mémoire de l'API proche de 384 Mo | Fuite ou charge mémoire ; le conteneur est tué par sa limite |
+| `OOM=true` ou mémoire de l'API proche de 768 Mo | Fuite ou charge mémoire ; le conteneur est tué par sa limite |
+| Journal `modele d'embeddings absent` ou `modele illisible` au démarrage | Image sans le modèle ou fichier abîmé : l'API refuse de démarrer en production plutôt que de chercher avec de faux vecteurs. Retour à la version précédente, puis vérifier le test de fumée de l'image dans le workflow Publish |
 | `postgres` non `healthy`, erreurs de connexion dans les journaux de l'API | Base arrêtée, disque plein ([disk-full](disk-full.md)) ou mémoire du serveur épuisée ([host](host.md)) |
 | Tous les conteneurs arrêtés | Serveur redémarré et Docker non relancé, ou arrêt manuel |
 | L'API répond en local mais l'alerte persiste | Prometheus ne joint plus `api:9464` (réseau Docker) : `dc restart prometheus` |
@@ -38,6 +39,7 @@ docker inspect -f '{{.State.Status}} redémarrages={{.RestartCount}} OOM={{.Stat
 2. **Problème apparu après un déploiement** : retour à la version précédente depuis le Dell, `gh workflow run deploy.yml -f action=rollback` (10 secondes mesurées), puis corriger par une PR.
 3. **PostgreSQL arrêté** : `dc up -d --wait postgres`, lire `dc logs --tail 100 postgres`. S'il refuse de démarrer faute de place : [disk-full](disk-full.md). Si les données sont corrompues : [restore](restore.md).
 4. **Tout est arrêté** : `sudo systemctl status docker`, puis `dc up -d --wait`.
+5. **Mémoire élevée sans fuite évidente** : mesurer le modèle d'embeddings seul dans le conteneur, `dc run --rm -T --no-deps api python -m lorakus.ai.providers.check </dev/null` (conteneur jetable : jamais `dc exec` dans `api`, une seconde copie du modèle sous la même limite pourrait le faire tuer ; DEPLOYMENT.md).
 5. **Dégradation sans panne** (erreurs, lenteur, mémoire) : chercher la route en cause dans Grafana (tableau « Lorakus API »), relever l'identifiant de requête (`request_id`) d'une erreur dans `dc logs api`. `dc restart api` ne se justifie que pour la mémoire, et après avoir noté les chiffres.
 
 ## Retour arrière

@@ -79,3 +79,17 @@ MEMORY_PROPOSALS: Final = Counter(
     "Propositions de faits : enregistrees (proposed) ou ecartees, avec la raison",
     ["outcome"],
 )
+
+# --- Embeddings locaux (PR 37). Aucune etiquette ne porte de contenu ni d'identifiant.
+EMBED_SECONDS: Final = Histogram(
+    "lorakus_embed_seconds",
+    "Duree d'un calcul d'embeddings local (kind : query ou passages)",
+    ["kind"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+)
+
+MEMORY_EMBEDDINGS: Final = Counter(
+    "lorakus_memory_embeddings_total",
+    "Faits vectorises (outcome : indexed, failed, stale_skipped)",
+    ["outcome"],
+)

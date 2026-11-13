@@ -70,6 +70,12 @@ smoke_api() {
   docker logs "$name" 2>&1 | tail -n 1 | python3 -c 'import json, sys; json.loads(sys.stdin.read())' \
     || fail "la derniere ligne de journal n'est pas du JSON"
   echo "Journaux JSON : OK"
+
+  # Modele d'embeddings integre a l'image (PR 37) : charge, dimension, sens en francais, et
+  # mesures (memoire, latence) sur cette architecture, lisibles dans le journal de la CI.
+  docker exec "$name" python -m lorakus.ai.providers.check \
+    || fail "modele d'embeddings absent ou defaillant"
+  echo "Modele d'embeddings : OK"
 }
 
 smoke_backup() {

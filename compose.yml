@@ -90,7 +90,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384m
+          # Modele d'embeddings local compris (PR 37) ; ajustee apres mesure en production.
+          memory: 768m
 
   # Worker : jobs (Procrastinate) et livraison des evenements (outbox). Meme image que l'API.
   worker:

@@ -12,7 +12,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0004](docs/adr/0004-job-queue.md) | File de jobs Procrastinate derrière le port `JobQueue` | Accepté (amendé 2026-11-08) | Si la maintenance du projet faiblit |
 | [0005](docs/adr/0005-frontend.md) | Frontend SPA + PWA en React | Validé (2026-11-08) | — |
 | [0006](docs/adr/0006-ai-abstraction.md) | Abstraction IA maison | Accepté | Phase 15 |
-| [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08 et 2026-11-12, D-D) | À chaque changement de tarif |
+| [0007](docs/adr/0007-model-routing.md) | Routing par tâche, classe de données et licence ; embeddings locaux | Accepté (amendé 2026-11-08, 2026-11-12 (D-D) et 2026-11-13 (modèle d'embeddings)) | À chaque changement de tarif |
 | [0008](docs/adr/0008-multi-tenancy-rls.md) | Multi-tenant dans les fondations (`user_id` + RLS) | Validé | Ouverture à d'autres utilisateurs |
 | [0009](docs/adr/0009-compose-before-k3s.md) | Docker Compose avant k3s ; hébergement Always Free | Validé (D-A, 2026-11-08), hébergement amendé par 0036 | Changement d'hébergeur |
 | [0010](docs/adr/0010-observability.md) | OpenTelemetry → Grafana LGTM self-hosted | Validé (exigence) / Accepté (outils) | Phase 6 (mesure RAM) |
@@ -73,5 +73,6 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |
 | — | Mémoire v1 : rien n'est retenu sans confirmation, seuls les messages de l'utilisateur sont analysés, extrait vérifié mot pour mot, propositions activées par défaut (ADR 0039) | 2026-11-12 |
+| — | Embeddings locaux : `multilingual-e5-small` int8 par ONNX Runtime dans l'API, sans `fastembed`, fichiers intégrés à l'image et vérifiés par SHA-256 ; PR 37 en deux livraisons, socle mesuré (37a) puis recherche hybride (37b) (amendement de l'ADR 0007) | 2026-11-13 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

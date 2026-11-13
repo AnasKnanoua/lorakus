@@ -9,6 +9,22 @@ ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b78
 
 FROM ${UV_IMAGE} AS uv
 
+# ---------------------------------------------------------------- modele
+# Modele d'embeddings local (PR 37, ADR 0007) : multilingual-e5-small quantifie en int8
+# (licence MIT). Telecharge a la construction, verifie par SHA-256 : un fichier modifie fait
+# echouer la construction. Rien n'est telecharge a l'execution.
+# - model.onnx : export ONNX int8 de Xenova (Transformers.js), revision epinglee ;
+# - tokenizer.json : celui du depot officiel intfloat (contenu fixe par l'empreinte).
+# Changer de modele = changer ces deux lignes ET verifier l'evaluation (python -m
+# lorakus.ai.providers.check) ; les vecteurs existants sont recalcules (model_id).
+FROM scratch AS model
+ADD --checksum=sha256:f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193 --chmod=644 \
+    https://huggingface.co/Xenova/multilingual-e5-small/resolve/97cb8f96eaed1a1f0dac821239943e854fce9c36/onnx/model_quantized.onnx \
+    /models/multilingual-e5-small/model.onnx
+ADD --checksum=sha256:0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39 --chmod=644 \
+    https://huggingface.co/intfloat/multilingual-e5-small/resolve/main/tokenizer.json \
+    /models/multilingual-e5-small/tokenizer.json
+
 # ---------------------------------------------------------------- builder
 FROM ${PYTHON_IMAGE} AS builder
 COPY --from=uv /uv /usr/local/bin/uv
@@ -56,12 +72,15 @@ COPY --from=builder --chown=root:root /app/.venv /app/.venv
 COPY --chown=root:root alembic.ini ./
 COPY --chown=root:root alembic ./alembic
 COPY --from=builder --chown=root:root /migrations/lorakus_modules ./lorakus_modules
+# Modele d'embeddings, en lecture seule comme le code (LORAKUS_EMBEDDING_MODEL_DIR).
+COPY --from=model --chown=root:root /models /app/models
 
 USER lorakus
 
 EXPOSE 8000 9464
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --start-interval=2s --retries=3 \
+# Delai de demarrage : chargement du modele d'embeddings compris (quelques secondes sur ARM).
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --start-interval=2s --retries=3 \
   CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).status == 200 else 1)"]
 
 CMD ["uvicorn", "--factory", "lorakus.api.app:create_app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header", "--no-access-log"]

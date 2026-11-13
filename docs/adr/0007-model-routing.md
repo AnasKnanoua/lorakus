@@ -30,3 +30,13 @@ Coût de quelques dollars par mois ; aucune donnée personnelle sur un free tier
 - **Disjoncteur** : 3 échecs consécutifs écartent un fournisseur 2 minutes, puis une seule requête d'essai.
 - **Cache de réponses** : aucun pour l'instant (chaque message de conversation est unique) ; il arrivera avec les tâches `structured` qui en profitent.
 - **Port** : `chat` (streaming) et `capabilities` en PR 32 ; `structured` et `embed` arrivent avec la mémoire (PR 36 et 37).
+
+## Amendement du 2026-11-13 (PR 37, embeddings locaux)
+
+- **Modèle** : `multilingual-e5-small` quantifié en int8 (export ONNX de Xenova, `tokenizer.json` du dépôt officiel `intfloat`), 118 Mo, 384 dimensions, 512 tokens, licence MIT. Entraîné pour la recherche « question → passage » (préfixes `query:` et `passage:`), couvre le français.
+- **Écartés** : `paraphrase-multilingual-MiniLM-L12-v2` (entraîné pour la similarité de phrases, pas pour la recherche ; 128 tokens) ; `embeddinggemma-300m` (environ 1,2 Go, licence Gemma à examiner avant toute vente) ; `Qwen3-Embedding-0.6B` (1,1 à 2,4 Go, hors de portée d'un serveur de 5,6 Go partagé avec la base).
+- **Exécution** : ONNX Runtime et `tokenizers` directement, **sans `fastembed`**. `fastembed` 0.9.1 ne propose pas ce modèle, télécharge les fichiers au premier usage (conteneur en lecture seule, sans sortie voulue vers Internet) et ajouterait `pillow`, `loguru`, `requests` et `tqdm` pour environ 80 lignes de code (tokenisation, moyenne des jetons, normalisation).
+- **Fichiers** : intégrés à l'image pendant sa construction (`backend/Dockerfile`, étape `model`), vérifiés par SHA-256 ; rien n'est téléchargé à l'exécution. L'identifiant du modèle (`model_id`) est dérivé de l'empreinte du fichier : un modèle changé rend les vecteurs périmés, qui sont recalculés.
+- **Port séparé** : `Embedder` (`embed_query`, `embed_passages`) plutôt qu'une méthode `embed` de `AIProvider`. Un calcul local n'a ni budget, ni rythme, ni fournisseur externe : le faire passer par le `ModelRouter` l'aurait soumis aux limites de 6 appels IA par minute (ADR 0038).
+- **Où** : dans le processus de l'API seulement (une copie en mémoire, une inférence à la fois dans un thread, 2 threads ONNX) ; ni le worker ni les migrations ne chargent ONNX Runtime. Limite mémoire de l'API portée de 384 à 768 Mo et alerte de 300 à 600 Mo, à resserrer après mesure en production.
+- **Repli** : `FakeEmbedder` (sac de mots) en développement et en test seulement ; sans modèle, l'API refuse de démarrer en staging et en production.

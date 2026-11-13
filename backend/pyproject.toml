@@ -9,6 +9,8 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "cryptography>=50.0.2",
     "fastapi>=0.162.2",
+    "numpy>=2.5.4",
+    "onnxruntime>=1.31.1,<1.32",
     "packaging>=26.3",
     "procrastinate>=3.10.0,<3.11",
     "prometheus-client>=0.26.0",
@@ -16,6 +18,7 @@ dependencies = [
     "pydantic-settings>=2.16.2",
     "sqlalchemy[asyncio]>=2.1.8",
     "structlog>=26.1.0",
+    "tokenizers>=0.23.3,<0.24",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -128,13 +131,14 @@ type = "forbidden"
 source_modules = ["lorakus.core", "lorakus.cli", "lorakus.worker", "lorakus_modules"]
 forbidden_modules = ["lorakus.ai.providers"]
 
-# Dans le moteur IA, seuls les adaptateurs touchent un SDK de fournisseur. Le test
+# Dans le moteur IA, seuls les adaptateurs touchent un SDK de fournisseur ou un moteur
+# d'inference local (ONNX Runtime, tokenizers : PR 37). Le test
 # tests/unit/test_ai_boundaries.py verifie la meme regle pour tout fichier, meme nouveau.
 [[tool.importlinter.contracts]]
 name = "Seuls les adaptateurs importent un SDK d'IA"
 type = "forbidden"
-source_modules = ["lorakus.ai.port", "lorakus.ai.router", "lorakus.ai.catalog", "lorakus.ai.usage", "lorakus.ai.breaker", "lorakus.ai.testing", "lorakus.core", "lorakus.api", "lorakus_modules"]
-forbidden_modules = ["anthropic"]
+source_modules = ["lorakus.ai.port", "lorakus.ai.router", "lorakus.ai.catalog", "lorakus.ai.usage", "lorakus.ai.breaker", "lorakus.ai.testing", "lorakus.ai.embeddings", "lorakus.core", "lorakus.api", "lorakus.db", "lorakus_modules"]
+forbidden_modules = ["anthropic", "onnxruntime", "tokenizers"]
 allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas appeler le SDK
 
 # Modules decouverts par le Core.

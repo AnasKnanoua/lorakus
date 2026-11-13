@@ -49,6 +49,7 @@ Le workflow `publish.yml` construit les images API et sauvegarde sur une machine
 
 - Les deux paquets GHCR sont **publics** (réglage irréversible) : le serveur les télécharge sans identifiant.
 - Une image n'est republiée que si son code change ; le déploiement prend le dernier commit de `main` qui a touché ces chemins.
+- L'image de l'API contient le modèle d'embeddings (`/app/models/multilingual-e5-small`, environ 135 Mo de plus, ADR 0007) : il est téléchargé à la construction et vérifié par SHA-256, puis le test de fumée le charge et affiche sa mémoire et sa latence sur chaque architecture (journal du job, étape du test de fumée).
 - Première publication d'une **nouvelle** image : les jobs amd64 et arm64 peuvent créer le paquet en même temps et l'un est refusé (`denied`). Relancer le job échoué (`gh run rerun <id> --failed`) suffit.
 
 ## 4. Déploiement
@@ -220,3 +221,13 @@ Durée cible : une soirée.
 3. Redémarrer l'API pour qu'elle la lise : `dc up -d --force-recreate api` (raccourci `dc` : `docs/runbooks/README.md`).
 
 Sans clé, l'assistant répond par son message de secours ; la clé ne va qu'au service `api` (test `test_compose_environment.py`). Rotation ou fuite : `docs/runbooks/ai.md`.
+
+### Mémoire du modèle d'embeddings (PR 37a)
+
+Mesure à faire après le premier déploiement de la PR 37a, sur le serveur en tant que `deploy` (raccourci `dc` : `docs/runbooks/README.md`) :
+
+```bash
+dc run --rm -T --no-deps api python -m lorakus.ai.providers.check </dev/null && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
+```
+
+La première commande lance un conteneur jetable de la même image (jamais `dc exec` dans `api` : une seconde copie du modèle sous la même limite de 768 Mo pourrait faire tuer l'API) et affiche la mémoire de ce seul conteneur ; la seconde donne la mémoire réelle du conteneur `api`, modèle compris. Reporter les chiffres dans `PROJECT_STATE.md`, puis resserrer la limite de l'API (`compose.yml`, 768 Mo) et le seuil de `LorakusApiHighMemory` (600 Mo) en gardant au moins 30 % de marge.

@@ -101,6 +101,13 @@ class Settings(BaseSettings):
     # plusieurs messages proches ne coutent qu'une analyse.
     memory_proposal_delay_seconds: float = Field(default=180, ge=0, le=3600)
 
+    # --- Embeddings locaux (PR 37, ADR 0007) ---
+    # Dossier du modele (model.onnx et tokenizer.json), integre a l'image de l'API. Absent :
+    # faux modele en developpement et en test, refus de demarrer en staging et en production.
+    embedding_model_dir: Path = Path("/app/models/multilingual-e5-small")
+    # Threads de calcul d'une inference : borne le processeur pris aux autres services.
+    embedding_threads: int = Field(default=2, ge=1, le=8)
+
     @model_validator(mode="after")
     def _production_rules(self) -> "Settings":
         """Regles qu'aucune variable ne peut assouplir hors developpement."""

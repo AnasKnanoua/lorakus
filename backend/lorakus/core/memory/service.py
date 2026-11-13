@@ -11,6 +11,11 @@ propositions, tous deterministes (aucun ne depend du modele) :
 
 Un fait `sensitive` n'est jamais remis a un fournisseur externe (verified_for_prompt).
 Le journal d'audit note chaque decision avec l'identifiant du fait, jamais son contenu.
+
+Vecteurs (PR 37) : chaque fait confirme recoit un embedding calcule localement, apres sa
+confirmation ou sa correction ; les faits sans vecteur valide (anciens faits, modele change,
+calcul echoue) sont rattrapes au message suivant. La vectorisation ne fait jamais echouer une
+decision de l'utilisateur : en cas d'erreur, elle est simplement refaite plus tard.
 """
 
 import hashlib
@@ -23,18 +28,25 @@ from typing import Final, Literal, get_args
 
 import structlog
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lorakus.ai.embeddings import Embedder, EmbeddingError
 from lorakus.ai.port import ChatMessage, ChatRequest, estimate_tokens
 from lorakus.ai.router import AIRefusedError, AIUnavailableError, ModelRouter
 from lorakus.ai.structured import StructuredOutputError, complete_structured
 from lorakus.core.identity.service import audit
-from lorakus.core.memory.models import MemoryFact, MemoryRejection, MemorySettings
+from lorakus.core.memory.models import (
+    MemoryEmbedding,
+    MemoryFact,
+    MemoryRejection,
+    MemorySettings,
+)
 from lorakus.core.memory.prompts import EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM
 from lorakus.db.database import Database
-from lorakus.observability.metrics import MEMORY_PROPOSALS
+from lorakus.observability.metrics import MEMORY_EMBEDDINGS, MEMORY_PROPOSALS
 
 log = structlog.get_logger("lorakus.memory")
 
@@ -51,6 +63,8 @@ MAX_VERIFIED: Final = 200
 PROMPT_FACTS_MAX: Final = 60
 PROMPT_FACTS_TOKENS: Final = 1500
 EXTRACT_TASK: Final = "memory.extract"
+# Faits vectorises au plus par passage : borne le temps d'un rattrapage (un message).
+EMBED_BATCH_MAX: Final = 64
 
 
 class InvalidFactError(ValueError):
@@ -155,9 +169,15 @@ def _view(fact: MemoryFact) -> FactView:
 class MemoryService:
     """Faits de l'utilisateur. Une instance par application."""
 
-    def __init__(self, database: Database, ai: ModelRouter | None = None) -> None:
+    def __init__(
+        self,
+        database: Database,
+        ai: ModelRouter | None = None,
+        embedder: Embedder | None = None,
+    ) -> None:
         self._db = database
         self._ai = ai
+        self._embedder = embedder
 
     # ------------------------------------------------------------------ lecture
     async def list_facts(self, user_id: uuid.UUID) -> list[FactView]:
@@ -171,7 +191,9 @@ class MemoryService:
         """(categorie, texte) des faits confirmes a donner au modele, du plus recent au plus ancien.
 
         Jamais `sensitive` : le seul fournisseur des conversations est externe. Taille bornee.
+        Rattrape d'abord les faits sans vecteur (appele a chaque message de l'assistant).
         """
+        await self._index_quietly(user_id)
         async with self._db.transaction(user_id) as session:
             rows = await session.execute(
                 select(MemoryFact.category, MemoryFact.content)
@@ -238,7 +260,9 @@ class MemoryService:
             await audit(
                 session, user_id, "memory.fact_add", "success", None, {"fact_id": str(fact.id)}
             )
-            return _view(fact)
+            view = _view(fact)
+        await self._index_quietly(user_id)
+        return view
 
     async def confirm(
         self,
@@ -262,7 +286,9 @@ class MemoryService:
             await audit(
                 session, user_id, "memory.fact_confirm", "success", None, {"fact_id": str(fact_id)}
             )
-            return _view(fact)
+            view = _view(fact)
+        await self._index_quietly(user_id)
+        return view
 
     async def update(
         self,
@@ -281,7 +307,9 @@ class MemoryService:
             await audit(
                 session, user_id, "memory.fact_update", "success", None, {"fact_id": str(fact_id)}
             )
-            return _view(fact)
+            view = _view(fact)
+        await self._index_quietly(user_id)
+        return view
 
     async def reject(self, user_id: uuid.UUID, fact_id: uuid.UUID) -> None:
         """Refuse une proposition : effacee, et son empreinte empeche de la reproposer."""
@@ -446,6 +474,92 @@ class MemoryService:
                     {"count": stored, "prompt_version": EXTRACT_PROMPT_VERSION},
                 )
         return self._outcome(stored, "ok")
+
+    # ---------------------------------------------------------------- vecteurs
+    async def index_facts(self, user_id: uuid.UUID) -> int:
+        """Vectorise les faits confirmes sans vecteur valide. Renvoie le nombre de vecteurs ecrits.
+
+        Valide = meme modele et meme texte. Le calcul se fait hors transaction (aucun verrou
+        tenu pendant l'inference) ; a l'ecriture, un fait corrige ou supprime entre-temps est
+        ignore, il sera repris au passage suivant. Leve SQLAlchemyError, jamais EmbeddingError.
+        """
+        if self._embedder is None:
+            return 0
+        model_id = self._embedder.model_id
+        async with self._db.transaction(user_id) as session:
+            rows = (
+                await session.execute(
+                    select(MemoryFact.id, MemoryFact.content, MemoryFact.content_hash)
+                    .outerjoin(MemoryEmbedding, MemoryEmbedding.fact_id == MemoryFact.id)
+                    .where(
+                        MemoryFact.status == "verified",
+                        or_(
+                            MemoryEmbedding.fact_id.is_(None),
+                            MemoryEmbedding.model_id != model_id,
+                            MemoryEmbedding.content_hash != MemoryFact.content_hash,
+                        ),
+                    )
+                    .order_by(MemoryFact.updated_at.desc(), MemoryFact.id)
+                    .limit(EMBED_BATCH_MAX)
+                )
+            ).all()
+        if not rows:
+            return 0
+        try:
+            vectors = await self._embedder.embed_passages([content for _, content, _ in rows])
+        except EmbeddingError as error:
+            log.warning("memory_embedding_failed", detail=str(error), facts=len(rows))
+            MEMORY_EMBEDDINGS.labels(outcome="failed").inc(len(rows))
+            return 0
+
+        async with self._db.transaction(user_id) as session:
+            # Verrou partage : un fait ne peut pas etre supprime pendant l'ecriture de son vecteur.
+            unchanged = set(
+                await session.scalars(
+                    select(MemoryFact.id)
+                    .where(
+                        MemoryFact.status == "verified",
+                        tuple_(MemoryFact.id, MemoryFact.content_hash).in_(
+                            [(fact_id, digest) for fact_id, _, digest in rows]
+                        ),
+                    )
+                    .with_for_update(read=True)
+                )
+            )
+            indexed = 0
+            for (fact_id, _, digest), vector in zip(rows, vectors, strict=True):
+                if fact_id not in unchanged:
+                    MEMORY_EMBEDDINGS.labels(outcome="stale_skipped").inc()
+                    continue
+                statement = pg_insert(MemoryEmbedding).values(
+                    fact_id=fact_id,
+                    user_id=user_id,
+                    model_id=model_id,
+                    content_hash=digest,
+                    embedding=vector,
+                )
+                await session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[MemoryEmbedding.fact_id],
+                        set_={
+                            "model_id": statement.excluded.model_id,
+                            "content_hash": statement.excluded.content_hash,
+                            "embedding": statement.excluded.embedding,
+                            "created_at": func.now(),
+                        },
+                    )
+                )
+                indexed += 1
+        if indexed:
+            MEMORY_EMBEDDINGS.labels(outcome="indexed").inc(indexed)
+        return indexed
+
+    async def _index_quietly(self, user_id: uuid.UUID) -> None:
+        """Vectorisation apres une decision : une erreur ne doit pas annuler la decision."""
+        try:
+            await self.index_facts(user_id)
+        except SQLAlchemyError:
+            log.warning("memory_embedding_store_failed", exc_info=True)
 
     # ------------------------------------------------------------------ interne
     @staticmethod

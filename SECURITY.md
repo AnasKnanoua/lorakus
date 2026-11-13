@@ -14,7 +14,7 @@ Contact : adresse dédiée à créer en phase 0 (`security@<domaine>`). Réponse
 | Prompt injection indirecte | Profil `ingest` sans outils, contenu encapsulé et marqué non fiable, outils à permissions, confirmation des écritures |
 | Fuite vers un fournisseur IA | Classes de données et contraintes de licence appliquées par le `ModelRouter` ; embeddings personnels locaux |
 | Compromission du serveur | Secrets hors dépôt, fichiers `.env` en 600, sauvegardes chiffrées hors Oracle, champs sensibles chiffrés |
-| Chaîne d'approvisionnement | Lockfiles (`uv.lock`, `pnpm-lock.yaml`, Gradle), pip-audit, Dependabot groupé, images épinglées |
+| Chaîne d'approvisionnement | Lockfiles (`uv.lock`, `pnpm-lock.yaml`, Gradle), pip-audit, Dependabot groupé, images épinglées ; modèle d'embeddings téléchargé à la construction de l'image et vérifié par SHA-256, au format ONNX (un graphe : le charger n'exécute pas de code, contrairement à un fichier pickle) |
 | Téléphone perdu (phase 7+) | Clé d'appareil dans Android Keystore, révocable depuis `/settings/devices`, tampon local chiffré |
 | Lot d'appareil falsifié (phase 7+) | Clé par appareil à portée limitée, schéma strict, horodatages bornés, idempotence, rate limit |
 | Outil de test offensif hors périmètre | Cibles en liste blanche, réseau Docker isolé, identifiants de staging uniquement |
@@ -123,6 +123,7 @@ Une alerte n'est fermée sans correctif que si la faille est inatteignable chez 
 
 - Export JSON et suppression par période depuis `/settings/data`.
 - Mémoire (`/memoire`) : chaque souvenir se modifie ou se supprime ; « Tout oublier » efface tout après ré-authentification ; un souvenir supprimé ne laisse aucune trace de son contenu (le journal d'audit ne garde que son identifiant) ; les propositions se désactivent, et les messages écrits pendant ce temps ne sont jamais analysés.
+- Vecteurs des souvenirs (PR 37) : un vecteur permet de reconstituer en partie le texte dont il vient ; il est donc traité comme le souvenir lui-même (même classe, RLS forcée, clé étrangère composée vers le fait de son propriétaire) et supprimé avec lui, y compris par « Tout oublier ». Calculés sur le serveur, jamais envoyés à un fournisseur.
 - Rétention par défaut : conversations brutes 12 mois (résumés conservés), sessions d'apps 90 jours (agrégats 2 ans), santé 2 ans, audit 12 mois.
 - Pause globale de la collecte et des interventions (PWA, puis tuile Android).
 - Ouverture à d'autres utilisateurs : consentement explicite pour la santé (RGPD art. 9), analyse d'impact, déclarations Google Play — à traiter avant toute ouverture.
