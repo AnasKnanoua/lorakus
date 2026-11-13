@@ -4,8 +4,9 @@
 # cherche des images qui n'existent pas encore (incident du 2026-11-11).
 set -euo pipefail
 
-# Memes chemins que .github/workflows/publish.yml.
-IMAGE_PATHS=(backend infra/backup infra/ci/smoke-image.sh .github/workflows/publish.yml)
+# Memes chemins que .github/workflows/publish.yml (et que resolve-images.sh) : les trois images,
+# API et sauvegarde comme web (interface et Caddy, depuis la PR 35).
+IMAGE_PATHS=(backend infra/backup frontend infra/web infra/ci/smoke-image.sh .github/workflows/publish.yml)
 
 git fetch --quiet origin main
 sha=$(git rev-parse origin/main)
