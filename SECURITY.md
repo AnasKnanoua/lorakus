@@ -123,7 +123,7 @@ Une alerte n'est fermée sans correctif que si la faille est inatteignable chez 
 
 - Export JSON et suppression par période depuis `/settings/data`.
 - Mémoire (`/memoire`) : chaque souvenir se modifie ou se supprime ; « Tout oublier » efface tout après ré-authentification ; un souvenir supprimé ne laisse aucune trace de son contenu (le journal d'audit ne garde que son identifiant) ; les propositions se désactivent, et les messages écrits pendant ce temps ne sont jamais analysés.
-- Vecteurs des souvenirs (PR 37) : un vecteur permet de reconstituer en partie le texte dont il vient ; il est donc traité comme le souvenir lui-même (même classe, RLS forcée, clé étrangère composée vers le fait de son propriétaire) et supprimé avec lui, y compris par « Tout oublier ». Calculés sur le serveur, jamais envoyés à un fournisseur.
+- Vecteurs des souvenirs (PR 37) : un vecteur permet de reconstituer en partie le texte dont il vient ; il est donc traité comme le souvenir lui-même (même classe, RLS forcée, clé étrangère composée vers le fait de son propriétaire) et supprimé avec lui, y compris par « Tout oublier ». Calculés sur le serveur, jamais envoyés à un fournisseur ; la recherche de la page Mémoire (PR 37b) est locale elle aussi, et sa question passe toujours en paramètre lié (jamais concaténée dans le SQL, testé avec des tentatives d'injection).
 - Rétention par défaut : conversations brutes 12 mois (résumés conservés), sessions d'apps 90 jours (agrégats 2 ans), santé 2 ans, audit 12 mois.
 - Pause globale de la collecte et des interventions (PWA, puis tuile Android).
 - Ouverture à d'autres utilisateurs : consentement explicite pour la santé (RGPD art. 9), analyse d'impact, déclarations Google Play — à traiter avant toute ouverture.

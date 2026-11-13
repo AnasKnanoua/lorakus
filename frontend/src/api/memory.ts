@@ -28,6 +28,15 @@ export async function listFacts(): Promise<Fact[]> {
   return data;
 }
 
+/** Souvenirs proches de `q` par les mots ET par le sens (recherche locale du serveur, PR 37b). */
+export async function searchFacts(q: string): Promise<Fact[]> {
+  const { data, response, error } = await api.GET("/api/v1/memory/search", { params: { query: { q } } });
+  if (data === undefined) {
+    throw new ApiError(response.status, error);
+  }
+  return data;
+}
+
 export async function addFact(content: string, category: Category): Promise<void> {
   const { response, error } = await api.POST("/api/v1/memory/facts", {
     body: { content, category },

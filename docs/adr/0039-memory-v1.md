@@ -1,8 +1,8 @@
 # ADR-0039 — Mémoire v1 : propositions vérifiées, confirmation obligatoire
 
-- **Statut** : Validé (2026-11-12, plan accepté par le propriétaire)
+- **Statut** : Validé (2026-11-12, plan accepté par le propriétaire ; amendé le 2026-11-13, PR 37b)
 - **Date** : 2026-11-12
-- **Revue prévue** : avec la PR 37 (recherche par embeddings) et avant toute ouverture commerciale
+- **Revue prévue** : avant toute ouverture commerciale (revue faite avec la PR 37 : amendement du 2026-11-13)
 
 ## Contexte
 
@@ -42,3 +42,10 @@ L'analyse tourne dans le processus de l'API (`DebouncedTasks`), car seule l'API 
 - Le prénom, une préférence ou un projet dits en conversation sont utilisés dès leur confirmation.
 - Une analyse coûte environ un dixième de centime avec Haiku 5.5 ; elle est bornée par le rythme IA par utilisateur (ADR 0038).
 - L'empreinte d'un texte refusé, non salée, pourrait être retrouvée pour un texte très court et devinable ; acceptable pour une information que l'utilisateur a lui-même écartée, à revoir si un client l'exige.
+
+## Amendement du 2026-11-13 (PR 37b, recherche hybride)
+
+- **Choix des souvenirs du prompt** : par priorité dans le même budget (60 faits, 1 500 tokens) : les faits d'identité toujours, puis les plus pertinents pour le message (recherche hybride), puis les plus récents. Quand tout tient, tout est donné, comme avant ; la pertinence décide de ce qui passe quand ce n'est plus le cas. Si le modèle d'embeddings échoue : plein texte seul ; sans question : récence.
+- **Recherche hybride** : plein texte PostgreSQL (configuration `french`, accents retirés par `lorakus.fold_fr`, colonne générée) et vecteurs locaux, fusionnés par RRF (rangs, jamais scores bruts : les similarités d'e5 sont tassées, ADR 0007). Classement sans seuil absolu ; un seuil ne sera ajouté que calibré sur le jeu d'évaluation.
+- **Page `/memoire`** : `GET /api/v1/memory/search` ; tous les faits confirmés de l'utilisateur, `sensitive` compris (la recherche est locale, la question ne part chez aucun fournisseur).
+- **Évaluation** : `backend/tests/evals/` (profil fictif), avec le vrai modèle dans la CI ; la PR échoue si recall@5 < 0,85 ou si l'hybride fait moins bien que la meilleure méthode seule (tolérance d'une question).

@@ -264,7 +264,7 @@ class AssistantService:
 
         now_local = self._clock().astimezone(ZoneInfo(config.timezone))
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
-        facts = await self._memory.verified_for_prompt(user_id) if self._memory else []
+        facts = await self._memory.verified_for_prompt(user_id, text) if self._memory else []
         request = ChatRequest(
             system=system_prompt(config.display_name, now_local, config.timezone, facts),
             messages=messages,

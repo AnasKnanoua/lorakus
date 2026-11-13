@@ -517,6 +517,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/memory/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Facts
+         * @description Faits confirmes les plus proches de `q`, par les mots ET par le sens (PR 37b).
+         *
+         *     Recherche hybride locale (plein texte et embeddings calcules sur le serveur) : la question
+         *     ne part chez aucun fournisseur.
+         */
+        get: operations["search_facts_api_v1_memory_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/memory/settings": {
         parameters: {
             query?: never;
@@ -1945,6 +1968,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForgetOut"];
+                };
+            };
+        };
+    };
+    search_facts_api_v1_memory_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

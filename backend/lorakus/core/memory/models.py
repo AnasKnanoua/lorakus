@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    Computed,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -15,7 +16,7 @@ from sqlalchemy import (
     Uuid,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lorakus.ai.embeddings import EMBEDDING_DIMENSIONS
@@ -40,6 +41,12 @@ class MemoryFact(Base):
     )
     content: Mapped[str] = mapped_column(Text)
     content_hash: Mapped[bytes] = mapped_column(LargeBinary)
+    # Plein texte en francais sans accents, calcule par PostgreSQL (migration 0011).
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('french'::regconfig, lorakus.fold_fr(content))", persisted=True),
+        deferred=True,
+    )
     category: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     data_class: Mapped[str] = mapped_column(Text)

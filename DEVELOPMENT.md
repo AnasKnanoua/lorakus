@@ -91,6 +91,7 @@ Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 | LLM | Promptfoo | Comportement sur `FakeProvider` en CI ; vrais fournisseurs chaque semaine |
 | E2E | Playwright | Scénarios d'acceptation du MVP |
 | Frontend | Vitest, axe-core | Composants et accessibilité |
+| Évaluation | pytest (`backend/tests/evals/`) | Qualité de la recherche dans la mémoire (recall@5, MRR) sur un jeu étiqueté fictif. Faux modèle dans `make check` ; vrai modèle dans la CI (étape « Évaluation de la recherche »). En local : `infra/models/fetch-embedding-model.sh /tmp/model && LORAKUS_EMBEDDING_MODEL_DIR=/tmp/model uv --directory backend run pytest -s tests/evals` |
 
 ## 8. Migrations
 

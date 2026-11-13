@@ -368,3 +368,31 @@ def test_prompt_stays_bounded_with_many_facts(owner: TestClient) -> None:
     system = provider.requests("chat")[0].system
     assert 0 < system.count("\n- [autre]") <= 60
     assert len(system) < 12_000
+
+
+# ------------------------------------------------------------------ recherche (PR 37b)
+def test_search_route_ranks_validates_and_isolates(owner: TestClient) -> None:
+    for content, category in [
+        ("Mon chat s'appelle Mochi", "other"),
+        ("Aime le jazz", "preference"),
+    ]:
+        assert (
+            owner.post(
+                f"{MEMORY}/facts", json={"content": content, "category": category}
+            ).status_code
+            == 201
+        )
+
+    response = owner.get(f"{MEMORY}/search", params={"q": "Mochi"})
+    assert response.status_code == 200
+    # Classement sans seuil (similarites d'e5 tassees, ADR 0007) : le bon fait en tete.
+    assert response.json()[0]["content"] == "Mon chat s'appelle Mochi"
+
+    assert owner.get(f"{MEMORY}/search").status_code == 422
+    assert owner.get(f"{MEMORY}/search", params={"q": "x" * 201}).status_code == 422
+
+    other = second_user(_app(owner))
+    assert other.get(f"{MEMORY}/search", params={"q": "Mochi"}).json() == []
+
+    anonymous = TestClient(_app(owner), base_url=BASE_URL)
+    assert anonymous.get(f"{MEMORY}/search", params={"q": "Mochi"}).status_code == 401
