@@ -2246,6 +2246,55 @@
         ]
       }
     },
+    "/api/v1/memory/search": {
+      "get": {
+        "description": "Faits confirmes les plus proches de `q`, par les mots ET par le sens (PR 37b).\n\nRecherche hybride locale (plein texte et embeddings calcules sur le serveur) : la question\nne part chez aucun fournisseur.",
+        "operationId": "search_facts_api_v1_memory_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FactOut"
+                  },
+                  "title": "Response Search Facts Api V1 Memory Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Facts",
+        "tags": [
+          "memoire"
+        ]
+      }
+    },
     "/api/v1/memory/settings": {
       "get": {
         "operationId": "get_settings_route_api_v1_memory_settings_get",

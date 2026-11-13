@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { getConversation, listConversations } from "@/api/assistant";
 import { fetchMe } from "@/api/auth";
-import { getProposalsEnabled, listFacts } from "@/api/memory";
+import { getProposalsEnabled, listFacts, searchFacts } from "@/api/memory";
 
 export const meQuery = queryOptions({
   queryKey: ["me"],
@@ -33,3 +33,11 @@ export const memorySettingsQuery = queryOptions({
   queryKey: ["memory", "settings"],
   queryFn: getProposalsEnabled,
 });
+
+/** Recherche par le sens dans la memoire (PR 37b) ; question deja stabilisee par l'appelant. */
+export const memorySearchQuery = (q: string) =>
+  queryOptions({
+    queryKey: ["memory", "search", q],
+    queryFn: () => searchFacts(q),
+    staleTime: 30_000,
+  });

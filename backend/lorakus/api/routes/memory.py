@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from lorakus.api.auth import current_user, recent_user
@@ -109,6 +109,20 @@ def _out(fact: FactView) -> FactOut:
 async def list_facts(user: User, memory: Memory) -> list[FactOut]:
     """Tous les faits : propositions en attente et faits confirmes, les plus recents d'abord."""
     return [_out(f) for f in await memory.list_facts(user.id)]
+
+
+@router.get("/search")
+async def search_facts(
+    user: User,
+    memory: Memory,
+    q: Annotated[str, Query(min_length=1, max_length=200)],
+) -> list[FactOut]:
+    """Faits confirmes les plus proches de `q`, par les mots ET par le sens (PR 37b).
+
+    Recherche hybride locale (plein texte et embeddings calcules sur le serveur) : la question
+    ne part chez aucun fournisseur.
+    """
+    return [_out(f) for f in await memory.search(user.id, q)]
 
 
 @router.post("/facts", status_code=status.HTTP_201_CREATED)

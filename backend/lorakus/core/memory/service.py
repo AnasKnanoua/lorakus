@@ -33,7 +33,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lorakus.ai.embeddings import Embedder, EmbeddingError
+from lorakus.ai.embeddings import Embedder, EmbeddingError, Vector
 from lorakus.ai.port import ChatMessage, ChatRequest, estimate_tokens
 from lorakus.ai.router import AIRefusedError, AIUnavailableError, ModelRouter
 from lorakus.ai.structured import StructuredOutputError, complete_structured
@@ -45,6 +45,11 @@ from lorakus.core.memory.models import (
     MemorySettings,
 )
 from lorakus.core.memory.prompts import EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM
+from lorakus.core.memory.search import (
+    lexical_ranking,
+    reciprocal_rank_fusion,
+    vector_ranking,
+)
 from lorakus.db.database import Database
 from lorakus.observability.metrics import MEMORY_EMBEDDINGS, MEMORY_PROPOSALS
 
@@ -62,6 +67,8 @@ MAX_VERIFIED: Final = 200
 # Taille du bloc de faits ajoute au prompt systeme de l'assistant.
 PROMPT_FACTS_MAX: Final = 60
 PROMPT_FACTS_TOKENS: Final = 1500
+# Recherche (PR 37b) : resultats au plus pour la page /memoire.
+SEARCH_RESULTS_MAX: Final = 20
 EXTRACT_TASK: Final = "memory.extract"
 # Faits vectorises au plus par passage : borne le temps d'un rattrapage (un message).
 EMBED_BATCH_MAX: Final = 64
@@ -187,29 +194,72 @@ class MemoryService:
             )
             return [_view(f) for f in rows]
 
-    async def verified_for_prompt(self, user_id: uuid.UUID) -> list[tuple[str, str]]:
-        """(categorie, texte) des faits confirmes a donner au modele, du plus recent au plus ancien.
+    async def verified_for_prompt(
+        self, user_id: uuid.UUID, question: str | None = None
+    ) -> list[tuple[str, str]]:
+        """(categorie, texte) des faits confirmes a donner au modele, dans un budget borne.
 
-        Jamais `sensitive` : le seul fournisseur des conversations est externe. Taille bornee.
+        Ordre de priorite (PR 37b) : les faits d'identite (prenom, ville...), puis les plus
+        pertinents pour `question` (recherche hybride), puis les plus recents. Quand tout tient
+        dans le budget, tout est donne ; la pertinence decide de ce qui passe quand ce n'est
+        plus le cas. Sans question, ou si la recherche echoue, ordre de recence.
+        Jamais `sensitive` : le seul fournisseur des conversations est externe.
         Rattrape d'abord les faits sans vecteur (appele a chaque message de l'assistant).
         """
         await self._index_quietly(user_id)
+        vector = await self._embed_question(question) if question else None
         async with self._db.transaction(user_id) as session:
-            rows = await session.execute(
-                select(MemoryFact.category, MemoryFact.content)
-                .where(MemoryFact.status == "verified", MemoryFact.data_class == "personal")
-                .order_by(MemoryFact.updated_at.desc(), MemoryFact.id)
-                .limit(PROMPT_FACTS_MAX)
+            rows = (
+                await session.execute(
+                    select(MemoryFact.id, MemoryFact.category, MemoryFact.content)
+                    .where(MemoryFact.status == "verified", MemoryFact.data_class == "personal")
+                    .order_by(MemoryFact.updated_at.desc(), MemoryFact.id)
+                )
+            ).all()
+            ranked = (
+                await self._ranked(session, question, vector, personal_only=True)
+                if question
+                else []
             )
-            facts: list[tuple[str, str]] = []
-            used = 0
-            for category, content in rows:
-                cost = estimate_tokens(content) + 4
-                if used + cost > PROMPT_FACTS_TOKENS:
-                    break
-                facts.append((category, content))
-                used += cost
-            return facts
+        by_id = {fact_id: (category, content) for fact_id, category, content in rows}
+        identity = [fact_id for fact_id, category, _ in rows if category == "identity"]
+        recent = [fact_id for fact_id, _, _ in rows]
+        facts: list[tuple[str, str]] = []
+        seen: set[uuid.UUID] = set()
+        used = 0
+        for fact_id in [*identity, *ranked, *recent]:
+            if fact_id in seen or fact_id not in by_id:
+                continue
+            seen.add(fact_id)
+            category, content = by_id[fact_id]
+            cost = estimate_tokens(content) + 4
+            if used + cost > PROMPT_FACTS_TOKENS or len(facts) >= PROMPT_FACTS_MAX:
+                continue  # un fait plus court peut encore tenir
+            facts.append((category, content))
+            used += cost
+        return facts
+
+    async def search(
+        self, user_id: uuid.UUID, question: str, limit: int = SEARCH_RESULTS_MAX
+    ) -> list[FactView]:
+        """Faits confirmes les plus pertinents pour `question` (page /memoire), meilleur en tete.
+
+        Tous les faits de l'utilisateur, `sensitive` compris : ils restent sur le serveur.
+        """
+        question = normalize(question)
+        if not question:
+            return []
+        await self._index_quietly(user_id)
+        vector = await self._embed_question(question)
+        async with self._db.transaction(user_id) as session:
+            ranked = (await self._ranked(session, question, vector, personal_only=False))[:limit]
+            if not ranked:
+                return []
+            facts = {
+                f.id: f
+                for f in await session.scalars(select(MemoryFact).where(MemoryFact.id.in_(ranked)))
+            }
+            return [_view(facts[fact_id]) for fact_id in ranked if fact_id in facts]
 
     async def proposals_enabled(self, user_id: uuid.UUID) -> bool:
         async with self._db.transaction(user_id) as session:
@@ -553,6 +603,34 @@ class MemoryService:
         if indexed:
             MEMORY_EMBEDDINGS.labels(outcome="indexed").inc(indexed)
         return indexed
+
+    async def _embed_question(self, question: str) -> Vector | None:
+        """Vecteur de la question ; None sans modele ou en cas d'erreur (plein texte seul)."""
+        if self._embedder is None:
+            return None
+        try:
+            return await self._embedder.embed_query(question)
+        except EmbeddingError as error:
+            log.warning("memory_query_embedding_failed", detail=str(error))
+            return None
+
+    async def _ranked(
+        self,
+        session: AsyncSession,
+        question: str,
+        vector: Vector | None,
+        *,
+        personal_only: bool,
+    ) -> list[uuid.UUID]:
+        """Classement hybride : plein texte et vecteurs fusionnes par RRF (core.memory.search)."""
+        rankings = [await lexical_ranking(session, question, personal_only=personal_only)]
+        if vector is not None and self._embedder is not None:
+            rankings.append(
+                await vector_ranking(
+                    session, vector, self._embedder.model_id, personal_only=personal_only
+                )
+            )
+        return reciprocal_rank_fusion(rankings)
 
     async def _index_quietly(self, user_id: uuid.UUID) -> None:
         """Vectorisation apres une decision : une erreur ne doit pas annuler la decision."""

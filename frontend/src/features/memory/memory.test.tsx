@@ -73,6 +73,43 @@ describe("mémoire", () => {
     expect(await screen.findByText("Aucun souvenir ne correspond.")).toBeVisible();
   });
 
+  it("ajoute les souvenirs proches par le sens sous les résultats exacts", async () => {
+    const state = installFakeApi({
+      loggedIn: true,
+      facts: [known("f1", "Mon chat s'appelle Mochi"), known("f2", "Mochi adore les croquettes"), known("f3", "Aime le jazz")],
+      semantic: { animal: ["f1", "f3"], Mochi: ["f1", "f2"] },
+    });
+    renderApp("/memoire");
+    const user = userEvent.setup();
+    await screen.findByText("Aime le jazz");
+    const search = screen.getByRole("searchbox", { name: "Rechercher dans la mémoire" });
+
+    // Aucun mot commun : seule la recherche du serveur trouve, dans sa section.
+    await user.type(search, "animal");
+    const related = await screen.findByRole("region", { name: "Proches par le sens" });
+    expect(within(related).getByText("Mon chat s'appelle Mochi")).toBeVisible();
+    expect(within(related).getByText("Aime le jazz")).toBeVisible();
+    expect(screen.queryByText("Aucun souvenir ne correspond.")).toBeNull();
+
+    // Les résultats exacts ne sont jamais répétés dans la section.
+    await user.clear(search);
+    await user.type(search, "Mochi");
+    const searches = state.requests.filter((r) => r.path === "/api/v1/memory/search").length;
+    await waitFor(() => {
+      expect(state.requests.filter((r) => r.path === "/api/v1/memory/search").length).toBe(searches + 1);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100)); // reponse affichee
+    expect(screen.queryByRole("region", { name: "Proches par le sens" })).toBeNull();
+    expect(screen.getAllByText("Mon chat s'appelle Mochi")).toHaveLength(1);
+
+    // Une ou deux lettres : pas de requête au serveur.
+    const before = state.requests.filter((r) => r.path === "/api/v1/memory/search").length;
+    await user.clear(search);
+    await user.type(search, "ja");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(state.requests.filter((r) => r.path === "/api/v1/memory/search").length).toBe(before);
+  });
+
   it("supprime un souvenir depuis son édition, après confirmation", async () => {
     const state = installFakeApi({ loggedIn: true, facts: [known("f1", "Joue aux échecs")] });
     renderApp("/memoire");

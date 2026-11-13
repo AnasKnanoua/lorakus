@@ -42,6 +42,8 @@ export interface FakeState {
   holdReply: Promise<void> | null;
   requests: { method: string; path: string; body: unknown }[];
   facts: FakeFact[];
+  /** Recherche par le sens (PR 37b) : question -> identifiants des faits renvoyes, dans l'ordre. */
+  semantic: Record<string, string[]>;
   proposalsEnabled: boolean;
   /** Derniere preuve d'identite trop ancienne : « tout oublier » repond 403. */
   reauthStale: boolean;
@@ -92,6 +94,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     holdReply: null,
     requests: [],
     facts: [],
+    semantic: {},
     proposalsEnabled: true,
     reauthStale: false,
     ...overrides,
@@ -199,6 +202,13 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       );
     }
     // --- memoire (PR 36)
+    if (path === "/api/v1/memory/search" && request.method === "GET") {
+      const ids = state.semantic[url.searchParams.get("q") ?? ""] ?? [];
+      return json(
+        200,
+        ids.map((id) => state.facts.find((f) => f.id === id)).filter((f) => f !== undefined),
+      );
+    }
     if (path === "/api/v1/memory/facts" && request.method === "GET") {
       return json(200, state.facts);
     }

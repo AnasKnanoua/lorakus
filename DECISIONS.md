@@ -43,6 +43,8 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0035](docs/adr/0035-notification-channels.md) | Canaux de notification : exploitation sur Discord, produit sur Telegram | Accepté | Ouverture à d'autres utilisateurs |
 | [0036](docs/adr/0036-environments.md) | Environnements : production sur Oracle (amende 0009) ; staging et sentinelle remplacés par 0037 | Validé (2026-11-09), amendé par 0037 | Changement d'hébergeur |
 | [0037](docs/adr/0037-ci-staging-external-sentinel.md) | Staging éphémère dans la CI, sentinelle externe par signal de vie (healthchecks.io) | Validé (2026-11-11) | Phase 17 ou disparition d'un service gratuit |
+| [0038](docs/adr/0038-public-exposure-caddy.md) | Exposition publique par Caddy, limites par utilisateur dans l'application | Validé (2026-11-12) | Avant toute ouverture commerciale, ou API à plusieurs processus |
+| [0039](docs/adr/0039-memory-v1.md) | Mémoire v1 : rien n'est retenu sans confirmation ; recherche hybride des souvenirs | Validé (2026-11-12, amendé 2026-11-13) | Avant toute ouverture commerciale |
 
 ## Décisions en attente d'avis
 
@@ -73,6 +75,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |
 | — | Mémoire v1 : rien n'est retenu sans confirmation, seuls les messages de l'utilisateur sont analysés, extrait vérifié mot pour mot, propositions activées par défaut (ADR 0039) | 2026-11-12 |
+| — | Recherche hybride des souvenirs (plein texte français sans accents + vecteurs, fusion RRF, sans seuil absolu) ; prompt : identité, puis pertinence, puis récence ; évaluation avec le vrai modèle dans la CI (amendement de l'ADR 0039) | 2026-11-13 |
 | — | Embeddings locaux : `multilingual-e5-small` int8 par ONNX Runtime dans l'API, sans `fastembed`, fichiers intégrés à l'image et vérifiés par SHA-256 ; PR 37 en deux livraisons, socle mesuré (37a) puis recherche hybride (37b) (amendement de l'ADR 0007) | 2026-11-13 |
 
 Sans réponse, la recommandation s'applique au début de la phase concernée et l'ADR passe en « Accepté ».

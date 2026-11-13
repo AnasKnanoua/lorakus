@@ -25,9 +25,14 @@ import { ConfirmDialog } from "@/features/chat/ConfirmDialog";
 import { TopBar } from "@/features/chat/layout";
 import { cn } from "@/lib/cn";
 import { withViewTransition } from "@/lib/motion";
-import { factsQuery, memorySettingsQuery } from "@/lib/queries";
+import { factsQuery, memorySearchQuery, memorySettingsQuery } from "@/lib/queries";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 import { FactEditor, messageFor } from "./FactEditor";
+
+// Souvenirs « proches par le sens » affiches au plus sous les resultats exacts : la recherche
+// classe sans seuil (similarites tassees, ADR 0007), on ne montre donc que la tete.
+const RELATED_MAX = 3;
 
 type Filter = Category | "all";
 
@@ -49,6 +54,10 @@ export function MemoryScreen() {
   const [filter, setFilter] = useState<Filter>("all");
   const [adding, setAdding] = useState(false);
   const search = fold(useDeferredValue(query).trim());
+  // Recherche par le sens (PR 37b) : au serveur seulement apres une pause de frappe, des
+  // 3 caracteres. Elle complete la recherche exacte, instantanee, faite ici.
+  const settled = useDebouncedValue(query.trim());
+  const semantic = useQuery({ ...memorySearchQuery(settled), enabled: settled.length >= 3 });
 
   // Chaque changement fait glisser les lignes vers leur nouvelle place (View Transitions).
   const refresh = () => withViewTransition(() => queryClient.invalidateQueries({ queryKey: ["memory"] }));
@@ -60,6 +69,13 @@ export function MemoryScreen() {
     (f) => (filter === "all" || f.category === filter) && (!search || fold(f.content).includes(search)),
   );
   const narrowed = filter !== "all" || search !== "";
+  const shown = new Set(visible.map((f) => f.id));
+  const related =
+    search.length >= 3 && fold(settled) === search
+      ? (semantic.data ?? [])
+          .filter((f) => !shown.has(f.id) && (filter === "all" || f.category === filter))
+          .slice(0, RELATED_MAX)
+      : [];
 
   return (
     <>
@@ -174,15 +190,27 @@ export function MemoryScreen() {
                 Aucun souvenir pour l'instant. Parle de toi à Lorakus, ou ajoute-en un.
               </p>
             ) : narrowed ? (
-              visible.length === 0 ? (
-                <p className="py-6 text-center text-sm text-ink-faint">Aucun souvenir ne correspond.</p>
-              ) : (
-                <ul className="pt-1">
-                  {visible.map((fact) => (
-                    <FactRow key={fact.id} fact={fact} onDone={refresh} showCategory={filter === "all"} />
-                  ))}
-                </ul>
-              )
+              <>
+                {visible.length === 0 && related.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-ink-faint">Aucun souvenir ne correspond.</p>
+                ) : (
+                  <ul className="pt-1">
+                    {visible.map((fact) => (
+                      <FactRow key={fact.id} fact={fact} onDone={refresh} showCategory={filter === "all"} />
+                    ))}
+                  </ul>
+                )}
+                {related.length > 0 && (
+                  <section aria-label="Proches par le sens" className="pt-4">
+                    <h3 className="flex h-9 items-center text-sm font-medium text-ink-faint">Proches par le sens</h3>
+                    <ul>
+                      {related.map((fact) => (
+                        <FactRow key={fact.id} fact={fact} onDone={refresh} showCategory={filter === "all"} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </>
             ) : (
               CATEGORIES.filter((c) => counts.has(c)).map((category) => (
                 <Collapsible key={category} title={CATEGORY_LABELS[category]} count={counts.get(category)} className="pt-3">
