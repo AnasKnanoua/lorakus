@@ -117,3 +117,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (2026-11-12, staging) : après le déploiement de la PR 35, `rollback` remet le même commit sans Caddy au lieu de la version d'avant.
 - **Cause** : chaque passage réussi faisait de la version en service la « précédente ». Après deux passages, la précédente était donc le premier passage.
 - **Correction** : un passage qui garde le même commit (images complétées) remplace la version en service sans toucher à la précédente. Le staging vérifie que le retour arrière revient bien à la version de production, sans Caddy quand elle n'en avait pas.
+
+## « Image web introuvable » au déploiement juste après une fusion
+
+- **Symptôme** (2026-11-13) : `make deploy` lancé juste après la fusion d'une PR qui ne touche que l'interface ; le staging échoue à « Trouver la version en production et la nouvelle version » : `Image web introuvable pour le commit … : le workflow Publish a-t-il reussi ?`. La production n'est pas touchée.
+- **Cause** : `wait-publish.sh` ne connaissait que les chemins des images API et sauvegarde ; pour une fusion qui ne change que `frontend/` ou `infra/web/`, il répondait « rien à attendre » alors que Publish construisait encore l'image web.
+- **Correction** : `wait-publish.sh` suit les chemins des trois images. Toute nouvelle image doit être ajoutée au même moment à `publish.yml` (déclencheurs), `resolve-images.sh` et `wait-publish.sh`.
+- **En attendant** : `gh run watch "$(gh run list --workflow publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status`, puis relancer `make deploy`.
