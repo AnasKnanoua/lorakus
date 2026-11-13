@@ -4,7 +4,7 @@
 
 - **Version** : v0.2.0 (2026-11-12)
 - **Phase** : P3 — Majordome, IA et mémoire, en cours depuis le 2026-11-12. Étape A terminée le 2026-11-12 : Lorakus s'utilise depuis le téléphone (PWA sur `https://app.lorakus.app`). Étape B (PR 36 à 41) à venir.
-- **Dernière mise à jour** : 2026-11-12
+- **Dernière mise à jour** : 2026-11-13
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -30,6 +30,7 @@
 
 ## En cours (P3)
 
+- PR 37a — Embeddings locaux, socle (ADR 0007, amendement du 2026-11-13), **à déployer** : port `Embedder` séparé de `AIProvider`, `multilingual-e5-small` int8 exécuté par ONNX Runtime dans l'API (sans `fastembed`), fichiers intégrés à l'image (étape `model` du Dockerfile, SHA-256 vérifiés), migration 0010 (`core_memory_embeddings`, `halfvec(384)`, RLS forcée, clé étrangère composée vers le fait de son propriétaire), vectorisation des faits confirmés après chaque décision et rattrapage des anciens au message suivant, `python -m lorakus.ai.providers.check` dans le test de fumée de l'image, limite de l'API 384 → 768 Mo et `LorakusApiHighMemory` 300 → 600 Mo. Vérifié localement (pytest sur PostgreSQL 18 + pgvector 0.8.6 avec un faux modèle, pyright strict, import-linter, `alembic check`, promtool, shellcheck, `docker compose config`). **Vérifié seulement par la CI et le staging** : construction de l'image avec le vrai modèle, son chargement et ses contrôles de sens sur amd64 et arm64. **À mesurer en production** : mémoire de l'API avec le modèle, puis limite et alerte resserrées (DEPLOYMENT.md, « Mémoire du modèle d'embeddings »).
 - Système de design (à déployer, docs/frontend.md) : échelle typographique, Inter à taille optique, trois niveaux de texte, hauteurs et arrondis harmonisés, boutons `secondary` et `danger-quiet` ; barre latérale sans orbe (marque seule), lignes de 40 px, action principale sur fond ; page Mémoire avec vrai titre, recherche et « + » compacts, filtres sans compteur, lignes touchables ; glisser vers la droite pour ouvrir le panneau.
 - Interface prête à grandir (à déployer) : navigation déclarée dans `src/navigation.ts` (groupes assistant et outils), conversations groupées par ancienneté et paginées, page Mémoire compacte (recherche, filtres, catégories repliables, réglages repliés), transitions entre écrans sans saut de la barre latérale, glisser pour fermer le panneau sur téléphone (docs/frontend.md, « Navigation » et « Mouvement »).
 - PR 36 — Mémoire v1 (ADR 0039), **déployée le 2026-11-13** et vérifiée sur le téléphone (propositions, confirmation, utilisation dans la réponse) : faits proposés après les conversations (messages de l'utilisateur seulement, extrait vérifié mot pour mot, 5 par analyse, 20 en attente), confirmés, corrigés ou refusés sur la page `/memoire`, faits confirmés dans le prompt de l'assistant (60 au plus), « Tout oublier » avec ré-authentification, mention des propositions en attente dans le chat. Migrations 0009 (Core) et `assistant_0002`. Propositions activées par défaut (choix du propriétaire, 2026-11-12).
@@ -53,6 +54,7 @@
 
 ## Décisions prises récemment
 
+- 2026-11-13 — Embeddings locaux (amendement de l'ADR 0007) : `multilingual-e5-small` int8 par ONNX Runtime, sans `fastembed` ; PR 37 en deux livraisons (37a socle mesuré, 37b recherche hybride). Idées notées : capture rapide des notes (« Partager → Lorakus »), suggestions d'idées sur les créneaux libres, cartes de rappel sur l'accueil.
 - 2026-11-12 — ADR 0038 : exposition par Caddy, limites par utilisateur dans l'application (API et appels IA), double authentification activée sur le serveur ; pas de limite par IP dans Caddy (module tiers). Idées notées : contrôle du téléphone en deux niveaux, prénom de l'utilisateur, nom de l'assistant au choix du client, revue de sécurité complète avant toute vente.
 - 2026-11-12 — D-D : 10 $ prépayés chez Anthropic sans rechargement automatique, plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en P3 ; repli par gabarit (amendement de l'ADR 0007). Prix vérifiés le jour même.
 - 2026-11-12 — Découpage de la P3 (PR 32 à 41) ; ouverture publique de `app.lorakus.app` à la PR 35, double authentification obligatoire pour se connecter en production.

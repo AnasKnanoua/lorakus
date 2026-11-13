@@ -1,5 +1,6 @@
 """Construction de l'application FastAPI."""
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -7,7 +8,7 @@ from importlib.metadata import version
 from fastapi import FastAPI
 
 from lorakus.ai.catalog import Catalog
-from lorakus.ai.providers import build_providers
+from lorakus.ai.providers import build_embedder, build_providers
 from lorakus.ai.router import ModelRouter
 from lorakus.ai.usage import UsageStore
 from lorakus.api.auth import RequestLimits
@@ -59,7 +60,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         ),
         max_concurrent_per_user=settings.ai_concurrent_calls,
     )
-    app.state.memory = MemoryService(database, app.state.ai)
+    # Modele d'embeddings local, charge une fois (quelques secondes, hors boucle d'evenements).
+    # Absent en staging ou en production : EmbeddingError, l'API ne demarre pas.
+    app.state.embedder = await asyncio.to_thread(build_embedder, settings)
+    app.state.memory = MemoryService(database, app.state.ai, app.state.embedder)
     app.state.background = DebouncedTasks()
     try:
         yield
