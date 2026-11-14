@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Literal
 
+from opentelemetry import trace
 from pydantic import ValidationError
 from sqlalchemy import func, insert, select, update
 
@@ -41,6 +42,7 @@ from lorakus.db.database import Database
 __all__ = ["CONFIRMATION_TTL", "ConfirmationStatus", "ToolError", "ToolResult", "ToolRuntime"]
 
 CONFIRMATION_TTL: Final = timedelta(minutes=10)
+_TRACER = trace.get_tracer("lorakus.tools")
 
 ConfirmationStatus = Literal["pending", "confirmed", "cancelled", "expired"]
 
@@ -98,6 +100,21 @@ class ToolRuntime:
         origin: str | None = None,
     ) -> ToolResult:
         """Execute un outil read ; met un outil write ou sensitive en attente de confirmation."""
+        with _TRACER.start_as_current_span("tool.call", attributes={"lorakus.tool": name}) as span:
+            result = await self._call(user_id, name, arguments, ip, origin)
+            span.set_attribute(
+                "lorakus.tool.outcome", "pending" if result.confirmation_id else "done"
+            )
+            return result
+
+    async def _call(
+        self,
+        user_id: uuid.UUID,
+        name: str,
+        arguments: dict[str, Any],
+        ip: str | None,
+        origin: str | None,
+    ) -> ToolResult:
         tool, validated = await self._prepare(user_id, name, arguments)
         if tool.risk == "read":
             result = await self._execute(user_id, tool, validated, ip, origin)
@@ -144,6 +161,12 @@ class ToolRuntime:
 
         Reservation, execution et audit dans la meme transaction (voir l'en-tete du fichier).
         """
+        with _TRACER.start_as_current_span("tool.confirm"):
+            return await self._confirm(user_id, confirmation_id, ip)
+
+    async def _confirm(
+        self, user_id: uuid.UUID, confirmation_id: uuid.UUID, ip: str | None
+    ) -> ToolResult:
         async with self._db.transaction(user_id) as session:
             # FOR UPDATE : un second clic simultane attend ici, puis ne trouve plus la ligne libre.
             row = (

@@ -49,6 +49,7 @@ const TRACE = {
       data_classes: [],
     },
   ],
+  otel_trace_id: "8a3e31692c5c2a55565ae789d7203f0a",
 };
 
 function conversationWithReply(trace: unknown) {
@@ -97,6 +98,8 @@ describe("pourquoi cette réponse", () => {
     expect(dialog).toHaveTextContent("claude-haiku-5-5");
     expect(dialog).toHaveTextContent("0.0006 $");
     expect(dialog).toHaveTextContent("personnelles");
+    expect(dialog).toHaveTextContent("8a3e31692c5c2a55565ae789d7203f0a");
+    expect(within(dialog).getByRole("button", { name: "Copier l'identifiant de trace" })).toBeVisible();
   });
 
   it("dit simplement qu'une ancienne réponse n'a pas d'explication", async () => {

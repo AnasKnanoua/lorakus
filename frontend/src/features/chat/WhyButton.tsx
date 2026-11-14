@@ -9,6 +9,7 @@ import { CircleHelp, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { getReplyTrace, type ReplyTrace } from "@/api/assistant";
+import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/button";
 
 const CARD_STATUS: Record<string, string> = {
@@ -123,7 +124,19 @@ function TraceBody({ trace }: { trace: ReplyTrace }) {
           <dd>{sent || "aucune"}</dd>
           <dt className="text-ink-faint">Version du prompt</dt>
           <dd className="[overflow-wrap:anywhere]">{trace.prompt_version ?? "inconnue"}</dd>
+          {trace.otel_trace_id && (
+            <>
+              <dt className="text-ink-faint">Trace</dt>
+              <dd className="flex items-center gap-1">
+                <code className="font-mono text-xs [overflow-wrap:anywhere]">{trace.otel_trace_id}</code>
+                <CopyButton text={trace.otel_trace_id} label="Copier l'identifiant de trace" />
+              </dd>
+            </>
+          )}
         </dl>
+        {trace.otel_trace_id && (
+          <p className="mt-2 text-xs text-ink-faint">À coller dans Grafana (Tempo) pour voir chaque étape et sa durée.</p>
+        )}
       </Section>
     </>
   );

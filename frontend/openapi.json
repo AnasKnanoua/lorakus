@@ -1430,6 +1430,17 @@
             "title": "Model Calls",
             "type": "integer"
           },
+          "otel_trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Otel Trace Id"
+          },
           "prompt_version": {
             "anyOf": [
               {

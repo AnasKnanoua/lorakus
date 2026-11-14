@@ -40,7 +40,7 @@ flowchart TB
     end
   end
   PG[("PostgreSQL 18 + pgvector")]
-  OBS["Alloy → Loki · Prometheus · Tempo → Grafana"]
+  OBS["API et worker → (OTLP) Tempo · Loki ; Prometheus → Grafana"]
   EXTP["Claude API · Gemini API · Telegram · Web Push · Strava · Chess.com · RSS"]
   PWA --> CADDY
   SENS --> CADDY
@@ -160,7 +160,7 @@ Détails dans [`SECURITY.md`](SECURITY.md).
 
 ## 10. Observabilité
 
-`structlog` (JSON, masquage des secrets et des données sensibles), OpenTelemetry (traces et métriques, attributs `gen_ai.*` pour les appels IA), Alloy comme collecteur, Loki (7 jours), Prometheus (15 jours), Tempo (3 jours, 20 % d'échantillonnage hors erreurs), Grafana (tableaux Plateforme, IA, Notifications, Appareils), sentinelle externe pour la disponibilité (ADR 0036), alertes d'exploitation vers Discord (ADR 0035). Page `/admin` côté produit.
+`structlog` (JSON, masquage des secrets et des données sensibles, `trace_id` et `span_id` dans chaque ligne), OpenTelemetry pour les traces (PR 40 : requêtes HTTP, `assistant.prepare` et `assistant.reply`, `ai.call` avec modèle, tokens et coût, `tool.call`, `specialist.consult`, requêtes SQL sans valeurs), envoyées par l'API et le worker eux-mêmes en OTLP/HTTP, sans collecteur (pas d'Alloy, pas d'accès au socket Docker) ; Loki (7 jours, copie des journaux de l'API et du worker, reçue en OTLP), Prometheus (15 jours, métriques `prometheus-client`), Tempo (3 jours, toutes les traces : le volume d'un usage personnel le permet), Grafana (tableaux Plateforme, IA, Notifications, Appareils), sentinelle externe pour la disponibilité (ADR 0036), alertes d'exploitation vers Discord (ADR 0035). Page `/admin` côté produit.
 
 ## 11. Déploiement
 

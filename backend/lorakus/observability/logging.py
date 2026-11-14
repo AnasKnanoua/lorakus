@@ -8,6 +8,7 @@ from typing import Final
 import structlog
 from structlog.typing import EventDict, Processor, WrappedLogger
 
+from lorakus.observability.telemetry import add_trace_ids
 from lorakus.settings import LogFormat
 
 # Valeur qui remplace toute donnee sensible dans les journaux.
@@ -39,13 +40,18 @@ def redact_sensitive(_logger: WrappedLogger, _method: str, event_dict: EventDict
     return event_dict
 
 
-def configure_logging(*, log_format: LogFormat, level: str = "INFO") -> None:
-    """Configure structlog et la journalisation standard (uvicorn compris)."""
+def configure_logging(*, log_format: LogFormat, level: str = "INFO") -> logging.Formatter:
+    """Configure structlog et la journalisation standard (uvicorn compris).
+
+    Renvoie le formateur de la sortie standard : la copie des journaux envoyee a Loki
+    (PR 40) utilise le meme rendu, avec trace_id et span_id quand une trace est en cours.
+    """
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
+        add_trace_ids,
         redact_sensitive,
     ]
 
@@ -62,10 +68,9 @@ def configure_logging(*, log_format: LogFormat, level: str = "INFO") -> None:
         cache_logger_on_first_use=False,
     )
 
+    formatter = structlog.stdlib.ProcessorFormatter(foreign_pre_chain=shared, processors=final)
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        structlog.stdlib.ProcessorFormatter(foreign_pre_chain=shared, processors=final)
-    )
+    handler.setFormatter(formatter)
 
     root = logging.getLogger()
     root.handlers = [handler]
@@ -78,3 +83,10 @@ def configure_logging(*, log_format: LogFormat, level: str = "INFO") -> None:
         uvicorn_logger.handlers = []
         uvicorn_logger.propagate = True
     logging.getLogger("uvicorn.access").disabled = True
+    # httpx2 et httpcore2 (client HTTP du SDK d'Anthropic) journalisent chaque requete avec
+    # son adresse COMPLETE (chaine de requete comprise) : doublon de notre ligne `ai_call`, et
+    # risque de fuite si une adresse portait une donnee (trouve par le test canari, PR 40).
+    # Avertissements seulement. Les anciens noms restent couverts.
+    for name in ("httpx2", "httpcore2", "httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+    return formatter

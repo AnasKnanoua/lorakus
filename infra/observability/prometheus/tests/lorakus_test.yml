@@ -600,3 +600,49 @@ tests:
               summary: Ecritures refusees car venues d'une autre origine
               description: Plus de 5 ecritures refusees en 15 minutes par le controle d'origine. Tentative CSRF ou adresse publique mal reglee.
               runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/web.md#lorakusoriginrefused
+
+  - name: Tempo injoignable (avertissement apres 10 minutes)
+    interval: 1m
+    input_series:
+      - series: 'up{job="tempo", instance="tempo:3200"}'
+        values: '0+0x15'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: LorakusTempoDown
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: LorakusTempoDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: observability
+              job: tempo
+              instance: tempo:3200
+            exp_annotations:
+              summary: Tempo (traces) est injoignable
+              description: Prometheus ne collecte plus Tempo depuis 10 minutes ; les traces des requetes ne sont plus enregistrees.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/observability.md
+
+  - name: Loki injoignable (avertissement apres 10 minutes)
+    interval: 1m
+    input_series:
+      - series: 'up{job="loki", instance="loki:3100"}'
+        values: '0+0x15'
+      - series: 'up{job="tempo", instance="tempo:3200"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: LorakusLokiDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: observability
+              job: loki
+              instance: loki:3100
+            exp_annotations:
+              summary: Loki (journaux) est injoignable
+              description: Prometheus ne collecte plus Loki depuis 10 minutes ; les journaux ne sont plus que sur la sortie standard des conteneurs.
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/observability.md
+      - eval_time: 11m
+        alertname: LorakusTempoDown
+        exp_alerts: []

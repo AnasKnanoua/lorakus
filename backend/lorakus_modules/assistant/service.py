@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 
 import anyio
 import structlog
+from opentelemetry import trace as otel
 from prometheus_client import Counter
 from sqlalchemy import delete, func, insert, select, update
 
@@ -53,10 +54,12 @@ from lorakus.core.memory.service import MemoryService, SourceMessage
 from lorakus.core.tools.runtime import ConfirmationStatus, ToolRuntime
 from lorakus.core.tools.spec import ToolError, ToolSpec
 from lorakus.db.database import Database
+from lorakus.observability.telemetry import current_trace_id
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.models import AssistantConversation, AssistantMessage
 from lorakus_modules.assistant.prompts import PROMPT_VERSION, reports_block, system_prompt
 
+_TRACER = otel.get_tracer("lorakus.assistant")
 log = structlog.get_logger("lorakus.assistant")
 
 TASK: Final = "chat"
@@ -398,6 +401,20 @@ class AssistantService:
                 .values(**values)
             )
 
+        with _TRACER.start_as_current_span("assistant.prepare") as span:
+            return await self._prepare(user_id, conversation_id, text, config, ip, stored, span)
+
+    async def _prepare(
+        self,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        text: str,
+        config: AssistantConfig,
+        ip: str | None,
+        stored: Sequence[AssistantMessage],
+        span: otel.Span,
+    ) -> Turn:
+        """Souvenirs, outils, specialistes et requete au modele (trace : assistant.prepare)."""
         history = await self._history(user_id, stored)
         now_local = self._clock().astimezone(ZoneInfo(config.timezone))
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
@@ -425,8 +442,19 @@ class AssistantService:
             ),
         )
         self._schedule_memory(user_id, conversation_id)
+        span.set_attributes(
+            {
+                "lorakus.reply_id": str(reply_id),
+                "lorakus.memory_facts": len(facts),
+                "lorakus.tools_offered": len(tools),
+                "lorakus.specialists": len(consultations),
+                "lorakus.routing_tier": routing.tier if routing else "none",
+            }
+        )
         trace: dict[str, object] = {
             "prompt_version": PROMPT_VERSION,
+            # Identifiant de la trace OpenTelemetry (PR 40) : retrouver la requete dans Grafana.
+            "otel_trace_id": current_trace_id(),
             "memory_fact_ids": [str(f.id) for f in facts],
             "routing": _routing_trace(routing),
             "specialists": [_consultation_trace(c) for c in consultations],
@@ -553,6 +581,11 @@ class AssistantService:
         calls = 0  # appels au modele reussis pour ce message
         budget_warning = False
         saved = False
+        # Span de la reponse (PR 40) : pas « courant » (generateur suspendu a chaque morceau),
+        # ferme a la fin, client parti compris.
+        span = _TRACER.start_span(
+            "assistant.reply", attributes={"lorakus.reply_id": str(turn.reply_id)}
+        )
 
         async def save() -> uuid.UUID:
             nonlocal saved
@@ -658,6 +691,15 @@ class AssistantService:
             REPLIES.labels(status=status, reason=reason).inc()
             yield Done(message_id=message_id, status=status, budget_warning=budget_warning)
         finally:
+            span.set_attributes(
+                {
+                    "lorakus.reply_status": status,
+                    "lorakus.reply_reason": reason,
+                    "lorakus.model_calls": calls,
+                    "lorakus.tool_actions": len(actions),
+                }
+            )
+            span.end()
             if not saved:
                 # Client parti en cours de reponse : on garde ce qui a ete genere (et les
                 # cartes deja montrees). Protege de l'annulation en cours, sinon l'ecriture

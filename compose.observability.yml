@@ -1,6 +1,8 @@
-# Observabilite : Prometheus (metriques) et Grafana (tableaux de bord).
-# S'ajoute a compose.yml : make obs-up en local, inclus aussi au deploiement.
-# Ports lies a 127.0.0.1 : en production, acces uniquement par tunnel SSH.
+# Observabilite : Prometheus (metriques), Grafana (tableaux de bord), Tempo (traces) et
+# Loki (journaux). S'ajoute a compose.yml : make obs-up en local, inclus aussi au deploiement.
+# Ports lies a 127.0.0.1 : en production, acces uniquement par tunnel SSH. Tempo et Loki n'ont
+# aucun port publie : seuls l'API, le worker (qui leur envoient) et Grafana (qui les lit) y
+# accedent, sur le reseau interne.
 
 x-logging: &default-logging
   driver: json-file
@@ -10,6 +12,58 @@ x-logging: &default-logging
     tag: "{{.Name}}"
 
 services:
+  # Traces et copie des journaux (PR 40) : activees seulement quand ce fichier est inclus.
+  api:
+    environment:
+      LORAKUS_OTEL_TRACES_ENDPOINT: http://tempo:4318/v1/traces
+      LORAKUS_OTEL_LOGS_ENDPOINT: http://loki:3100/otlp/v1/logs
+
+  worker:
+    environment:
+      LORAKUS_OTEL_TRACES_ENDPOINT: http://tempo:4318/v1/traces
+      LORAKUS_OTEL_LOGS_ENDPOINT: http://loki:3100/otlp/v1/logs
+
+  # Traces (PR 40, ADR 0010) : 3 jours, stockage local. Image sans shell : pas de test de
+  # sante Docker ; Prometheus la surveille (alerte LorakusTempoDown).
+  tempo:
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./infra/observability/tempo:/etc/tempo:ro
+      - tempo-data:/var/tempo
+    read_only: true
+    tmpfs: ["/tmp:size=32m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          # Estimation a mesurer apres le premier deploiement (PR 40).
+          memory: 256m
+
+  # Journaux (PR 40, ADR 0010) : 7 jours, stockage local, recus en OTLP. Meme surveillance.
+  loki:
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./infra/observability/loki:/etc/loki:ro
+      - loki-data:/loki
+    read_only: true
+    tmpfs: ["/tmp:size=32m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          # Estimation a mesurer apres le premier deploiement (PR 40).
+          memory: 256m
+
   prometheus:
     image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     restart: unless-stopped
@@ -152,3 +206,5 @@ volumes:
   prometheus-data:
   grafana-data:
   alertmanager-data:
+  tempo-data:
+  loki-data:

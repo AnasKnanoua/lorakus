@@ -42,3 +42,12 @@ scrape_configs:
   - job_name: alertmanager
     static_configs:
       - targets: ["alertmanager:9093"]
+
+  # Traces et journaux (PR 40) : surveilles pour savoir quand ils ne recoivent plus rien.
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
