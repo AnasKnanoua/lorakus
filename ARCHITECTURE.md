@@ -106,7 +106,7 @@ Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 so
 
 | Module | Rôle | Phase |
 | --- | --- | --- |
-| `assistant` | Conversations, outils du chat (liste explicite, cartes de confirmation, ADR 0040), briefing | 3 |
+| `assistant` | Conversations, outils du chat (liste explicite, cartes de confirmation, ADR 0040), routage vers les spécialistes et trace « Pourquoi ? » (PR 39), briefing | 3 |
 | `calendars` | Abonnements ICS en lecture vers l'`Agenda` | 4 |
 | `academic` | Cours, examens, devoirs (crée des tâches), coefficients, retards | 4 |
 | `projects` | Idées, projets, tâches de projet, projets inactifs, capture Telegram | 4 |
@@ -132,7 +132,7 @@ Les règles de couplage et le contrat de manifeste sont dans [`MODULE_SYSTEM.md`
 
 ## 7. Flux principaux
 
-1. **Chat** : PWA → SSE → `assistant` → faits confirmés (`MemoryService.verified_for_prompt`) → `ModelRouter.chat` avec les outils autorisés → boucle d'outils via `tools` (permission, confirmation, audit) → réponse streamée → analyse différée des messages de l'utilisateur (faits proposés, ADR 0039).
+1. **Chat** : PWA → SSE → `assistant` → faits confirmés (`MemoryService.prompt_facts`) → routage (`IntentRouter` : mots-clés, puis sens) et consultation des spécialistes en parallèle (`Orchestrator`, seulement si un spécialiste est actif) → `ModelRouter.chat` avec les outils autorisés → boucle d'outils via `tools` (permission, confirmation, audit) → réponse streamée → réponse enregistrée avec sa trace « Pourquoi ? » → analyse différée des messages de l'utilisateur (faits proposés, ADR 0039).
 2. **Signal → intervention** : un module émet `Signals.emit(Signal)` → `InterventionPolicy` consulte `context` → applique niveau, budget, cooldown → au plus une notification, éventuellement avec une pièce jointe fournie par un port (`InspirationProvider`) → feedback de l'utilisateur enregistré.
 3. **Calendrier** : job `calendars.sync` (30 min) → lecture ICS → créneaux dans l'`Agenda` → le planificateur et le briefing les voient.
 4. **Appareil** (phase 7) : Sensors sessionise localement → lot signé toutes les 15 min → `device_ingest` → événement `device.usage_batch` / `device.health_batch` → modules propriétaires.

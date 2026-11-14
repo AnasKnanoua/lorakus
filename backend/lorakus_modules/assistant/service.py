@@ -46,6 +46,8 @@ from lorakus.ai.router import (
     ChatResult,
     ModelRouter,
 )
+from lorakus.core.agents.orchestrator import Consultation, Orchestrator
+from lorakus.core.agents.routing import IntentRouter, Routing
 from lorakus.core.background import DebouncedTasks
 from lorakus.core.memory.service import MemoryService, SourceMessage
 from lorakus.core.tools.runtime import ConfirmationStatus, ToolRuntime
@@ -53,7 +55,7 @@ from lorakus.core.tools.spec import ToolError, ToolSpec
 from lorakus.db.database import Database
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.models import AssistantConversation, AssistantMessage
-from lorakus_modules.assistant.prompts import PROMPT_VERSION, system_prompt
+from lorakus_modules.assistant.prompts import PROMPT_VERSION, reports_block, system_prompt
 
 log = structlog.get_logger("lorakus.assistant")
 
@@ -181,6 +183,11 @@ class Turn:
     request: ChatRequest
     tools: dict[str, ToolSpec] = field(default_factory=dict[str, ToolSpec])
     ip: str | None = None
+    # Identifiant de la reponse, fixe des le debut : les consultations des specialistes y
+    # sont reliees (core_agent_runs.trace_id) avant meme qu'elle soit ecrite.
+    reply_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    # Ce que la trace « Pourquoi ? » dira de la preparation (souvenirs, routage, specialistes).
+    trace: dict[str, object] = field(default_factory=dict[str, object])
 
     @property
     def origin(self) -> str:
@@ -257,12 +264,16 @@ class AssistantService:
         background: DebouncedTasks | None = None,
         memory_delay_s: float = 180,
         tools: ToolRuntime | None = None,
+        orchestrator: Orchestrator | None = None,
+        intent_router: IntentRouter | None = None,
     ) -> None:
         self._db = database
         self._ai = ai
         self._clock = clock
         self._memory = memory
         self._tools = tools
+        self._orchestrator = orchestrator
+        self._intent_router = intent_router or IntentRouter()
         self._background = background
         self._memory_delay_s = memory_delay_s
 
@@ -299,6 +310,22 @@ class AssistantService:
                 .order_by(AssistantMessage.created_at, AssistantMessage.id)
             )
             return conversation, list(messages)
+
+    async def reply(
+        self, user_id: uuid.UUID, conversation_id: uuid.UUID, message_id: uuid.UUID
+    ) -> AssistantMessage:
+        """Une reponse de l'assistant (ConversationNotFoundError si absente ou d'un autre)."""
+        async with self._db.transaction(user_id) as session:
+            message = await session.scalar(
+                select(AssistantMessage).where(
+                    AssistantMessage.id == message_id,
+                    AssistantMessage.conversation_id == conversation_id,
+                    AssistantMessage.role == "assistant",
+                )
+            )
+        if message is None:
+            raise ConversationNotFoundError
+        return message
 
     async def card_statuses(
         self, user_id: uuid.UUID, messages: Sequence[AssistantMessage]
@@ -374,11 +401,18 @@ class AssistantService:
         history = await self._history(user_id, stored)
         now_local = self._clock().astimezone(ZoneInfo(config.timezone))
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
-        facts = await self._memory.verified_for_prompt(user_id, text) if self._memory else []
+        facts = await self._memory.prompt_facts(user_id, text) if self._memory else []
         tools = tool_definitions(await self._tools.available(user_id)) if self._tools else {}
+        reply_id = uuid.uuid4()
+        routing, consultations = await self._consult(user_id, text, reply_id)
         request = ChatRequest(
             system=system_prompt(
-                config.display_name, now_local, config.timezone, facts, tools=bool(tools)
+                config.display_name,
+                now_local,
+                config.timezone,
+                [(f.category, f.content) for f in facts],
+                tools=bool(tools),
+                reports=reports_block(consultations),
             ),
             messages=messages,
             tools=tuple(
@@ -391,9 +425,39 @@ class AssistantService:
             ),
         )
         self._schedule_memory(user_id, conversation_id)
+        trace: dict[str, object] = {
+            "prompt_version": PROMPT_VERSION,
+            "memory_fact_ids": [str(f.id) for f in facts],
+            "routing": _routing_trace(routing),
+            "specialists": [_consultation_trace(c) for c in consultations],
+        }
         return Turn(
-            user_id=user_id, conversation_id=conversation_id, request=request, tools=tools, ip=ip
+            user_id=user_id,
+            conversation_id=conversation_id,
+            request=request,
+            tools=tools,
+            ip=ip,
+            reply_id=reply_id,
+            trace=trace,
         )
+
+    async def _consult(
+        self, user_id: uuid.UUID, question: str, reply_id: uuid.UUID
+    ) -> tuple[Routing | None, list[Consultation]]:
+        """Routage puis consultation des specialistes (PR 39). Sans specialiste actif : rien,
+        pas meme un calcul d'embedding (aucun cout ajoute au chat)."""
+        if self._orchestrator is None:
+            return None, []
+        profiles = await self._orchestrator.agents.available(user_id)
+        if not profiles:
+            return None, []
+        routing = await self._intent_router.route(question, profiles)
+        if not routing.targets:
+            return routing, []
+        consultations = await self._orchestrator.consult(
+            user_id, routing.targets, trace_id=str(reply_id)
+        )
+        return routing, consultations
 
     async def _history(
         self, user_id: uuid.UUID, stored: Sequence[AssistantMessage]
@@ -486,6 +550,7 @@ class AssistantService:
         reason = "ok"
         result: ChatResult | None = None
         cost = Decimal(0)
+        calls = 0  # appels au modele reussis pour ce message
         budget_warning = False
         saved = False
 
@@ -495,7 +560,14 @@ class AssistantService:
             content = "".join(parts).strip() or (
                 "Voici ce que je te propose." if actions else FALLBACKS["error"]
             )
-            return await self._save_reply(turn, content, status, result, cost, actions)
+            trace = {
+                **turn.trace,
+                "model": result.model if result else None,
+                "model_calls": calls,
+                "cost_usd": str(cost) if result else None,
+                "data_classes_sent": _classes_sent(turn, calls),
+            }
+            return await self._save_reply(turn, content, status, result, cost, actions, trace)
 
         def fallback(key: str) -> Delta:
             # Avant tout texte et toute carte : la reponse est le gabarit. Apres : on garde ce
@@ -542,6 +614,7 @@ class AssistantService:
                         else:
                             result = event
                             cost += event.cost_usd
+                            calls += 1
                             budget_warning = budget_warning or event.budget_warning
                     if not uses or last:
                         break
@@ -644,8 +717,9 @@ class AssistantService:
         result: ChatResult | None,
         cost: Decimal,
         actions: list[dict[str, object]],
+        trace: dict[str, object],
     ) -> uuid.UUID:
-        message_id = uuid.uuid4()
+        message_id = turn.reply_id
         async with self._db.transaction(turn.user_id) as session:
             await session.execute(
                 insert(AssistantMessage).values(
@@ -660,6 +734,7 @@ class AssistantService:
                     prompt_version=PROMPT_VERSION if status != "fallback" else None,
                     cost_usd=cost if result else None,
                     actions=actions,
+                    trace=trace,
                 )
             )
             await session.execute(
@@ -668,6 +743,42 @@ class AssistantService:
                 .values(updated_at=func.now())
             )
         return message_id
+
+
+def _routing_trace(routing: Routing | None) -> dict[str, object] | None:
+    if routing is None:
+        return None
+    return {
+        "tier": routing.tier,
+        "best": routing.best,
+        "score": routing.score,
+        "runner_up": routing.runner_up,
+        "reason": routing.reason,
+    }
+
+
+def _consultation_trace(c: Consultation) -> dict[str, object]:
+    return {
+        "specialist": c.specialist,
+        "display_name": c.display_name,
+        "intent": c.intent,
+        "status": c.report.status,
+        "duration_ms": c.duration_ms,
+        "cached": c.cached,
+        "skipped": c.skipped,
+        "data_classes": list(c.data_classes),
+    }
+
+
+def _classes_sent(turn: Turn, calls: int) -> list[str]:
+    """Classes de donnees parties chez le fournisseur pour ce message (ADR 0026)."""
+    if calls == 0:
+        return []
+    classes = {"personal"}  # la conversation elle-meme
+    for item in cast(list[dict[str, object]], turn.trace.get("specialists", [])):
+        classes.update(cast(list[str], item["data_classes"]))
+    order = {"public": 0, "personal": 1, "sensitive": 2}
+    return sorted(classes, key=lambda c: order.get(c, 9))
 
 
 def _for_model(data: dict[str, object]) -> str:

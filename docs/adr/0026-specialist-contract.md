@@ -24,3 +24,10 @@ Contrat libre en texte (non testable) ; appels directs entre spécialistes (cont
 ## Conséquences
 
 P2 : profil, registre, modèles et table ; P3 : orchestrateur et cache. Les champs `report_class` et `actions` existent dès P2, leur logique arrive avec le premier besoin réel (ADR 0027, 0028). Tests de contrat obligatoires pour chaque profil.
+
+## Amendement du 2026-11-14 (PR 39) : orchestrateur livré, cache par durée de vie
+
+- **Orchestrateur** (`core/agents/orchestrator.py`) : au plus 4 spécialistes en parallèle, délai de chacun borné par un plafond global de 3 s par question, aucune reprise ; disjoncteur par spécialiste (3 échecs, 15 minutes, puis un essai), le même que celui des fournisseurs d'IA ; dépend d'un contrat (`SpecialistDirectory`), pas du service concret.
+- **Cache** : par durée de vie déclarée dans le profil (`cache_ttl_s`, 0 par défaut), par utilisateur, jamais pour un rapport en échec, en mémoire de l'API. **L'invalidation par événements est reportée** au premier spécialiste réel qui en a besoin (décision du propriétaire, 2026-11-14) : les événements sont traités par le worker, un autre processus que l'API.
+- **Vers le modèle** : seuls les rapports d'un spécialiste dont la classe maximale n'est pas `sensitive` (en attendant le filtre par marqueurs, ADR 0027, P10), au statut `ok` ou `partial`, entrent dans le prompt, comme des données, dans un bloc qu'un rapport ne peut pas refermer ; jamais un fait `sensitive`. `core_agent_runs` enregistre `trace_id` (la réponse du chat) et les classes réellement transmises.
+- **Trace « Pourquoi m'as-tu dit ça ? »** (scénario 7) : enregistrée avec chaque réponse (`asst_messages.trace`) : version du prompt, modèle, appels, coût, souvenirs fournis (par identifiant, jamais leur texte), outils et cartes, routage, spécialistes, classes de données transmises. Route `GET /api/v1/assistant/conversations/{id}/messages/{id}/trace`, bouton « Pourquoi ? » dans le chat.

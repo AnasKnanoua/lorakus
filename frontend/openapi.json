@@ -1354,6 +1354,280 @@
         "title": "TotpSetupResponse",
         "type": "object"
       },
+      "TraceFact": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "category"
+        ],
+        "title": "TraceFact",
+        "type": "object"
+      },
+      "TraceOut": {
+        "description": "« Pourquoi m'as-tu dit ca ? » (PR 39) : ce qui a servi a ecrire une reponse.",
+        "properties": {
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "data_classes_sent": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Classes Sent",
+            "type": "array"
+          },
+          "memory_facts": {
+            "items": {
+              "$ref": "#/components/schemas/TraceFact"
+            },
+            "title": "Memory Facts",
+            "type": "array"
+          },
+          "memory_facts_removed": {
+            "title": "Memory Facts Removed",
+            "type": "integer"
+          },
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_calls": {
+            "title": "Model Calls",
+            "type": "integer"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "routing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceRouting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specialists": {
+            "items": {
+              "$ref": "#/components/schemas/TraceSpecialist"
+            },
+            "title": "Specialists",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/TraceTool"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "message_id",
+          "prompt_version",
+          "model",
+          "model_calls",
+          "cost_usd",
+          "data_classes_sent",
+          "memory_facts",
+          "memory_facts_removed",
+          "tools",
+          "routing",
+          "specialists"
+        ],
+        "title": "TraceOut",
+        "type": "object"
+      },
+      "TraceRouting": {
+        "properties": {
+          "best": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "runner_up": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runner Up"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tier",
+          "reason"
+        ],
+        "title": "TraceRouting",
+        "type": "object"
+      },
+      "TraceSpecialist": {
+        "properties": {
+          "cached": {
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "data_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Classes",
+            "type": "array"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "intent": {
+            "title": "Intent",
+            "type": "string"
+          },
+          "skipped": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped"
+          },
+          "specialist": {
+            "title": "Specialist",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "specialist",
+          "display_name",
+          "intent",
+          "status",
+          "duration_ms",
+          "cached",
+          "data_classes"
+        ],
+        "title": "TraceSpecialist",
+        "type": "object"
+      },
+      "TraceTool": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "activity",
+              "card"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "kind",
+          "text"
+        ],
+        "title": "TraceTool",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1707,6 +1981,60 @@
           }
         },
         "summary": "Send Message",
+        "tags": [
+          "Assistant"
+        ]
+      }
+    },
+    "/api/v1/assistant/conversations/{conversation_id}/messages/{message_id}/trace": {
+      "get": {
+        "description": "Explication d'une reponse. 404 si elle n'existe pas, n'est pas a l'utilisateur, ou est\nanterieure aux traces.",
+        "operationId": "reply_trace_api_v1_assistant_conversations__conversation_id__messages__message_id__trace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reply Trace",
         "tags": [
           "Assistant"
         ]

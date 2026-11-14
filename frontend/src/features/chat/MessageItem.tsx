@@ -7,6 +7,7 @@ import { Markdown } from "@/components/Markdown";
 import { Orb } from "@/components/Orb";
 
 import { ToolActions } from "./ToolActions";
+import { WhyButton } from "./WhyButton";
 
 export function UserMessage({ text }: { text: string }) {
   return (
@@ -28,6 +29,7 @@ export function AssistantMessage({
   writing = false,
   actions = [],
   conversationId = "",
+  messageId,
 }: {
   text: string;
   status: ReplyStatus | "streaming";
@@ -35,6 +37,8 @@ export function AssistantMessage({
   /** Outils utilises et cartes de confirmation de la reponse (PR 38). */
   actions?: readonly ToolAction[];
   conversationId?: string;
+  /** Reponse enregistree : son explication (« Pourquoi ? ») peut etre ouverte (PR 39). */
+  messageId?: string;
 }) {
   const done = !writing && status !== "fallback" && text.length > 0;
   const thinking = !text && actions.length === 0;
@@ -61,6 +65,7 @@ export function AssistantMessage({
         {done && (
           <div className="mt-2 -ml-1.5 flex gap-1 transition-opacity duration-200 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within/answer:opacity-100 [@media(hover:hover)]:group-hover/answer:opacity-100">
             <CopyButton text={text} label="Copier la réponse" />
+            {messageId && conversationId && <WhyButton conversationId={conversationId} messageId={messageId} />}
           </div>
         )}
       </div>

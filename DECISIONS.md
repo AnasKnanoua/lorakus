@@ -30,8 +30,8 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
 | [0023](docs/adr/0023-codename-lorakus.md) | Nom de code LORAKUS | Validé (2026-11-08) | Avant toute ouverture commerciale |
 | [0024](docs/adr/0024-blobstore-port.md) | Stockage de fichiers derrière le port `BlobStore` | Accepté | Passage à un hébergeur payant |
-| [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | Validé (D-H) | Fin de la phase 3 |
-| [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | Validé (D-H) | Fin de la phase 3 |
+| [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | Validé (D-H), amendé 2026-11-14 (routage en deux paliers) | Fin de la phase 3 |
+| [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | Validé (D-H), amendé 2026-11-14 (orchestrateur, cache par durée de vie, trace) | Fin de la phase 3 |
 | [0027](docs/adr/0027-report-confidentiality.md) | Confidentialité des rapports transmis au LLM | Validé (D-I) | Après la phase 14 |
 | [0028](docs/adr/0028-preparations-approvals.md) | Préparations en arrière-plan et file d'approbation | Accepté | Phase 6 |
 | [0029](docs/adr/0029-progressive-friction.md) | Friction progressive et pactes volontaires (amende 0016) | Validé (D-J) | Phase 12 |
@@ -77,6 +77,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |
 | — | Mémoire v1 : rien n'est retenu sans confirmation, seuls les messages de l'utilisateur sont analysés, extrait vérifié mot pour mot, propositions activées par défaut (ADR 0039) | 2026-11-12 |
 | — | Recherche hybride des souvenirs (plein texte français sans accents + vecteurs, fusion RRF, sans seuil absolu) ; prompt : identité, puis pertinence, puis récence ; évaluation avec le vrai modèle dans la CI (amendement de l'ADR 0039) | 2026-11-13 |
+| — | Orchestrateur (PR 39) : palier 3 du routage et invalidation du cache par événements reportés à la P4 (amendements des ADR 0025 et 0026) ; trace « Pourquoi ? » enregistrée avec chaque réponse, souvenirs par identifiant | 2026-11-14 |
 | — | Outils dans le chat (PR 38, ADR 0040) : cartes de confirmation écrites par le code, jamais confirmables par le modèle ; liste explicite des outils du chat ; un message = un appel dans la limite par minute ; une seule PR | 2026-11-13 |
 | — | Hébergement et IA (recherche du 2026-11-13) : Oracle gratuit et Haiku 5.5 seul jusqu'à la v0.5 ; ARM payant, adaptateur IA européen et checklist RGPD seulement au premier client | 2026-11-13 |
 | — | Embeddings locaux : `multilingual-e5-small` int8 par ONNX Runtime dans l'API, sans `fastembed`, fichiers intégrés à l'image et vérifiés par SHA-256 ; PR 37 en deux livraisons, socle mesuré (37a) puis recherche hybride (37b) (amendement de l'ADR 0007) | 2026-11-13 |

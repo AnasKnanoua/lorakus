@@ -15,6 +15,8 @@ from lorakus.api.auth import RequestLimits
 from lorakus.api.modules import mount_module_routes
 from lorakus.api.origin import OriginCheckMiddleware
 from lorakus.api.routes import auth, health, memory, modules, tools
+from lorakus.core.agents.orchestrator import Orchestrator
+from lorakus.core.agents.routing import IntentRouter
 from lorakus.core.agents.service import AgentService
 from lorakus.core.background import DebouncedTasks
 from lorakus.core.identity.service import IdentityService
@@ -66,6 +68,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.memory = MemoryService(database, app.state.ai, app.state.embedder)
     # Outils des modules : services du Core qu'ils peuvent utiliser (PR 38).
     app.state.tools = ToolRuntime(database, app.state.modules, ToolPorts(memory=app.state.memory))
+    # Specialistes (PR 39) : un orchestrateur et un routage par application (etat partage).
+    app.state.orchestrator = Orchestrator(app.state.agents)
+    app.state.intent_router = IntentRouter(app.state.embedder)
     app.state.background = DebouncedTasks()
     try:
         yield

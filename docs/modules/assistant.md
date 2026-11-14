@@ -28,6 +28,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | Messages de secours | Gabarits fixes | Doivent marcher précisément quand l'IA ne marche pas |
 | Choisir un outil | LLM | Comprendre la demande ; l'exécution et la décision restent au code et à l'utilisateur |
 | Texte des cartes | Règle (code de l'outil) | Ce que l'utilisateur confirme ne doit dépendre d'aucun texte du modèle |
+| Choisir les spécialistes | Règles, puis similarité par embeddings locaux (marge réglée sur un jeu distinct) ; pas de LLM avant la P4 | Gratuit, rapide (environ 35 ms), rien ne sort du serveur ; un appel LLM coûterait 1,6 s |
 
 ## API (`/api/v1/assistant`, session et module activé requis)
 
@@ -38,6 +39,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | `GET /conversations/{id}` | Conversation et messages |
 | `DELETE /conversations/{id}` | Suppression définitive (204) |
 | `POST /conversations/{id}/messages` | Corps `{"content": "..."}` ; réponse `text/event-stream` |
+| `GET /conversations/{id}/messages/{id}/trace` | « Pourquoi m'as-tu dit ça ? » (PR 39) : souvenirs fournis, outils et cartes, routage, spécialistes, modèle, appels, coût, classes transmises ; 404 pour une réponse antérieure |
 
 Flux de réponse :
 

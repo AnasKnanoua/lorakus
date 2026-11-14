@@ -137,6 +137,15 @@ class FactView:
 
 
 @dataclass(frozen=True)
+class PromptFact:
+    """Fait confirme donne au modele."""
+
+    id: uuid.UUID
+    category: str
+    content: str
+
+
+@dataclass(frozen=True)
 class ProposalOutcome:
     proposed: int
     reason: str  # ok, disabled, pending_full, ai_unavailable, ai_refused, invalid_output, empty
@@ -197,7 +206,14 @@ class MemoryService:
     async def verified_for_prompt(
         self, user_id: uuid.UUID, question: str | None = None
     ) -> list[tuple[str, str]]:
-        """(categorie, texte) des faits confirmes a donner au modele, dans un budget borne.
+        """(categorie, texte) des faits confirmes a donner au modele (voir prompt_facts)."""
+        return [(f.category, f.content) for f in await self.prompt_facts(user_id, question)]
+
+    async def prompt_facts(
+        self, user_id: uuid.UUID, question: str | None = None
+    ) -> list["PromptFact"]:
+        """Faits confirmes a donner au modele, dans un budget borne, avec leur identifiant
+        (la trace d'une reponse les cite par identifiant, jamais par leur texte).
 
         Ordre de priorite (PR 37b) : les faits d'identite (prenom, ville...), puis les plus
         pertinents pour `question` (recherche hybride), puis les plus recents. Quand tout tient
@@ -224,7 +240,7 @@ class MemoryService:
         by_id = {fact_id: (category, content) for fact_id, category, content in rows}
         identity = [fact_id for fact_id, category, _ in rows if category == "identity"]
         recent = [fact_id for fact_id, _, _ in rows]
-        facts: list[tuple[str, str]] = []
+        facts: list[PromptFact] = []
         seen: set[uuid.UUID] = set()
         used = 0
         for fact_id in [*identity, *ranked, *recent]:
@@ -235,7 +251,7 @@ class MemoryService:
             cost = estimate_tokens(content) + 4
             if used + cost > PROMPT_FACTS_TOKENS or len(facts) >= PROMPT_FACTS_MAX:
                 continue  # un fait plus court peut encore tenir
-            facts.append((category, content))
+            facts.append(PromptFact(fact_id, category, content))
             used += cost
         return facts
 

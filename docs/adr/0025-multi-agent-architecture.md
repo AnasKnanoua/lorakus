@@ -19,3 +19,10 @@ Un service ou un processus par agent (contraire à l'ADR 0001) ; spécialistes e
 ## Conséquences
 
 Nouveau service `agents` dans le Core (ADR 0026). Le nom affiché du Majordome est configurable (`ASSISTANT_DISPLAY_NAME`). Un spécialiste se désactive comme un module. Extraction en service séparé possible plus tard sans changer le contrat.
+
+## Amendement du 2026-11-14 (PR 39) : routage en deux paliers jusqu'à la P4
+
+- **Palier 1, règles** : mots-clés déclarés par intention dans le `SpecialistProfile` (`keywords`), mots entiers, sans accents ni casse ; une question peut toucher plusieurs spécialistes.
+- **Palier 2, sens** : similarité avec les phrases d'exemple de chaque intention (`examples`), par le modèle d'embeddings local (rien ne sort du serveur), contre une classe « sans spécialiste » (bavardage, culture générale, mémoire). Le modèle donnant des similarités tassées, aucune valeur absolue : la meilleure intention n'est retenue que si elle devance de `margin` la suivante et la classe « sans spécialiste ». Marge choisie sur la partie `tuning` de `backend/tests/evals/intent_routing.json`, mesurée sur la partie `measure` (objectif fixé avant mesure : 90 %), dans la CI avec le vrai modèle.
+- **Palier 3 (LLM léger si ambigu) reporté à la P4** (décision du propriétaire, 2026-11-14) : sans vrai spécialiste, il n'aurait rien à départager, et coûterait un appel (environ 1,6 s mesurées) qui menace l'objectif de 5 s. En attendant, une question ambiguë ne consulte personne.
+- Sans spécialiste actif, le routage ne fait rien (pas même un embedding) : aucun coût ajouté au chat.

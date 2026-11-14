@@ -116,6 +116,14 @@ class SpecialistProfile(BaseModel):
     actions: list[str] = Field(default_factory=list[str])
     limits: str = Field(min_length=1, description="Ce que le specialiste ne fait pas, en clair")
     handler: SpecialistHandler
+    # Routage (PR 39, ADR 0025) : par intention, des mots-cles (palier 1, regles) et des
+    # phrases d'exemple (palier 2, similarite par embeddings locaux). Une intention sans
+    # l'un ni l'autre n'est jamais choisie automatiquement (seulement par l'API interne).
+    keywords: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+    examples: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+    # Duree de vie d'un rapport en cache, en secondes (0 : jamais mis en cache). Invalidation
+    # par evenements reportee au premier specialiste reel qui en a besoin (ADR 0026, amende).
+    cache_ttl_s: float = Field(default=0, ge=0, le=3600)
 
     @model_validator(mode="after")
     def _coherent(self) -> Self:
@@ -126,4 +134,11 @@ class SpecialistProfile(BaseModel):
             raise ValueError("budget LLM sans usage LLM")
         if self.llm_usage != "none" and self.monthly_llm_budget_eur == 0:
             raise ValueError("usage LLM sans budget mensuel")
+        for field_name, table in (("keywords", self.keywords), ("examples", self.examples)):
+            unknown = sorted(set(table) - set(self.intents))
+            if unknown:
+                raise ValueError(f"{field_name} pour une intention non declaree : {unknown}")
+            for phrases in table.values():
+                if not phrases or any(not p.strip() or len(p) > 200 for p in phrases):
+                    raise ValueError(f"{field_name} : phrases non vides de 200 caracteres au plus")
         return self

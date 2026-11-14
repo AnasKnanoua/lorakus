@@ -77,3 +77,7 @@ class AssistantMessage(Base):
     actions: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb"), default=list
     )
+    # Trace « Pourquoi m'as-tu dit ca ? » (PR 39) : souvenirs fournis (identifiants), routage,
+    # specialistes consultes, modele, appels, cout, classes de donnees transmises. NULL pour
+    # les messages de l'utilisateur et les reponses anterieures.
+    trace: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)

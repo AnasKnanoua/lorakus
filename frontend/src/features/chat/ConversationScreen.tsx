@@ -85,6 +85,7 @@ export function ConversationScreen() {
               status={asStatus(m.status)}
               actions={m.actions}
               conversationId={conversationId}
+              messageId={m.id}
             />
           ),
         )}
