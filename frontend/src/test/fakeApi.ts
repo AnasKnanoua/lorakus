@@ -12,6 +12,20 @@ export interface FakeMessage {
   model: string | null;
   cost_usd: string | null;
   created_at: string;
+  actions?: FakeAction[];
+}
+
+/** Outil d'une reponse (PR 38), au format de l'API (ActionOut). */
+export interface FakeAction {
+  kind: "activity" | "card";
+  tool: string;
+  label?: string;
+  ok?: boolean;
+  confirmation_id?: string;
+  risk?: "write" | "sensitive";
+  summary?: string;
+  expires_at?: string;
+  status?: "pending" | "confirmed" | "cancelled" | "expired";
 }
 
 export interface FakeFact {
@@ -35,7 +49,13 @@ export interface FakeState {
   assistantEnabled: boolean;
   conversations: Map<string, { id: string; title: string; messages: FakeMessage[] }>;
   /** Reponse que le prochain message recevra, decoupee en morceaux de flux. */
-  nextReply: { chunks: string[]; status: "ok" | "interrupted" | "fallback"; budgetWarning?: boolean };
+  nextReply: {
+    chunks: string[];
+    status: "ok" | "interrupted" | "fallback";
+    budgetWarning?: boolean;
+    /** Outils et cartes envoyes apres le texte, comme les evenements tool et card du serveur. */
+    actions?: FakeAction[];
+  };
   /** Simule une coupure reseau a l'envoi du prochain message. */
   failNextSend: boolean;
   /** Si defini, le flux s'arrete apres les morceaux de texte jusqu'a ce que la promesse aboutisse. */
@@ -47,6 +67,8 @@ export interface FakeState {
   proposalsEnabled: boolean;
   /** Derniere preuve d'identite trop ancienne : « tout oublier » repond 403. */
   reauthStale: boolean;
+  /** Cartes de confirmation, par identifiant (PR 38). */
+  cards: Map<string, FakeAction>;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -97,6 +119,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     semantic: {},
     proposalsEnabled: true,
     reauthStale: false,
+    cards: new Map(),
     ...overrides,
   };
   let counter = 0;
@@ -190,9 +213,18 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       const reply = state.nextReply;
       // Comme le serveur : le message de l'utilisateur est enregistre des le debut du tour.
       conversation.messages.push(message("user", content, "ok"));
-      const saved = message("assistant", reply.chunks.join(""), reply.status);
+      const actions = (reply.actions ?? []).map((a) => ({ ...a }));
+      const saved = { ...message("assistant", reply.chunks.join(""), reply.status), actions };
+      for (const action of actions) {
+        if (action.kind === "card" && action.confirmation_id) {
+          state.cards.set(action.confirmation_id, action); // meme objet : son etat suit les clics
+        }
+      }
       return sse(
-        reply.chunks.map((t) => ({ event: "delta", data: { text: t } })),
+        [
+          ...reply.chunks.map((t) => ({ event: "delta", data: { text: t } })),
+          ...actions.map((a) => ({ event: a.kind === "card" ? "card" : "tool", data: { ...a } })),
+        ],
         {
           event: "done",
           data: { message_id: saved.id, status: reply.status, budget_warning: reply.budgetWarning ?? false },
@@ -268,6 +300,22 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       const deleted = state.facts.length;
       state.facts = [];
       return json(200, { deleted });
+    }
+    const cardMatch = /^\/api\/v1\/tools\/confirmations\/([^/]+)(\/cancel)?$/.exec(path);
+    if (cardMatch && request.method === "POST") {
+      const card = state.cards.get(cardMatch[1] ?? "");
+      if (!card || card.status !== "pending") {
+        return json(409, { detail: "Cette action n'est plus disponible (déjà traitée ou expirée)." });
+      }
+      if (cardMatch[2] === "/cancel") {
+        card.status = "cancelled";
+        return new Response(null, { status: 204 });
+      }
+      if (card.risk === "sensitive" && state.reauthStale) {
+        return json(403, { detail: { code: "reauth_required", message: "Confirmez votre identite." } });
+      }
+      card.status = "confirmed";
+      return json(200, { tool: card.tool, risk: card.risk, result: { message: "Fait." } });
     }
     if (path === "/api/v1/auth/reauth") {
       const ok = (body as { password: string }).password === state.password;

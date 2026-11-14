@@ -1,6 +1,114 @@
 {
   "components": {
     "schemas": {
+      "ActionOut": {
+        "description": "Outil d'une reponse : indication (activity) ou carte de confirmation (card).",
+        "properties": {
+          "confirmation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Id"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "kind": {
+            "enum": [
+              "activity",
+              "card"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pending",
+                  "confirmed",
+                  "cancelled",
+                  "expired"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "tool"
+        ],
+        "title": "ActionOut",
+        "type": "object"
+      },
       "ApiKeyCreateRequest": {
         "properties": {
           "expires_in_days": {
@@ -711,6 +819,14 @@
       },
       "MessageOut": {
         "properties": {
+          "actions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -1125,6 +1241,18 @@
             ],
             "title": "Confirmation Id"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "result": {
             "anyOf": [
               {
@@ -1140,6 +1268,17 @@
           "risk": {
             "title": "Risk",
             "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
           },
           "tool": {
             "title": "Tool",
@@ -2525,6 +2664,43 @@
           }
         },
         "summary": "Confirm Tool",
+        "tags": [
+          "outils et specialistes"
+        ]
+      }
+    },
+    "/api/v1/tools/confirmations/{confirmation_id}/cancel": {
+      "post": {
+        "description": "Refuse une action en attente : elle ne pourra plus etre confirmee.",
+        "operationId": "cancel_tool_api_v1_tools_confirmations__confirmation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "confirmation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Confirmation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Tool",
         "tags": [
           "outils et specialistes"
         ]

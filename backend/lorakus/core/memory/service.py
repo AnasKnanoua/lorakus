@@ -286,8 +286,21 @@ class MemoryService:
             )
 
     # ------------------------------------------------------------- decisions
-    async def add_fact(self, user_id: uuid.UUID, content: str, category: Category) -> FactView:
-        """Fait saisi par l'utilisateur lui-meme : confirme d'emblee."""
+    async def get_fact(self, user_id: uuid.UUID, fact_id: uuid.UUID) -> FactView:
+        """Un fait de l'utilisateur (FactNotFoundError s'il n'existe pas ou n'est pas a lui)."""
+        async with self._db.transaction(user_id) as session:
+            return _view(await self._get(session, fact_id))
+
+    async def add_fact(
+        self,
+        user_id: uuid.UUID,
+        content: str,
+        category: Category,
+        *,
+        source_ref: str | None = None,
+    ) -> FactView:
+        """Fait confirme d'emblee par l'utilisateur : saisi a la main, ou retenu depuis une
+        conversation par une carte qu'il a confirmee (source_ref, ex. conversation:<id>)."""
         text = clean_content(content)
         async with self._db.transaction(user_id) as session:
             await self._check_verified_room(session)
@@ -299,7 +312,8 @@ class MemoryService:
                 category=category,
                 status="verified",
                 data_class="personal",
-                source_kind="manual",
+                source_kind="conversation" if source_ref else "manual",
+                source_ref=source_ref,
                 confirmed_at=func.now(),
             )
             if await self._hash_exists(session, fact.content_hash):

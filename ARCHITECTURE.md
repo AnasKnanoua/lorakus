@@ -106,7 +106,7 @@ Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 so
 
 | Module | Rôle | Phase |
 | --- | --- | --- |
-| `assistant` | Conversations, composition des outils des modules actifs, briefing | 3 |
+| `assistant` | Conversations, outils du chat (liste explicite, cartes de confirmation, ADR 0040), briefing | 3 |
 | `calendars` | Abonnements ICS en lecture vers l'`Agenda` | 4 |
 | `academic` | Cours, examens, devoirs (crée des tâches), coefficients, retards | 4 |
 | `projects` | Idées, projets, tâches de projet, projets inactifs, capture Telegram | 4 |

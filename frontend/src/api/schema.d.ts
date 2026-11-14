@@ -658,6 +658,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tools/confirmations/{confirmation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Tool
+         * @description Refuse une action en attente : elle ne pourra plus etre confirmee.
+         */
+        post: operations["cancel_tool_api_v1_tools_confirmations__confirmation_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tools/{name}": {
         parameters: {
             query?: never;
@@ -682,6 +702,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActionOut
+         * @description Outil d'une reponse : indication (activity) ou carte de confirmation (card).
+         */
+        ActionOut: {
+            /** Confirmation Id */
+            confirmation_id?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "activity" | "card";
+            /** Label */
+            label?: string | null;
+            /** Ok */
+            ok?: boolean | null;
+            /** Risk */
+            risk?: string | null;
+            /** Status */
+            status?: ("pending" | "confirmed" | "cancelled" | "expired") | null;
+            /** Summary */
+            summary?: string | null;
+            /** Tool */
+            tool: string;
+        };
         /** ApiKeyCreateRequest */
         ApiKeyCreateRequest: {
             /** Expires In Days */
@@ -965,6 +1012,11 @@ export interface components {
         };
         /** MessageOut */
         MessageOut: {
+            /**
+             * Actions
+             * @default []
+             */
+            actions: components["schemas"]["ActionOut"][];
             /** Content */
             content: string;
             /** Cost Usd */
@@ -1123,12 +1175,16 @@ export interface components {
         ToolCallResponse: {
             /** Confirmation Id */
             confirmation_id?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
             /** Result */
             result?: {
                 [key: string]: unknown;
             } | null;
             /** Risk */
             risk: string;
+            /** Summary */
+            summary?: string | null;
             /** Tool */
             tool: string;
         };
@@ -2172,6 +2228,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ToolCallResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_tool_api_v1_tools_confirmations__confirmation_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                confirmation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

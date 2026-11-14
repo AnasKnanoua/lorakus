@@ -1,5 +1,6 @@
 import { ApiError, api, type Schemas } from "./client";
 import { readSse } from "./sse";
+import type { ToolAction } from "./tools";
 
 export type Conversation = Schemas["ConversationOut"];
 export type ConversationDetail = Schemas["ConversationDetail"];
@@ -82,8 +83,36 @@ function isStatus(value: unknown): value is ReplyStatus {
   return value === "ok" || value === "interrupted" || value === "fallback";
 }
 
+/** Evenement d'outil du flux (tool ou card) -> action affichable, ou null s'il est invalide. */
+function toAction(event: string, payload: Record<string, unknown>): ToolAction | null {
+  if (typeof payload["tool"] !== "string") {
+    return null;
+  }
+  if (event === "tool" && typeof payload["label"] === "string") {
+    return { kind: "activity", tool: payload["tool"], label: payload["label"], ok: payload["ok"] !== false };
+  }
+  if (
+    event === "card" &&
+    typeof payload["confirmation_id"] === "string" &&
+    typeof payload["summary"] === "string" &&
+    typeof payload["expires_at"] === "string"
+  ) {
+    return {
+      kind: "card",
+      tool: payload["tool"],
+      confirmation_id: payload["confirmation_id"],
+      risk: payload["risk"] === "sensitive" ? "sensitive" : "write",
+      summary: payload["summary"],
+      expires_at: payload["expires_at"],
+      status: "pending",
+    };
+  }
+  return null;
+}
+
 /**
- * Envoie un message et lit la reponse en flux. onDelta recoit chaque morceau de texte.
+ * Envoie un message et lit la reponse en flux. onDelta recoit chaque morceau de texte,
+ * onAction chaque outil utilise ou carte de confirmation (PR 38).
  * Annuler `signal` coupe la connexion ; le serveur garde alors la reponse partielle.
  */
 export async function sendMessage(
@@ -91,6 +120,7 @@ export async function sendMessage(
   content: string,
   onDelta: (text: string) => void,
   signal?: AbortSignal,
+  onAction?: (action: ToolAction) => void,
 ): Promise<ReplyDone> {
   const { data, response, error } = await api.POST(
     "/api/v1/assistant/conversations/{conversation_id}/messages",
@@ -108,6 +138,11 @@ export async function sendMessage(
     const payload = parseJson(event.data);
     if (event.event === "delta" && typeof payload["text"] === "string") {
       onDelta(payload["text"]);
+    } else if (event.event === "tool" || event.event === "card") {
+      const action = toAction(event.event, payload);
+      if (action) {
+        onAction?.(action);
+      }
     } else if (event.event === "done") {
       const status = payload["status"];
       return {

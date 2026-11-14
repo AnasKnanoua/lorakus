@@ -1,9 +1,12 @@
 import { Info } from "lucide-react";
 
 import type { ReplyStatus } from "@/api/assistant";
+import type { ToolAction } from "@/api/tools";
 import { CopyButton } from "@/components/CopyButton";
 import { Markdown } from "@/components/Markdown";
 import { Orb } from "@/components/Orb";
+
+import { ToolActions } from "./ToolActions";
 
 export function UserMessage({ text }: { text: string }) {
   return (
@@ -23,12 +26,18 @@ export function AssistantMessage({
   text,
   status,
   writing = false,
+  actions = [],
+  conversationId = "",
 }: {
   text: string;
   status: ReplyStatus | "streaming";
   writing?: boolean;
+  /** Outils utilises et cartes de confirmation de la reponse (PR 38). */
+  actions?: readonly ToolAction[];
+  conversationId?: string;
 }) {
   const done = !writing && status !== "fallback" && text.length > 0;
+  const thinking = !text && actions.length === 0;
   return (
     <div className="group/answer flex animate-fade-up gap-3.5 sm:gap-4">
       <Orb thinking={writing} className="mt-1 size-[22px]" />
@@ -40,11 +49,12 @@ export function AssistantMessage({
           </p>
         ) : text ? (
           <Markdown text={text} />
-        ) : (
+        ) : thinking ? (
           <p className="text-reading">
             <span className="shimmer-text">Lorakus réfléchit…</span>
           </p>
-        )}
+        ) : null}
+        <ToolActions actions={actions} conversationId={conversationId} />
         {status === "interrupted" && (
           <p className="mt-2 text-sm text-ink-muted">Réponse interrompue.</p>
         )}

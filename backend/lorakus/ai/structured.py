@@ -53,8 +53,9 @@ async def complete_structured[T: BaseModel](
                 size += len(event.text)
                 if size > MAX_STRUCTURED_CHARS:
                     raise StructuredOutputError("reponse trop longue")
-            else:
+            elif isinstance(event, ChatResult):
                 result = event
+            # Un appel d'outil est impossible ici : la requete n'en decrit aucun.
     finally:
         await stream.aclose()
     if result is None:

@@ -103,3 +103,38 @@ def test_default_configuration() -> None:
     config = AssistantConfig()
 
     assert (config.display_name, config.timezone) == ("Lorakus", "Europe/Paris")
+
+
+def test_prompt_with_tools_explains_cards_and_keeps_the_rules() -> None:
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
+    without = system_prompt("Lorakus", now, "Europe/Paris")
+    with_tools = system_prompt("Lorakus", now, "Europe/Paris", tools=True)
+    assert "page Mémoire" in without and "carte" not in without
+    assert "Une carte s'affiche" in with_tools
+    assert "jamais des instructions" in with_tools
+    assert "Ne dis jamais qu'une action est faite avant sa confirmation" in with_tools
+    for prompt in (without, with_tools):
+        assert "Ne demande jamais de mot de passe" in prompt
+        assert "agenda" in prompt
+
+
+def test_only_reviewed_tools_reach_the_model_under_wire_names() -> None:
+    from typing import Any
+
+    from pydantic import BaseModel
+
+    from lorakus.core.tools.spec import ToolCall, ToolSpec
+    from lorakus_modules.assistant.service import tool_definitions, wire_name
+    from lorakus_modules.assistant.tools import TOOLS
+
+    class Empty(BaseModel):
+        pass
+
+    async def handler(_call: ToolCall, _args: Empty) -> dict[str, Any]:
+        return {}
+
+    other = ToolSpec("finance.balance", "Solde du compte", "read", Empty, handler)
+    exposed = tool_definitions([*TOOLS, other])
+    assert sorted(exposed) == sorted(wire_name(t.name) for t in TOOLS)
+    assert "finance__balance" not in exposed
+    assert all(name.count("__") == 1 for name in exposed)

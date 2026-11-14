@@ -28,7 +28,8 @@ from lorakus.core.agents.contract import (
 )
 from lorakus.core.modules.manifest import ModuleManifest
 from lorakus.core.modules.registry import ModuleRegistry
-from lorakus.core.tools.spec import ToolCall, ToolSpec
+from lorakus.core.tools.runtime import ToolRuntime
+from lorakus.core.tools.spec import ToolCall, ToolError, ToolSpec
 
 pytestmark = pytest.mark.integration
 executed: list[tuple[str, Any, Any]] = []
@@ -55,6 +56,35 @@ async def _add_note(call: ToolCall, args: NoteIn) -> dict[str, Any]:
 async def _pay(call: ToolCall, args: NoteIn) -> dict[str, Any]:
     executed.append(("pay", call.user_id, args.text))
     return {"paid": True}
+
+
+async def _note_summary(_call: ToolCall, args: NoteIn) -> str:
+    return f"Ajouter la note « {args.text} »"
+
+
+async def _pay_summary(_call: ToolCall, args: NoteIn) -> str:
+    return f"Payer : {args.text}\x07"  # caractere de controle : retire de la carte
+
+
+failures: list[str] = []
+
+
+async def _ping(call: ToolCall, _args: Empty) -> dict[str, Any]:
+    executed.append(("ping", call.user_id, ""))
+    return {"pong": True}
+
+
+async def _ping_summary(_call: ToolCall, _args: Empty) -> str:
+    return "Envoyer un signal"
+
+
+async def _flaky(call: ToolCall, args: NoteIn) -> dict[str, Any]:
+    """Echoue tant que `failures` n'est pas vide (une erreur par appel)."""
+    if failures:
+        raise ToolError(failures.pop(0))
+    executed.append(("flaky", call.user_id, args.text))
+    await asyncio.sleep(0.2)  # laisse a un second clic le temps d'arriver
+    return {"ok": True}
 
 
 async def _alpha(ctx: SpecialistContext) -> SpecialistReport:
@@ -115,14 +145,31 @@ def _profile(name: str, handler: Any, intent: str, **extra: Any) -> SpecialistPr
 def client() -> Iterator[TestClient]:
     asyncio.run(wipe_identity())
     executed.clear()
+    failures.clear()
     registry = ModuleRegistry(
         [
             _module(
                 "alpha",
                 tools=[
                     ToolSpec("alpha.whoami", "Qui suis-je", "read", Empty, _whoami),
-                    ToolSpec("alpha.add_note", "Ajoute une note", "write", NoteIn, _add_note),
-                    ToolSpec("alpha.pay", "Paie", "sensitive", NoteIn, _pay),
+                    ToolSpec(
+                        "alpha.add_note",
+                        "Ajoute une note",
+                        "write",
+                        NoteIn,
+                        _add_note,
+                        summary=_note_summary,
+                    ),
+                    ToolSpec("alpha.pay", "Paie", "sensitive", NoteIn, _pay, summary=_pay_summary),
+                    ToolSpec("alpha.ping", "Signal", "write", Empty, _ping, summary=_ping_summary),
+                    ToolSpec(
+                        "alpha.flaky",
+                        "Peut echouer",
+                        "write",
+                        NoteIn,
+                        _flaky,
+                        summary=_note_summary,
+                    ),
                 ],
                 specialist=_profile("alpha", _alpha, "revision_plan", actions=["alpha.add_note"]),
             ),
@@ -245,3 +292,143 @@ def test_agent_runs_are_append_only_for_the_application(client: TestClient) -> N
         )
     )
     assert privileges == [(False, False)]
+
+
+# ----------------------------------------------------------------- PR 38 : cartes
+def _pending(client: TestClient, tool: str = "alpha.add_note", note: str = "reviser") -> str:
+    response = client.post(f"/api/v1/tools/{tool}", json={"arguments": {"text": note}})
+    assert response.status_code == 202
+    return str(response.json()["confirmation_id"])
+
+
+def test_card_text_is_written_by_the_tool_from_validated_arguments(client: TestClient) -> None:
+    pending = client.post("/api/v1/tools/alpha.add_note", json={"arguments": {"text": "maths"}})
+    body = pending.json()
+    assert body["summary"] == "Ajouter la note « maths »"
+    assert body["expires_at"] is not None
+    sensitive = client.post("/api/v1/tools/alpha.pay", json={"arguments": {"text": "loyer"}})
+    assert sensitive.json()["summary"] == "Payer : loyer"
+
+
+def test_cancelled_action_can_no_longer_be_confirmed(client: TestClient) -> None:
+    confirmation = _pending(client)
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}/cancel").status_code == 204
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}").status_code == 409
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}/cancel").status_code == 409
+    assert executed == []
+    actions = [e["action"] for e in client.get("/api/v1/auth/audit").json()]
+    assert "tools.cancel" in actions
+
+
+def test_confirmed_action_cannot_be_cancelled(client: TestClient) -> None:
+    confirmation = _pending(client)
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}").status_code == 200
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}/cancel").status_code == 409
+
+
+def test_a_failing_action_stays_pending_and_can_be_retried(client: TestClient) -> None:
+    failures.append("Ce souvenir existe déjà.")
+    confirmation = _pending(client, "alpha.flaky")
+    first = client.post(f"/api/v1/tools/confirmations/{confirmation}")
+    assert first.status_code == 409
+    assert first.json()["detail"] == "Ce souvenir existe déjà."
+    assert executed == []
+    second = client.post(f"/api/v1/tools/confirmations/{confirmation}")
+    assert second.status_code == 200
+    assert [e[0] for e in executed] == ["flaky"]
+
+
+def test_decided_actions_forget_their_arguments(client: TestClient) -> None:
+    confirmed, cancelled = _pending(client, note="secret-1"), _pending(client, note="secret-2")
+    client.post(f"/api/v1/tools/confirmations/{confirmed}")
+    client.post(f"/api/v1/tools/confirmations/{cancelled}/cancel")
+    rows = asyncio.run(migrator_sql("SELECT arguments::text FROM lorakus.core_tool_confirmations"))
+    assert "secret" not in str(rows)
+
+
+def test_statuses_and_two_simultaneous_confirmations(client: TestClient) -> None:
+    runtime: ToolRuntime = client.app.state.tools  # type: ignore[attr-defined]
+    me = client.get("/api/v1/auth/me").json()["id"]
+    import uuid
+
+    user = uuid.UUID(me)
+    double = _pending(client, "alpha.flaky")
+    cancelled, expired, waiting = _pending(client), _pending(client), _pending(client)
+    client.post(f"/api/v1/tools/confirmations/{cancelled}/cancel")
+    asyncio.run(
+        migrator_sql(
+            "UPDATE lorakus.core_tool_confirmations SET expires_at = now() WHERE id = :id",
+            {"id": expired},
+        )
+    )
+
+    async def twice() -> list[bool]:
+        async def attempt() -> bool:
+            try:
+                await runtime.confirm(user, uuid.UUID(double))
+            except ToolError:
+                return False
+            return True
+
+        return list(await asyncio.gather(attempt(), attempt()))
+
+    outcomes = asyncio.run(twice())
+    assert sorted(outcomes) == [False, True]
+    assert [e[0] for e in executed] == ["flaky"]
+
+    statuses = asyncio.run(
+        runtime.statuses(user, [uuid.UUID(x) for x in (double, cancelled, expired, waiting)])
+    )
+    assert [statuses[uuid.UUID(x)] for x in (double, cancelled, expired, waiting)] == [
+        "confirmed",
+        "cancelled",
+        "expired",
+        "pending",
+    ]
+
+
+def test_application_can_only_erase_frozen_arguments(client: TestClient) -> None:
+    """Garantie de la 0006 conservee par la 0012 : en lorakus_app, changer les arguments d'une
+    action en attente est refuse ; seul leur effacement passe."""
+    import uuid
+
+    from lorakus.db.database import Database
+    from lorakus.settings import get_settings
+
+    confirmation = uuid.UUID(_pending(client, note="original"))
+    user = uuid.UUID(client.get("/api/v1/auth/me").json()["id"])
+
+    async def as_app(sql: str) -> None:
+        database = Database.connect(get_settings())
+        try:
+            async with database.transaction(user) as session:
+                await session.execute(text(sql), {"id": confirmation})
+        finally:
+            await database.close()
+
+    with pytest.raises(Exception, match="arguments figes"):
+        asyncio.run(
+            as_app(
+                "UPDATE lorakus.core_tool_confirmations "
+                'SET arguments = \'{"text": "pirate"}\' WHERE id = :id'
+            )
+        )
+    with pytest.raises(Exception, match="permission denied"):
+        asyncio.run(
+            as_app(
+                "UPDATE lorakus.core_tool_confirmations "
+                "SET expires_at = now() + interval '1 day' WHERE id = :id"
+            )
+        )
+    asyncio.run(
+        as_app("UPDATE lorakus.core_tool_confirmations SET arguments = '{}' WHERE id = :id")
+    )
+
+
+def test_a_refused_action_without_arguments_never_runs(client: TestClient) -> None:
+    """Sans argument, rien n'empeche la validation : seul le refus enregistre doit bloquer."""
+    pending = client.post("/api/v1/tools/alpha.ping", json={})
+    confirmation = pending.json()["confirmation_id"]
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}/cancel").status_code == 204
+    assert client.post(f"/api/v1/tools/confirmations/{confirmation}").status_code == 409
+    assert executed == []
