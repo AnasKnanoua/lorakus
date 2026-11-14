@@ -235,6 +235,13 @@ async def test_meaning_picks_a_clear_winner_and_refuses_ambiguity() -> None:
     assert ambiguous.targets == () and ambiguous.reason == "ambigu"
 
 
+async def test_default_margin_comes_from_the_tuning_set() -> None:
+    """0 : choisie sur la partie `tuning` du jeu d'evaluation avec le vrai modele (CI)."""
+    from lorakus.core.agents.routing import DEFAULT_MARGIN
+
+    assert DEFAULT_MARGIN == 0.0
+
+
 async def test_off_topic_questions_consult_nobody() -> None:
     routing = await IntentRouter(FakeEmbedder()).route("Merci beaucoup", [DAY, SLEEP])
     assert routing.targets == () and routing.best == NONE

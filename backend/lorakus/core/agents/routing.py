@@ -30,9 +30,12 @@ from lorakus.core.agents.orchestrator import Target
 
 log = structlog.get_logger("lorakus.agents")
 
-# Marge entre la meilleure intention et la suivante (ou « sans specialiste »). Valeur de
-# depart ; l'evaluation avec le vrai modele (CI) affiche la marge optimale du jeu de reglage.
-DEFAULT_MARGIN: Final = 0.03
+# Marge entre la meilleure intention et la suivante (ou « sans specialiste »). Choisie sur le
+# jeu de REGLAGE avec le vrai modele (CI, 2026-11-14) : 0 donne 80 % de bonnes decisions,
+# toute marge positive fait baisser le score (0,03 : 35 %). Les ecarts entre intentions sont
+# trop petits avec ce modele (0,001 a 0,02) pour qu'une marge aide. La classe « sans
+# specialiste » reste le seul filtre des questions hors sujet.
+DEFAULT_MARGIN: Final = 0.0
 NONE: Final = "_none"
 
 # Classe « sans specialiste » : ce qui ne demande les donnees d'aucun specialiste.
