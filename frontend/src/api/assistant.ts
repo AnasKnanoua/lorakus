@@ -6,6 +6,7 @@ export type Conversation = Schemas["ConversationOut"];
 export type ConversationDetail = Schemas["ConversationDetail"];
 export type Message = Schemas["MessageOut"];
 export type ReplyStatus = "ok" | "interrupted" | "fallback";
+export type ReplyTrace = Schemas["TraceOut"];
 
 export interface ReplyDone {
   messageId: string;
@@ -154,4 +155,22 @@ export async function sendMessage(
   }
   // Flux ferme sans evenement de fin : connexion coupee en route.
   return { messageId: "", status: "interrupted", budgetWarning: false };
+}
+
+/**
+ * « Pourquoi m'as-tu dit ca ? » (PR 39) : ce qui a servi a ecrire une reponse.
+ * null si la reponse n'a pas d'explication (anterieure a cette fonction).
+ */
+export async function getReplyTrace(conversationId: string, messageId: string): Promise<ReplyTrace | null> {
+  const { data, response, error } = await api.GET(
+    "/api/v1/assistant/conversations/{conversation_id}/messages/{message_id}/trace",
+    { params: { path: { conversation_id: conversationId, message_id: messageId } } },
+  );
+  if (response.status === 404) {
+    return null;
+  }
+  if (data === undefined) {
+    throw new ApiError(response.status, error);
+  }
+  return data;
 }

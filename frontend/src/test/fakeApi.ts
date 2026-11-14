@@ -69,6 +69,8 @@ export interface FakeState {
   reauthStale: boolean;
   /** Cartes de confirmation, par identifiant (PR 38). */
   cards: Map<string, FakeAction>;
+  /** Explications des reponses (PR 39), par identifiant de message ; absente : 404. */
+  traces: Map<string, unknown>;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -120,6 +122,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     proposalsEnabled: true,
     reauthStale: false,
     cards: new Map(),
+    traces: new Map(),
     ...overrides,
   };
   let counter = 0;
@@ -179,6 +182,13 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       const id = nextId();
       state.conversations.set(id, { id, title: "Nouvelle conversation", messages: [] });
       return json(201, { id, title: "Nouvelle conversation", created_at: NOW, updated_at: NOW });
+    }
+    const traceMatch = /^\/api\/v1\/assistant\/conversations\/([^/]+)\/messages\/([^/]+)\/trace$/.exec(path);
+    if (traceMatch && request.method === "GET") {
+      const trace = state.traces.get(traceMatch[2] ?? "");
+      return trace === undefined
+        ? json(404, { detail: "Aucune explication pour cette réponse." })
+        : json(200, trace);
     }
     const match = /^\/api\/v1\/assistant\/conversations\/([^/]+)(\/messages)?$/.exec(path);
     const conversation = match?.[1] ? state.conversations.get(match[1]) : undefined;

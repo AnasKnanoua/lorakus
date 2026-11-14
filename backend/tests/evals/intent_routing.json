@@ -1,0 +1,99 @@
+{
+  "description": "Routage des questions vers des specialistes FICTIFS calques sur ceux prevus (Sergent, Preparateur, Analyste, Tresorier). Deux parties disjointes : 'tuning' sert a choisir la marge, 'measure' a la mesurer. Ne jamais regler sur 'measure'. Les questions de 'measure' evitent volontairement de reprendre les mots des exemples.",
+  "specialists": {
+    "focus": {
+      "day_plan": [
+        "Qu'est-ce que je dois faire aujourd'hui ?",
+        "Quel est mon programme de la journée ?",
+        "Organise ma journée",
+        "Qu'est-ce qui est prévu pour demain ?"
+      ],
+      "deadlines": [
+        "Quand dois-je rendre mon devoir ?",
+        "Quelles sont mes prochaines échéances ?",
+        "Est-ce que j'ai un examen bientôt ?",
+        "Qu'est-ce que je dois rendre cette semaine ?"
+      ]
+    },
+    "fitness": {
+      "sleep": [
+        "Comment j'ai dormi cette nuit ?",
+        "Combien d'heures de sommeil cette semaine ?",
+        "Est-ce que je dors assez ?"
+      ],
+      "training": [
+        "Quelle séance de sport je fais aujourd'hui ?",
+        "Combien de kilomètres j'ai couru ce mois-ci ?",
+        "Est-ce que je me suis assez entraîné cette semaine ?"
+      ]
+    },
+    "chess": {
+      "activity": [
+        "Combien de parties d'échecs j'ai jouées aujourd'hui ?",
+        "Combien de temps j'ai passé sur Chess.com ?",
+        "Quel est mon classement aux échecs ?"
+      ]
+    },
+    "finance": {
+      "spending": [
+        "Combien j'ai dépensé ce mois-ci ?",
+        "Quel est mon budget restant ?",
+        "Où part mon argent ?"
+      ]
+    }
+  },
+  "tuning": [
+    {"q": "Qu'est-ce que j'ai au programme ce matin ?", "expected": "focus.day_plan"},
+    {"q": "Aide-moi à planifier ma journée", "expected": "focus.day_plan"},
+    {"q": "Qu'ai-je à faire ce soir ?", "expected": "focus.day_plan"},
+    {"q": "Il me reste combien de temps pour le projet de réseaux ?", "expected": "focus.deadlines"},
+    {"q": "Quelle est la date limite du TP ?", "expected": "focus.deadlines"},
+    {"q": "Est-ce que j'ai bien récupéré cette nuit ?", "expected": "fitness.sleep"},
+    {"q": "À quelle heure je me suis couché hier ?", "expected": "fitness.sleep"},
+    {"q": "J'ai fait combien de footings cette semaine ?", "expected": "fitness.training"},
+    {"q": "Quel entraînement est prévu demain ?", "expected": "fitness.training"},
+    {"q": "J'ai joué combien de blitz hier ?", "expected": "chess.activity"},
+    {"q": "Mon elo a-t-il progressé ?", "expected": "chess.activity"},
+    {"q": "Combien j'ai claqué en restaurants ?", "expected": "finance.spending"},
+    {"q": "Est-ce que je suis dans mon budget ?", "expected": "finance.spending"},
+    {"q": "Salut Lorakus", "expected": "_none"},
+    {"q": "Explique-moi la descente de gradient", "expected": "_none"},
+    {"q": "Écris un poème sur l'automne", "expected": "_none"},
+    {"q": "Retiens que mon chat s'appelle Mochi", "expected": "_none"},
+    {"q": "Quelle est la différence entre TCP et UDP ?", "expected": "_none"},
+    {"q": "Merci pour ton aide", "expected": "_none"},
+    {"q": "Comment on fait une boucle for en Rust ?", "expected": "_none"}
+  ],
+  "measure": [
+    {"q": "Qu'est-ce qui m'attend cet après-midi ?", "expected": "focus.day_plan"},
+    {"q": "Par quoi je commence ma matinée ?", "expected": "focus.day_plan"},
+    {"q": "Fais-moi un planning pour aujourd'hui", "expected": "focus.day_plan"},
+    {"q": "Mes tâches du jour ?", "expected": "focus.day_plan"},
+    {"q": "Pour quand est le rapport de stage ?", "expected": "focus.deadlines"},
+    {"q": "Quels rendus arrivent la semaine prochaine ?", "expected": "focus.deadlines"},
+    {"q": "Le partiel de maths, c'est quand ?", "expected": "focus.deadlines"},
+    {"q": "Ai-je du retard sur mes devoirs ?", "expected": "focus.deadlines"},
+    {"q": "J'ai bien dormi ?", "expected": "fitness.sleep"},
+    {"q": "Ma nuit a été courte ?", "expected": "fitness.sleep"},
+    {"q": "Je me réveille fatigué, mon sommeil est-il régulier ?", "expected": "fitness.sleep"},
+    {"q": "Je cours combien par semaine en moyenne ?", "expected": "fitness.training"},
+    {"q": "Quelle était ma dernière sortie à vélo ?", "expected": "fitness.training"},
+    {"q": "Je suis allé à la salle combien de fois ce mois-ci ?", "expected": "fitness.training"},
+    {"q": "J'ai trop joué aux échecs aujourd'hui ?", "expected": "chess.activity"},
+    {"q": "Combien de rapides j'ai perdues cette semaine ?", "expected": "chess.activity"},
+    {"q": "Mes stats d'échecs du mois ?", "expected": "chess.activity"},
+    {"q": "Il me reste combien d'argent pour finir le mois ?", "expected": "finance.spending"},
+    {"q": "Mes dépenses en courses ont augmenté ?", "expected": "finance.spending"},
+    {"q": "J'ai payé combien d'abonnements ?", "expected": "finance.spending"},
+    {"q": "Coucou, tu vas bien ?", "expected": "_none"},
+    {"q": "Qu'est-ce qu'une fonction de perte ?", "expected": "_none"},
+    {"q": "Résume-moi la Révolution française", "expected": "_none"},
+    {"q": "Traduis « bonne nuit » en turc", "expected": "_none"},
+    {"q": "Souviens-toi que le thé me réussit mieux que le café", "expected": "_none"},
+    {"q": "Donne-moi une idée de cadeau pour ma mère", "expected": "_none"},
+    {"q": "Comment fonctionne un hachage SHA-256 ?", "expected": "_none"},
+    {"q": "Quelle heure est-il à Ankara ?", "expected": "_none"},
+    {"q": "Corrige les fautes de ce paragraphe", "expected": "_none"},
+    {"q": "Tu peux m'expliquer le RAG ?", "expected": "_none"}
+  ]
+}

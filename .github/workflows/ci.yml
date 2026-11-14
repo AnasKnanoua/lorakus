@@ -50,11 +50,13 @@ jobs:
 
       - name: Evaluation de la recherche avec le vrai modele d'embeddings
         # Jeu etiquete (profil fictif) sur PostgreSQL et le vrai modele, verifie par SHA-256 :
-        # la PR echoue si la recherche hybride passe sous ses garde-fous de regression (PR 37b).
+        # la PR echoue si la recherche hybride passe sous ses garde-fous de regression (PR 37b)
+        # ou si le routage vers les specialistes manque son objectif (PR 39).
         # Les chiffres sont publies dans le resume du job.
         env:
           LORAKUS_EMBEDDING_MODEL_DIR: ${{ runner.temp }}/embedding-model
           LORAKUS_EVAL_REPORT: ${{ runner.temp }}/memory-eval.json
+          LORAKUS_ROUTING_EVAL_REPORT: ${{ runner.temp }}/routing-eval.json
         run: |
           ./infra/models/fetch-embedding-model.sh "$LORAKUS_EMBEDDING_MODEL_DIR"
           # Resume ecrit meme si l'evaluation echoue : c'est la qu'on lit pourquoi.
@@ -66,6 +68,14 @@ jobs:
             echo
             echo '```json'
             cat "$LORAKUS_EVAL_REPORT" 2>/dev/null || echo '{"erreur": "rapport absent"}'
+            echo '```'
+            echo "</details>"
+            echo
+            echo "### Routage vers les specialistes (marge reglee sur 'tuning', mesuree sur 'measure')"
+            echo "<details><summary>Rapport complet, erreurs comprises</summary>"
+            echo
+            echo '```json'
+            cat "$LORAKUS_ROUTING_EVAL_REPORT" 2>/dev/null || echo '{"erreur": "rapport absent"}'
             echo '```'
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"

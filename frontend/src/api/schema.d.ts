@@ -143,6 +143,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/conversations/{conversation_id}/messages/{message_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reply Trace
+         * @description Explication d'une reponse. 404 si elle n'existe pas, n'est pas a l'utilisateur, ou est
+         *     anterieure aux traces.
+         */
+        get: operations["reply_trace_api_v1_assistant_conversations__conversation_id__messages__message_id__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/api-keys": {
         parameters: {
             query?: never;
@@ -1213,6 +1234,94 @@ export interface components {
             /** Secret */
             secret: string;
         };
+        /** TraceFact */
+        TraceFact: {
+            /** Category */
+            category: string;
+            /** Content */
+            content: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /**
+         * TraceOut
+         * @description « Pourquoi m'as-tu dit ca ? » (PR 39) : ce qui a servi a ecrire une reponse.
+         */
+        TraceOut: {
+            /** Cost Usd */
+            cost_usd: string | null;
+            /** Data Classes Sent */
+            data_classes_sent: string[];
+            /** Memory Facts */
+            memory_facts: components["schemas"]["TraceFact"][];
+            /** Memory Facts Removed */
+            memory_facts_removed: number;
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /** Model */
+            model: string | null;
+            /** Model Calls */
+            model_calls: number;
+            /** Prompt Version */
+            prompt_version: string | null;
+            routing: components["schemas"]["TraceRouting"] | null;
+            /** Specialists */
+            specialists: components["schemas"]["TraceSpecialist"][];
+            /** Tools */
+            tools: components["schemas"]["TraceTool"][];
+        };
+        /** TraceRouting */
+        TraceRouting: {
+            /** Best */
+            best?: string | null;
+            /** Reason */
+            reason: string;
+            /** Runner Up */
+            runner_up?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Tier */
+            tier: string;
+        };
+        /** TraceSpecialist */
+        TraceSpecialist: {
+            /** Cached */
+            cached: boolean;
+            /** Data Classes */
+            data_classes: string[];
+            /** Display Name */
+            display_name: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Intent */
+            intent: string;
+            /** Skipped */
+            skipped?: string | null;
+            /** Specialist */
+            specialist: string;
+            /** Status */
+            status: string;
+        };
+        /** TraceTool */
+        TraceTool: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "activity" | "card";
+            /** Status */
+            status?: string | null;
+            /** Text */
+            text: string;
+            /** Tool */
+            tool: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -1469,6 +1578,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_trace_api_v1_assistant_conversations__conversation_id__messages__message_id__trace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceOut"];
+                };
             };
             /** @description Validation Error */
             422: {
