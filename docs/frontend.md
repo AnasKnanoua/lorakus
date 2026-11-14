@@ -98,7 +98,7 @@ Les écrans sont capturés dans un vrai navigateur (Chromium sans interface) con
 
 ## « Pourquoi cette réponse ? » (PR 39)
 
-`features/chat/WhyButton.tsx`. À côté de « Copier », sous chaque réponse enregistrée, une icône `quiet` ouvre une fenêtre (mêmes formes que les dialogues de confirmation) chargée seulement à l'ouverture : souvenirs fournis (et nombre de souvenirs supprimés depuis), outils et issue des cartes, spécialistes et façon dont ils ont été choisis, puis les détails (modèle, appels, coût, données transmises, version du prompt) en liste de définitions `sm`. Textes bruts. Une réponse antérieure dit simplement qu'elle n'a pas d'explication. Testé, accessibilité comprise (`features/chat/why.test.tsx`).
+`features/chat/WhyButton.tsx`. À côté de « Copier », sous chaque réponse enregistrée, une icône `quiet` ouvre une fenêtre (mêmes formes que les dialogues de confirmation) chargée seulement à l'ouverture : souvenirs fournis (et nombre de souvenirs supprimés depuis), outils et issue des cartes, spécialistes et façon dont ils ont été choisis, puis les détails (modèle, appels, coût, données transmises, version du prompt et, depuis la PR 40, identifiant de trace à copier pour Grafana) en liste de définitions `sm`. Textes bruts. Une réponse antérieure dit simplement qu'elle n'a pas d'explication. Testé, accessibilité comprise (`features/chat/why.test.tsx`).
 
 ## Tests
 

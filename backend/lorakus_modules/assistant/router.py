@@ -229,6 +229,9 @@ class TraceOut(BaseModel):
     tools: list[TraceTool]
     routing: TraceRouting | None
     specialists: list[TraceSpecialist]
+    # Identifiant de la trace OpenTelemetry (PR 40), a chercher dans Grafana (Tempo) ;
+    # None si la telemetrie est desactivee ou pour une reponse anterieure.
+    otel_trace_id: str | None = None
 
 
 @router.get("/conversations/{conversation_id}/messages/{message_id}/trace")
@@ -290,6 +293,7 @@ async def reply_trace(
         tools=tools,
         routing=TraceRouting.model_validate(routing) if routing else None,
         specialists=[TraceSpecialist.model_validate(s) for s in trace.get("specialists", [])],
+        otel_trace_id=trace.get("otel_trace_id"),
     )
 
 

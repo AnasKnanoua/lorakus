@@ -1268,6 +1268,8 @@ export interface components {
             model: string | null;
             /** Model Calls */
             model_calls: number;
+            /** Otel Trace Id */
+            otel_trace_id?: string | null;
             /** Prompt Version */
             prompt_version: string | null;
             routing: components["schemas"]["TraceRouting"] | null;

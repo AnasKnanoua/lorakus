@@ -32,6 +32,8 @@ from decimal import Decimal
 from typing import Final, Literal, NoReturn, Protocol
 
 import structlog
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 from lorakus.ai.breaker import CircuitBreaker
 from lorakus.ai.catalog import Catalog, split_target
@@ -58,6 +60,7 @@ from lorakus.observability.metrics import (
 )
 
 log = structlog.get_logger("lorakus.ai")
+_TRACER = trace.get_tracer("lorakus.ai")
 
 BUDGET_WARNING_RATIO: Final = Decimal("0.8")
 
@@ -248,6 +251,17 @@ class ModelRouter:
             completion: Completion | None = None
             emitted = False
             started = time.monotonic()
+            # Span de l'appel (PR 40) : cree sans devenir « courant », car ce generateur est
+            # suspendu a chaque morceau de texte ; il est ferme explicitement plus bas.
+            span = _TRACER.start_span(
+                "ai.call",
+                attributes={
+                    "lorakus.ai.task": task,
+                    "lorakus.ai.provider": name,
+                    "lorakus.ai.model": model,
+                    "lorakus.ai.tools": len(bounded.tools),
+                },
+            )
             try:
                 async for event in self._providers[name].chat_stream(model, bounded):
                     if isinstance(event, ToolUseEvent):
@@ -267,6 +281,10 @@ class ModelRouter:
             except ProviderError as error:
                 self._breaker.failure(name)
                 outcome = "interrupted" if emitted else "error"
+                span.set_attribute("lorakus.ai.outcome", outcome)
+                span.set_attribute("lorakus.ai.error_kind", error.kind)
+                span.set_status(StatusCode.ERROR)
+                span.end()
                 AI_REQUESTS.labels(task=task, provider=name, model=model, outcome=outcome).inc()
                 log.warning("ai_provider_failed", task=task, target=target, kind=error.kind)
                 if emitted:
@@ -275,6 +293,8 @@ class ModelRouter:
             except BaseException:
                 # Client parti (annulation) ou bogue : pas de verdict sur le fournisseur.
                 self._breaker.abandoned(name)
+                span.set_attribute("lorakus.ai.outcome", "abandoned")
+                span.end()
                 raise
 
             self._breaker.success(name)
@@ -284,6 +304,16 @@ class ModelRouter:
             await self._record(
                 user_id, task, name, model, data_class, completion.usage, cost, duration_ms
             )
+            span.set_attributes(
+                {
+                    "lorakus.ai.outcome": "ok",
+                    "lorakus.ai.input_tokens": completion.usage.input_tokens,
+                    "lorakus.ai.output_tokens": completion.usage.output_tokens,
+                    "lorakus.ai.cost_usd": float(cost),
+                    "lorakus.ai.stop_reason": completion.stop_reason,
+                }
+            )
+            span.end()
             log.info(
                 "ai_call",
                 task=task,

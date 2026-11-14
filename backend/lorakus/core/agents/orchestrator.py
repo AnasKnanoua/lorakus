@@ -24,12 +24,14 @@ from dataclasses import dataclass, field
 from typing import Any, Final, Protocol
 
 import structlog
+from opentelemetry import trace
 
 from lorakus.ai.breaker import CircuitBreaker
 from lorakus.core.agents.contract import SpecialistProfile, SpecialistReport
 from lorakus.core.agents.service import AgentError, Answer, classes_for_llm
 
 log = structlog.get_logger("lorakus.agents")
+_TRACER = trace.get_tracer("lorakus.agents")
 
 MAX_PARALLEL: Final = 4
 DEADLINE_S: Final = 3.0
@@ -124,6 +126,26 @@ class Orchestrator:
         return list(await asyncio.gather(*tasks))
 
     async def _one(
+        self,
+        user_id: uuid.UUID,
+        target: Target,
+        trace_id: str | None,
+        started: float,
+        deadline_s: float,
+    ) -> Consultation:
+        attributes = {"lorakus.specialist": target.specialist, "lorakus.intent": target.intent}
+        with _TRACER.start_as_current_span("specialist.consult", attributes=attributes) as span:
+            result = await self._consult_one(user_id, target, trace_id, started, deadline_s)
+            span.set_attributes(
+                {
+                    "lorakus.specialist.status": result.report.status,
+                    "lorakus.specialist.cached": result.cached,
+                    "lorakus.specialist.skipped": result.skipped or "",
+                }
+            )
+            return result
+
+    async def _consult_one(
         self,
         user_id: uuid.UUID,
         target: Target,

@@ -192,7 +192,7 @@ Mise en place sur le serveur : [runbook, « Remplacer la clé B2 du serveur »](
 
 ## 8. Accès d'administration
 
-Grafana, Prometheus et Alertmanager ne sont pas exposés publiquement : accès par tunnel SSH, par exemple `ssh -L 3000:localhost:3000 lorakus-prod`.
+Grafana, Prometheus et Alertmanager ne sont pas exposés publiquement : accès par tunnel SSH, par exemple `ssh -L 3000:localhost:3000 lorakus-prod`. Tempo et Loki (PR 40) n'ont aucun port, même local : on les consulte dans Grafana (Explore), qui a leurs sources de données ; un identifiant de trace se copie depuis « Pourquoi ? » sous une réponse du chat ([runbook](docs/runbooks/observability.md)).
 
 ## 9. Changer d'hébergeur
 

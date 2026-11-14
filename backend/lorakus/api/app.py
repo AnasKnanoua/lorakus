@@ -30,6 +30,11 @@ from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
 from lorakus.observability.request_context import RequestContextMiddleware
+from lorakus.observability.telemetry import (
+    configure_telemetry,
+    instrument_app,
+    instrument_database,
+)
 from lorakus.settings import get_settings
 
 
@@ -41,6 +46,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         start_metrics_server(settings.metrics_port)
     database = Database.connect(settings)
     app.state.database = database
+    if app.state.telemetry is not None:
+        instrument_database(database.engine)
     app.state.identity = IdentityService(database, settings)
     app.state.modules = ModuleService(database, app.state.registry)
     app.state.agents = AgentService(database, app.state.modules)
@@ -77,6 +84,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     finally:
         await app.state.background.close()
         await database.close()
+        if app.state.telemetry is not None:
+            app.state.telemetry.shutdown()  # vide les derniers lots de traces et journaux
 
 
 def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
@@ -89,7 +98,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     propre application isolee, et la configuration est lue au bon moment.
     """
     settings = get_settings()
-    configure_logging(log_format=settings.log_format, level=settings.log_level)
+    formatter = configure_logging(log_format=settings.log_format, level=settings.log_level)
     is_production = settings.environment == "production"
     if settings.environment in ("staging", "production") and not settings.public_origin:
         # Sans origine connue, toute ecriture depuis un navigateur serait refusee.
@@ -112,6 +121,17 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
     app.include_router(memory.router, prefix="/api")
+    # Traces et journaux vers Tempo et Loki (PR 40) ; rien sans adresse configuree.
+    app.state.telemetry = configure_telemetry(
+        service_name="lorakus-api",
+        version=version("lorakus"),
+        environment=settings.environment,
+        traces_endpoint=settings.otel_traces_endpoint,
+        logs_endpoint=settings.otel_logs_endpoint,
+        log_formatter=formatter,
+    )
+    if app.state.telemetry is not None:
+        instrument_app(app)
     app.state.registry = registry if registry is not None else ModuleRegistry.from_entry_points()
     # Routage et prix verifies ici : une configuration IA invalide empeche le demarrage.
     app.state.ai_catalog = Catalog.load()

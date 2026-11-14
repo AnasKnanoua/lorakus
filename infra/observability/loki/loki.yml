@@ -1,0 +1,58 @@
+# Loki (journaux, PR 40, ADR 0010) : un seul processus, stockage local, 7 jours de retention.
+# Recoit les journaux de l'API et du worker en OTLP/HTTP (/otlp/v1/logs) sur le reseau
+# interne seulement, sans agent ni acces au socket Docker ; lu par Grafana. Aucun port publie.
+# Les journaux restent aussi sur la sortie standard (docker compose logs) : Loki est une copie
+# consultable, pas la source unique.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-11-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 168h
+  # trace_id et span_id des journaux OTLP sont gardes comme metadonnees structurees :
+  # c'est ce qui relie un journal a sa trace dans Grafana.
+  allow_structured_metadata: true
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 8
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+# Peu de memoire : pas de cache de resultats au-dela du minimum.
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 32
+
+# Statistiques d'usage envoyees par defaut a Grafana Labs : coupees (comme ONNX Runtime).
+analytics:
+  reporting_enabled: false

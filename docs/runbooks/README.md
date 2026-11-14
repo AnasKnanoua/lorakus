@@ -14,6 +14,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Accès public : Caddy, limites, origine](web.md) | `LorakusWebDown`, `LorakusRateLimited`, `LorakusOriginRefused` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |
+| [Traces et journaux : Tempo, Loki](observability.md) | `LorakusTempoDown`, `LorakusLokiDown` |
 | [Pièges déjà rencontrés](pitfalls.md) | — |
 
 Tous suivent le même plan : symptôme, vérifications, causes probables, actions, retour arrière.

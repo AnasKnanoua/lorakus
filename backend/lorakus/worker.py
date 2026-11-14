@@ -11,6 +11,7 @@ import asyncio
 import signal
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 from typing import Final
 
@@ -25,6 +26,7 @@ from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
+from lorakus.observability.telemetry import configure_telemetry, instrument_database
 from lorakus.settings import get_settings
 
 # Fichier touche a chaque tour : le test de sante du conteneur verifie son age.
@@ -47,12 +49,22 @@ async def _heartbeat(stop: asyncio.Event) -> None:
 
 async def run() -> None:
     settings = get_settings()
-    configure_logging(log_format=settings.log_format, level=settings.log_level)
+    formatter = configure_logging(log_format=settings.log_format, level=settings.log_level)
+    telemetry = configure_telemetry(
+        service_name="lorakus-worker",
+        version=version("lorakus"),
+        environment=settings.environment,
+        traces_endpoint=settings.otel_traces_endpoint,
+        logs_endpoint=settings.otel_logs_endpoint,
+        log_formatter=formatter,
+    )
     if settings.metrics_port is not None:
         start_metrics_server(settings.metrics_port)
     # Importer les manifestes enregistre les handlers (@on) et les jobs (@job) des modules.
     modules = ModuleRegistry.from_entry_points()
     database = Database.connect(settings)
+    if telemetry is not None:
+        instrument_database(database.engine)
     queue = ProcrastinateQueue(settings, database, job_registry)
     relay = OutboxRelay(database, bus)
     stop = asyncio.Event()
@@ -68,6 +80,8 @@ async def run() -> None:
         await queue.close()
         await database.close()
         log.info("worker_stopped")
+        if telemetry is not None:
+            telemetry.shutdown()
 
 
 def healthy() -> bool:

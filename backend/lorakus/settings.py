@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     log_level: LogLevel = "INFO"
     # Port des metriques Prometheus ; None = pas de serveur de metriques (tests, dev).
     metrics_port: int | None = Field(default=None, ge=1024, le=65535)
+    # Traces (Tempo) et copie des journaux (Loki) en OTLP/HTTP, PR 40. Vide = desactive
+    # (tests, developpement) : rien n'est installe. Adresses du reseau interne uniquement,
+    # ex. http://tempo:4318/v1/traces et http://loki:3100/otlp/v1/logs.
+    otel_traces_endpoint: str = ""
+    otel_logs_endpoint: str = ""
 
     # --- PostgreSQL ---
     db_host: str = "127.0.0.1"

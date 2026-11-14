@@ -226,6 +226,32 @@ groups:
           description: node_exporter est injoignable depuis 5 minutes (disque, memoire et sauvegardes non surveilles).
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/host.md
 
+  # Traces et journaux (PR 40) : leur panne ne gene pas l'application (export en arriere-plan,
+  # journaux toujours sur la sortie standard), mais l'historique se perd : avertissement.
+  - name: lorakus-telemetry
+    rules:
+      - alert: LorakusTempoDown
+        expr: up{job="tempo"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: observability
+        annotations:
+          summary: Tempo (traces) est injoignable
+          description: Prometheus ne collecte plus Tempo depuis 10 minutes ; les traces des requetes ne sont plus enregistrees.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/observability.md
+
+      - alert: LorakusLokiDown
+        expr: up{job="loki"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: observability
+        annotations:
+          summary: Loki (journaux) est injoignable
+          description: Prometheus ne collecte plus Loki depuis 10 minutes ; les journaux ne sont plus que sur la sortie standard des conteneurs.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/observability.md
+
   # Moteur IA et assistant (PR 33). Metriques lorakus_ai_* (ModelRouter) et
   # lorakus_assistant_replies_total (module assistant).
   - name: lorakus-ai
