@@ -14,7 +14,9 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lorakus.db.base import Base
@@ -70,3 +72,8 @@ class AssistantMessage(Base):
     prompt_version: Mapped[str | None] = mapped_column(Text)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Outils de la reponse (PR 38) : indications (kind=activity) et cartes (kind=card), dans
+    # l'ordre. L'issue d'une carte n'est pas ici : elle est lue dans core_tool_confirmations.
+    actions: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb"), default=list
+    )

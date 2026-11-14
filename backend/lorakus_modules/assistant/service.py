@@ -6,11 +6,19 @@ passe, et son message est enregistre dans tous les cas.
 
 Le prompt envoye est borne : seuls les derniers messages tiennent dans HISTORY_TOKENS, pour
 que le cout d'un message reste petit meme dans une longue conversation.
+
+Outils (PR 38) : le modele peut demander les outils du profil assistant (CHAT_TOOLS), tous
+executes par le ToolRuntime. Un outil read rend son resultat au modele ; un outil write ou
+sensitive produit une CARTE pour l'utilisateur, et le modele apprend seulement qu'elle attend
+sa confirmation (jamais son identifiant : il ne peut pas la confirmer). Au plus
+MAX_MODEL_CALLS appels au modele par message, le dernier sans outil ; au plus
+MAX_TOOL_CALLS appels d'outils et MAX_CARDS cartes.
 """
 
+import json
 import uuid
 from collections.abc import AsyncGenerator, Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Final, Literal, cast
@@ -21,7 +29,16 @@ import structlog
 from prometheus_client import Counter
 from sqlalchemy import delete, func, insert, select, update
 
-from lorakus.ai.port import ChatMessage, ChatRequest, TextDelta, estimate_tokens
+from lorakus.ai.port import (
+    ChatMessage,
+    ChatRequest,
+    TextDelta,
+    ToolDefinition,
+    ToolResult,
+    ToolUse,
+    ToolUseEvent,
+    estimate_tokens,
+)
 from lorakus.ai.router import (
     AIInterruptedError,
     AIRefusedError,
@@ -31,6 +48,8 @@ from lorakus.ai.router import (
 )
 from lorakus.core.background import DebouncedTasks
 from lorakus.core.memory.service import MemoryService, SourceMessage
+from lorakus.core.tools.runtime import ConfirmationStatus, ToolRuntime
+from lorakus.core.tools.spec import ToolError, ToolSpec
 from lorakus.db.database import Database
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.models import AssistantConversation, AssistantMessage
@@ -48,6 +67,29 @@ MEMORY_MESSAGES: Final = 20
 # indisponible, reponse invalide, propositions en attente au maximum), ils le seront plus tard.
 _MEMORY_DONE: Final = frozenset({"ok", "empty", "disabled"})
 DEFAULT_TITLE: Final = "Nouvelle conversation"
+
+# Outils du profil assistant (SECURITY.md §7) : liste explicite. L'outil d'un futur module
+# n'est propose au modele que s'il est ajoute ici, apres revue.
+CHAT_TOOLS: Final = (
+    "assistant.search_memory",
+    "assistant.remember",
+    "assistant.update_memory",
+    "assistant.forget_memory",
+)
+MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
+MAX_TOOL_CALLS: Final = 6  # par message
+MAX_CARDS: Final = 3  # cartes de confirmation par message
+# Ce que le modele recoit pour une action mise en attente : jamais l'identifiant de la carte.
+PENDING_FOR_MODEL: Final = (
+    "Carte de confirmation affichée à l'utilisateur. Rien n'est fait tant qu'il ne l'a pas "
+    "confirmée lui-même : ne dis pas que c'est fait, et ne redemande pas la même action."
+)
+CARD_STATUS_FOR_MODEL: Final[dict[str, str]] = {
+    "pending": "en attente de sa confirmation",
+    "confirmed": "confirmée par l'utilisateur",
+    "cancelled": "refusée par l'utilisateur",
+    "expired": "expirée sans réponse",
+}
 
 MessageStatus = Literal["ok", "interrupted", "fallback"]
 Role = Literal["user", "assistant"]
@@ -91,13 +133,33 @@ class Delta:
 
 
 @dataclass(frozen=True)
+class Activity:
+    """Un outil read a servi (ou a echoue) : indication discrete dans le chat."""
+
+    tool: str
+    label: str
+    ok: bool = True
+
+
+@dataclass(frozen=True)
+class Card:
+    """Action en attente de la confirmation de l'utilisateur (texte ecrit par l'outil)."""
+
+    confirmation_id: uuid.UUID
+    tool: str
+    risk: str
+    summary: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
 class Done:
     message_id: uuid.UUID
     status: MessageStatus
     budget_warning: bool
 
 
-ReplyEvent = Delta | Done
+ReplyEvent = Delta | Activity | Card | Done
 
 
 @dataclass(frozen=True)
@@ -109,11 +171,40 @@ class StoredMessage:
 
 @dataclass(frozen=True)
 class Turn:
-    """Tour pret a etre joue : tout ce qui peut echouer avec une 404 est deja verifie."""
+    """Tour pret a etre joue : tout ce qui peut echouer avec une 404 est deja verifie.
+
+    tools : outils proposes au modele, par nom « fil » (sans point, voir wire_name).
+    """
 
     user_id: uuid.UUID
     conversation_id: uuid.UUID
     request: ChatRequest
+    tools: dict[str, ToolSpec] = field(default_factory=dict[str, ToolSpec])
+    ip: str | None = None
+
+    @property
+    def origin(self) -> str:
+        return f"conversation:{self.conversation_id}"
+
+
+def wire_name(tool_name: str) -> str:
+    """Nom d'outil accepte par les fournisseurs : `module.action` -> `module__action`."""
+    return tool_name.replace(".", "__")
+
+
+def tool_definitions(specs: Sequence[ToolSpec]) -> dict[str, ToolSpec]:
+    """Outils autorises pour le chat, indexes par nom fil (un doublon est une erreur)."""
+    allowed = {s.name: s for s in specs if s.name in CHAT_TOOLS}
+    named = {wire_name(name): spec for name, spec in sorted(allowed.items())}
+    if len(named) != len(allowed):
+        raise ValueError("deux outils ont le meme nom fil")
+    return named
+
+
+def card_note(summary: str, status: str) -> str:
+    """Rappel, pour le modele, d'une carte d'un message precedent et de son issue."""
+    line = " ".join(summary.split())
+    return f"[Carte proposée : {line} ; {CARD_STATUS_FOR_MODEL.get(status, status)}]"
 
 
 def title_from(text: str) -> str:
@@ -165,11 +256,13 @@ class AssistantService:
         memory: MemoryService | None = None,
         background: DebouncedTasks | None = None,
         memory_delay_s: float = 180,
+        tools: ToolRuntime | None = None,
     ) -> None:
         self._db = database
         self._ai = ai
         self._clock = clock
         self._memory = memory
+        self._tools = tools
         self._background = background
         self._memory_delay_s = memory_delay_s
 
@@ -207,6 +300,20 @@ class AssistantService:
             )
             return conversation, list(messages)
 
+    async def card_statuses(
+        self, user_id: uuid.UUID, messages: Sequence[AssistantMessage]
+    ) -> dict[uuid.UUID, ConfirmationStatus]:
+        """Issue actuelle de chaque carte des messages (confirmee, refusee, expiree...)."""
+        ids = [
+            uuid.UUID(str(action["confirmation_id"]))
+            for message in messages
+            for action in message.actions
+            if action.get("kind") == "card"
+        ]
+        if not ids or self._tools is None:
+            return {}
+        return await self._tools.statuses(user_id, ids)
+
     async def delete_conversation(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> None:
         async with self._db.transaction(user_id) as session:
             result = await session.execute(
@@ -216,6 +323,10 @@ class AssistantService:
             )
             if result.first() is None:
                 raise ConversationNotFoundError
+        if self._tools is not None:
+            # Les actions de la conversation ne peuvent plus etre confirmees ; leurs arguments
+            # (qui citent la conversation) sont effaces.
+            await self._tools.retire_origin(user_id, f"conversation:{conversation_id}")
 
     # ------------------------------------------------------------------- un tour
     async def start_turn(
@@ -224,6 +335,7 @@ class AssistantService:
         conversation_id: uuid.UUID,
         text: str,
         config: AssistantConfig,
+        ip: str | None = None,
     ) -> Turn:
         """Enregistre le message de l'utilisateur et prepare la requete au modele.
 
@@ -233,16 +345,13 @@ class AssistantService:
             conversation = await session.get(AssistantConversation, conversation_id)
             if conversation is None:
                 raise ConversationNotFoundError
-            rows = await session.execute(
-                select(AssistantMessage.role, AssistantMessage.content, AssistantMessage.status)
-                .where(AssistantMessage.conversation_id == conversation_id)
-                .order_by(AssistantMessage.created_at, AssistantMessage.id)
+            stored = list(
+                await session.scalars(
+                    select(AssistantMessage)
+                    .where(AssistantMessage.conversation_id == conversation_id)
+                    .order_by(AssistantMessage.created_at, AssistantMessage.id)
+                )
             )
-            # Valeurs garanties par les contraintes CHECK de la migration assistant_0001.
-            history = [
-                StoredMessage(cast(Role, role), content, cast(MessageStatus, status))
-                for role, content, status in rows
-            ]
             await session.execute(
                 insert(AssistantMessage).values(
                     id=uuid.uuid4(),
@@ -254,7 +363,7 @@ class AssistantService:
                 )
             )
             values: dict[str, object] = {"updated_at": func.now()}
-            if conversation.title == DEFAULT_TITLE and not history:
+            if conversation.title == DEFAULT_TITLE and not stored:
                 values["title"] = title_from(text)
             await session.execute(
                 update(AssistantConversation)
@@ -262,15 +371,56 @@ class AssistantService:
                 .values(**values)
             )
 
+        history = await self._history(user_id, stored)
         now_local = self._clock().astimezone(ZoneInfo(config.timezone))
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
         facts = await self._memory.verified_for_prompt(user_id, text) if self._memory else []
+        tools = tool_definitions(await self._tools.available(user_id)) if self._tools else {}
         request = ChatRequest(
-            system=system_prompt(config.display_name, now_local, config.timezone, facts),
+            system=system_prompt(
+                config.display_name, now_local, config.timezone, facts, tools=bool(tools)
+            ),
             messages=messages,
+            tools=tuple(
+                ToolDefinition(
+                    name=name,
+                    description=spec.description,
+                    input_schema=spec.input_model.model_json_schema(),
+                )
+                for name, spec in tools.items()
+            ),
         )
         self._schedule_memory(user_id, conversation_id)
-        return Turn(user_id=user_id, conversation_id=conversation_id, request=request)
+        return Turn(
+            user_id=user_id, conversation_id=conversation_id, request=request, tools=tools, ip=ip
+        )
+
+    async def _history(
+        self, user_id: uuid.UUID, stored: Sequence[AssistantMessage]
+    ) -> list[StoredMessage]:
+        """Messages pour le modele ; les cartes d'une reponse y sont rappelees avec leur issue
+        (texte ecrit par le code : le modele sait ce que l'utilisateur a confirme ou refuse)."""
+        statuses = await self.card_statuses(user_id, stored)
+        history: list[StoredMessage] = []
+        for message in stored:
+            content = message.content
+            notes = [
+                card_note(
+                    str(action["summary"]),
+                    statuses.get(uuid.UUID(str(action["confirmation_id"])), "expired"),
+                )
+                for action in message.actions
+                if action.get("kind") == "card"
+            ]
+            if notes:
+                content = "\n\n".join([content, *notes]) if content.strip() else "\n".join(notes)
+            # Valeurs garanties par les contraintes CHECK de la migration assistant_0001.
+            history.append(
+                StoredMessage(
+                    cast(Role, message.role), content, cast(MessageStatus, message.status)
+                )
+            )
+        return history
 
     # ------------------------------------------------------------------ memoire
     def _schedule_memory(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> None:
@@ -328,73 +478,174 @@ class AssistantService:
         return outcome.reason
 
     async def play(self, turn: Turn) -> AsyncGenerator[ReplyEvent]:
-        """Reponse en flux, puis Done. Toujours enregistree, meme si le client part."""
+        """Reponse en flux (texte, outils, cartes), puis Done. Toujours enregistree, meme si
+        le client part."""
         parts: list[str] = []
+        actions: list[dict[str, object]] = []
         status: MessageStatus = "ok"
         reason = "ok"
         result: ChatResult | None = None
+        cost = Decimal(0)
+        budget_warning = False
         saved = False
 
         async def save() -> uuid.UUID:
             nonlocal saved
             saved = True
-            content = "".join(parts) or FALLBACKS["error"]
-            return await self._save_reply(turn, content, status, result)
+            content = "".join(parts).strip() or (
+                "Voici ce que je te propose." if actions else FALLBACKS["error"]
+            )
+            return await self._save_reply(turn, content, status, result, cost, actions)
+
+        def fallback(key: str) -> Delta:
+            # Avant tout texte et toute carte : la reponse est le gabarit. Apres : on garde ce
+            # qui a ete montre (cartes comprises) et la reponse est marquee interrompue.
+            nonlocal status
+            if parts or actions:
+                status = "interrupted"
+                return Delta("")
+            status = "fallback"
+            parts[:] = [FALLBACKS[key]]
+            return Delta(FALLBACKS[key])
 
         try:
             try:
-                async for event in self._ai.chat_stream(
-                    turn.user_id, task=TASK, data_class="personal", request=turn.request
-                ):
-                    if isinstance(event, TextDelta):
-                        parts.append(event.text)
-                        yield Delta(event.text)
-                    else:
-                        result = event
+                messages = list(turn.request.messages)
+                counters = {"tools": 0, "cards": 0}
+                for call_index in range(MAX_MODEL_CALLS if turn.tools else 1):
+                    last = call_index == MAX_MODEL_CALLS - 1
+                    request = turn.request.model_copy(
+                        update={
+                            # Copie : la requete d'un tour ne change plus une fois envoyee.
+                            "messages": list(messages),
+                            "tool_choice": "none" if last else "auto",
+                        }
+                    )
+                    round_text: list[str] = []
+                    uses: list[ToolUse] = []
+                    async for event in self._ai.chat_stream(
+                        turn.user_id,
+                        task=TASK,
+                        data_class="personal",
+                        request=request,
+                        continuation=call_index > 0,
+                    ):
+                        if isinstance(event, TextDelta):
+                            if not round_text and parts and not parts[-1].endswith(("\n", " ")):
+                                parts.append("\n\n")  # texte d'un nouveau tour : un paragraphe
+                                yield Delta("\n\n")
+                            round_text.append(event.text)
+                            parts.append(event.text)
+                            yield Delta(event.text)
+                        elif isinstance(event, ToolUseEvent):
+                            uses.append(event.tool_use)
+                        else:
+                            result = event
+                            cost += event.cost_usd
+                            budget_warning = budget_warning or event.budget_warning
+                    if not uses or last:
+                        break
+                    messages.append(
+                        ChatMessage(
+                            role="assistant", content="".join(round_text), tool_uses=tuple(uses)
+                        )
+                    )
+                    results: list[ToolResult] = []
+                    for use in uses:
+                        content, is_error, shown = await self._run_tool(turn, use, counters)
+                        if shown is not None:
+                            actions.append(_action(shown))
+                            yield shown
+                        results.append(
+                            ToolResult(tool_use_id=use.id, content=content, is_error=is_error)
+                        )
+                    messages.append(ChatMessage(role="user", tool_results=tuple(results)))
             except AIUnavailableError as error:
-                status, reason = "fallback", error.reason
+                reason = error.reason
                 key = error.reason if error.reason in ("budget", "rate_limited") else "unavailable"
-                parts[:] = [FALLBACKS[key]]
-                yield Delta(FALLBACKS[key])
+                notice = fallback(key)
+                if notice.text:
+                    yield notice
             except AIRefusedError as error:
-                status, reason = "fallback", error.reason
-                key = "too_long" if error.reason == "too_long" else "refused"
-                parts[:] = [FALLBACKS[key]]
-                yield Delta(FALLBACKS[key])
+                reason = error.reason
+                notice = fallback("too_long" if error.reason == "too_long" else "refused")
+                if notice.text:
+                    yield notice
             except AIInterruptedError:
                 status, reason = "interrupted", "provider"
             except Exception:
                 # Bogue : l'utilisateur recoit un gabarit, la trace complete part au journal.
                 log.exception("assistant_reply_failed")
-                status, reason = "fallback", "error"
-                parts[:] = [FALLBACKS["error"]]
-                yield Delta(FALLBACKS["error"])
+                reason = "error"
+                notice = fallback("error")
+                if notice.text:
+                    yield notice
 
             message_id = await save()
             REPLIES.labels(status=status, reason=reason).inc()
-            yield Done(
-                message_id=message_id,
-                status=status,
-                budget_warning=result.budget_warning if result else False,
-            )
+            yield Done(message_id=message_id, status=status, budget_warning=budget_warning)
         finally:
             if not saved:
-                # Client parti en cours de reponse : on garde ce qui a ete genere. Protege de
-                # l'annulation en cours, sinon l'ecriture serait annulee a son tour.
+                # Client parti en cours de reponse : on garde ce qui a ete genere (et les
+                # cartes deja montrees). Protege de l'annulation en cours, sinon l'ecriture
+                # serait annulee a son tour.
                 status, reason = "interrupted", "client_left"
                 with anyio.CancelScope(shield=True):
-                    if parts:
+                    if parts or actions:
                         try:
                             await save()
                         except Exception:  # ex. conversation supprimee pendant la reponse
                             log.exception("assistant_partial_reply_not_saved")
                 REPLIES.labels(status=status, reason=reason).inc()
 
+    async def _run_tool(
+        self, turn: Turn, use: ToolUse, counters: dict[str, int]
+    ) -> tuple[str, bool, Activity | Card | None]:
+        """Execute une demande du modele par le ToolRuntime.
+
+        Renvoie (resultat pour le modele, erreur ?, evenement a montrer). Le resultat est une
+        DONNEE (JSON ou texte fixe) ; pour une carte, jamais son identifiant.
+        """
+        spec = turn.tools.get(use.name)
+        if spec is None or self._tools is None:
+            return _for_model({"erreur": "outil inconnu"}), True, None
+        counters["tools"] += 1
+        if counters["tools"] > MAX_TOOL_CALLS:
+            return _for_model({"erreur": "trop d'appels d'outils pour ce message"}), True, None
+        if spec.risk != "read" and counters["cards"] >= MAX_CARDS:
+            return _for_model({"erreur": "trop d'actions proposées pour ce message"}), True, None
+        label = spec.activity or spec.description
+        try:
+            outcome = await self._tools.call(
+                turn.user_id, spec.name, use.input, turn.ip, origin=turn.origin
+            )
+        except ToolError as error:
+            shown = Activity(spec.name, label, ok=False) if spec.risk == "read" else None
+            return _for_model({"erreur": str(error)}), True, shown
+        if outcome.confirmation_id is None:
+            return _for_model(outcome.result or {}), False, Activity(spec.name, label)
+        if outcome.summary is None or outcome.expires_at is None:  # garanti par ToolRuntime
+            return _for_model({"erreur": "action impossible a decrire"}), True, None
+        counters["cards"] += 1
+        card = Card(
+            confirmation_id=outcome.confirmation_id,
+            tool=spec.name,
+            risk=spec.risk,
+            summary=outcome.summary,
+            expires_at=outcome.expires_at,
+        )
+        return PENDING_FOR_MODEL, False, card
+
     async def _save_reply(
-        self, turn: Turn, content: str, status: MessageStatus, result: ChatResult | None
+        self,
+        turn: Turn,
+        content: str,
+        status: MessageStatus,
+        result: ChatResult | None,
+        cost: Decimal,
+        actions: list[dict[str, object]],
     ) -> uuid.UUID:
         message_id = uuid.uuid4()
-        cost: Decimal | None = result.cost_usd if result else None
         async with self._db.transaction(turn.user_id) as session:
             await session.execute(
                 insert(AssistantMessage).values(
@@ -407,7 +658,8 @@ class AssistantService:
                     provider=result.provider if result else None,
                     model=result.model if result else None,
                     prompt_version=PROMPT_VERSION if status != "fallback" else None,
-                    cost_usd=cost,
+                    cost_usd=cost if result else None,
+                    actions=actions,
                 )
             )
             await session.execute(
@@ -416,3 +668,22 @@ class AssistantService:
                 .values(updated_at=func.now())
             )
         return message_id
+
+
+def _for_model(data: dict[str, object]) -> str:
+    """Resultat d'outil pour le modele : du JSON, jamais une consigne."""
+    return json.dumps(data, ensure_ascii=False, default=str)
+
+
+def _action(event: Activity | Card) -> dict[str, object]:
+    """Trace d'un outil enregistree avec la reponse (reaffichee au rechargement)."""
+    if isinstance(event, Activity):
+        return {"kind": "activity", "tool": event.tool, "label": event.label, "ok": event.ok}
+    return {
+        "kind": "card",
+        "confirmation_id": str(event.confirmation_id),
+        "tool": event.tool,
+        "risk": event.risk,
+        "summary": event.summary,
+        "expires_at": event.expires_at.isoformat(),
+    }

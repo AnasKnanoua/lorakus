@@ -90,6 +90,18 @@ async def test_ai_quota_per_minute(database: Database, identity: IdentityService
     assert [await quota.allow(user) for _ in range(3)] == [True, True, False]
 
 
+@pytest.mark.anyio
+async def test_ai_quota_continuations_skip_the_minute_but_not_the_day(
+    database: Database, identity: IdentityService
+) -> None:
+    """Boucle d'outils (PR 38) : un message = un appel par minute ; le jour compte tout."""
+    user = await identity.create_owner(OWNER_EMAIL, OWNER_PASSWORD)
+    quota = AICallQuota(RateLimiter(database), per_minute=1, per_day=3)
+    assert await quota.allow(user)
+    assert [await quota.allow(user, continuation=True) for _ in range(3)] == [True, True, False]
+    assert not await quota.allow(user)  # minute deja prise, et jour epuise
+
+
 def test_api_answers_429_with_retry_after(monkeypatch: pytest.MonkeyPatch, api: TestClient) -> None:
     monkeypatch.setenv("LORAKUS_API_REQUESTS_PER_MINUTE", "3")
     get_settings.cache_clear()  # la fixture api a deja lu les parametres

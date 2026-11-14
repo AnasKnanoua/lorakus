@@ -14,6 +14,8 @@ from lorakus.ai.port import (
     DataClass,
     ProviderError,
     TextDelta,
+    ToolDefinition,
+    ToolUseEvent,
     Usage,
 )
 from lorakus.ai.router import (
@@ -24,7 +26,7 @@ from lorakus.ai.router import (
     ModelRouter,
     RouterEvent,
 )
-from lorakus.ai.testing import FakeProvider
+from lorakus.ai.testing import FakeProvider, FakeReply
 from lorakus.observability.metrics import AI_REFUSALS
 
 pytestmark = pytest.mark.anyio
@@ -124,9 +126,11 @@ class CountingQuota:
     def __init__(self, allowed: int) -> None:
         self.allowed = allowed
         self.asked: list[uuid.UUID] = []
+        self.continuations: list[bool] = []
 
-    async def allow(self, user_id: uuid.UUID) -> bool:
+    async def allow(self, user_id: uuid.UUID, *, continuation: bool = False) -> bool:
         self.asked.append(user_id)
+        self.continuations.append(continuation)
         return len(self.asked) <= self.allowed
 
 
@@ -156,7 +160,7 @@ def result_of(events: list[RouterEvent]) -> ChatResult:
     return last
 
 
-def external(replies: list[str] | None = None, **kwargs: object) -> FakeProvider:
+def external(replies: list[str | FakeReply] | None = None, **kwargs: object) -> FakeProvider:
     return FakeProvider(replies=replies or [], external=True, **kwargs)  # type: ignore[arg-type]
 
 
@@ -428,3 +432,67 @@ async def test_concurrent_answers_per_user_are_capped_and_released() -> None:
 
 def test_usage_prompt_tokens_include_cache() -> None:
     assert Usage(input_tokens=1, cache_read_tokens=2, cache_write_tokens=3).prompt_tokens == 6
+
+
+# ------------------------------------------------------------- outils (PR 38)
+TOOL = ToolDefinition(name="assistant__search_memory", description="Cherche.", input_schema={})
+
+
+def with_tools(text: str = "Bonjour") -> ChatRequest:
+    return request(text).model_copy(update={"tools": (TOOL,)})
+
+
+async def test_tool_requests_skip_providers_that_cannot_use_tools() -> None:
+    no_tools = external(["texte seul"], provider_name="primary", tools=False)
+    able = external([FakeReply("Je cherche.", tool_calls=(("assistant__search_memory", {}),))])
+    able.provider_name = "backup"
+    router = make_router({"primary": no_tools, "backup": able})
+
+    events = await collect(router, req=with_tools())
+
+    assert no_tools.calls == []
+    assert any(isinstance(e, ToolUseEvent) for e in events)
+    assert result_of(events).provider == "backup"
+    # Sans outils, le premier fournisseur reste le premier choix.
+    assert result_of(await collect(router)).provider == "primary"
+
+
+async def test_tool_definitions_count_in_the_prompt_size_limit() -> None:
+    big = ToolDefinition(name="gros", description="x" * 1000, input_schema={"d": "y" * 3000})
+    router = make_router({"primary": external(["ok"], provider_name="primary")})
+    with pytest.raises(AIRefusedError) as refused:
+        await collect(router, req=request().model_copy(update={"tools": (big,)}))
+    assert refused.value.reason == "too_long"
+
+
+async def test_continuation_is_passed_to_the_quota() -> None:
+    quota = CountingQuota(allowed=10)
+    router = make_router({"primary": external(["a", "b"], provider_name="primary")}, quota=quota)
+    await collect(router)
+    _ = [
+        e
+        async for e in router.chat_stream(
+            USER, task="chat", data_class="personal", request=request(), continuation=True
+        )
+    ]
+    assert quota.continuations == [False, True]
+
+
+async def test_no_switch_of_model_after_a_tool_call_was_emitted() -> None:
+    class BreaksAfterTool(FakeProvider):
+        async def chat_stream(self, model: str, request: ChatRequest):  # type: ignore[override]
+            async for event in super().chat_stream(model, request):
+                if not isinstance(event, ToolUseEvent):
+                    raise ProviderError("unavailable", "panne apres l'appel")
+                yield event
+
+    broken = BreaksAfterTool(
+        replies=[FakeReply("", tool_calls=(("assistant__search_memory", {}),))],
+        external=True,
+        provider_name="primary",
+    )
+    backup = external(["ne doit pas servir"], provider_name="backup")
+    router = make_router({"primary": broken, "backup": backup})
+    with pytest.raises(AIInterruptedError):
+        await collect(router, req=with_tools())
+    assert backup.calls == []

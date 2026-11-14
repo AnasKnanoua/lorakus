@@ -11,7 +11,17 @@ import anthropic
 import httpx2
 import pytest
 
-from lorakus.ai.port import ChatMessage, ChatRequest, Completion, ProviderError, TextDelta
+from lorakus.ai.port import (
+    ChatMessage,
+    ChatRequest,
+    Completion,
+    ProviderError,
+    TextDelta,
+    ToolDefinition,
+    ToolResult,
+    ToolUse,
+    ToolUseEvent,
+)
 from lorakus.ai.providers.anthropic import AnthropicProvider
 
 pytestmark = pytest.mark.anyio
@@ -209,3 +219,164 @@ def test_is_declared_external() -> None:
 
     assert provider.capabilities().external
     assert provider.name == "anthropic"
+
+
+# ------------------------------------------------------------- outils (PR 38)
+def _start(index: int, block: dict[str, object]) -> tuple[str, dict[str, object]]:
+    return (
+        "content_block_start",
+        {"type": "content_block_start", "index": index, "content_block": block},
+    )
+
+
+def _json(index: int, partial: str) -> tuple[str, dict[str, object]]:
+    return (
+        "content_block_delta",
+        {
+            "type": "content_block_delta",
+            "index": index,
+            "delta": {"type": "input_json_delta", "partial_json": partial},
+        },
+    )
+
+
+def _stop(index: int) -> tuple[str, dict[str, object]]:
+    return ("content_block_stop", {"type": "content_block_stop", "index": index})
+
+
+TOOL_STREAM = sse(
+    (
+        "message_start",
+        {
+            "type": "message_start",
+            "message": {
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-haiku-5-5",
+                "content": [],
+                "stop_reason": None,
+                "stop_sequence": None,
+                "usage": {"input_tokens": 120, "output_tokens": 1},
+            },
+        },
+    ),
+    _start(0, {"type": "text", "text": ""}),
+    (
+        "content_block_delta",
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": "Je cherche."},
+        },
+    ),
+    _stop(0),
+    _start(
+        1, {"type": "tool_use", "id": "toolu_A", "name": "assistant__search_memory", "input": {}}
+    ),
+    _json(1, '{"quest'),
+    _json(1, 'ion": "mat'),
+    _json(1, 'in"}'),
+    _stop(1),
+    _start(2, {"type": "tool_use", "id": "toolu_B", "name": "assistant__remember", "input": {}}),
+    _json(2, '{"content": tronque'),
+    _stop(2),
+    (
+        "message_delta",
+        {
+            "type": "message_delta",
+            "delta": {"stop_reason": "tool_use", "stop_sequence": None},
+            "usage": {"output_tokens": 30},
+        },
+    ),
+    ("message_stop", {"type": "message_stop"}),
+)
+
+TOOLS_REQUEST = ChatRequest(
+    system="Tu es Lorakus.",
+    messages=[
+        ChatMessage(role="user", content="Quand est-ce que je révise ?"),
+        ChatMessage(
+            role="assistant",
+            content="Je regarde.",
+            tool_uses=(
+                ToolUse(
+                    id="toolu_0", name="assistant__search_memory", input={"question": "réviser"}
+                ),
+            ),
+        ),
+        ChatMessage(
+            role="user",
+            tool_results=(ToolResult(tool_use_id="toolu_0", content='{"souvenirs": []}'),),
+        ),
+    ],
+    tools=(
+        ToolDefinition(
+            name="assistant__search_memory",
+            description="Cherche.",
+            input_schema={"type": "object", "properties": {"question": {"type": "string"}}},
+        ),
+    ),
+    tool_choice="none",
+)
+
+
+async def test_tool_calls_are_reassembled_from_json_fragments() -> None:
+    provider, _ = make_provider(streaming(TOOL_STREAM))
+
+    events = [e async for e in provider.chat_stream("claude-haiku-5-5", REQUEST)]
+
+    assert events[0] == TextDelta("Je cherche.")
+    assert events[1] == ToolUseEvent(
+        ToolUse(id="toolu_A", name="assistant__search_memory", input={"question": "matin"})
+    )
+    # JSON illisible : appel sans argument, que la validation par schema refusera ensuite.
+    assert events[2] == ToolUseEvent(ToolUse(id="toolu_B", name="assistant__remember", input={}))
+    completion = events[-1]
+    assert isinstance(completion, Completion) and completion.stop_reason == "tool_use"
+
+
+async def test_tools_history_and_choice_are_sent_in_the_api_format() -> None:
+    provider, seen = make_provider(streaming(HAPPY_STREAM))
+
+    _ = [e async for e in provider.chat_stream("claude-haiku-5-5", TOOLS_REQUEST)]
+
+    body = json.loads(seen[0].content)
+    assert body["tools"] == [
+        {
+            "name": "assistant__search_memory",
+            "description": "Cherche.",
+            "input_schema": {"type": "object", "properties": {"question": {"type": "string"}}},
+        }
+    ]
+    assert body["tool_choice"] == {"type": "none"}
+    assert body["messages"][1] == {
+        "role": "assistant",
+        "content": [
+            {"type": "text", "text": "Je regarde."},
+            {
+                "type": "tool_use",
+                "id": "toolu_0",
+                "name": "assistant__search_memory",
+                "input": {"question": "réviser"},
+            },
+        ],
+    }
+    assert body["messages"][2] == {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_0",
+                "content": '{"souvenirs": []}',
+                "is_error": False,
+            }
+        ],
+    }
+
+
+async def test_no_tools_means_no_tool_fields() -> None:
+    provider, seen = make_provider(streaming(HAPPY_STREAM))
+    _ = [e async for e in provider.chat_stream("claude-haiku-5-5", REQUEST)]
+    body = json.loads(seen[0].content)
+    assert "tools" not in body and "tool_choice" not in body

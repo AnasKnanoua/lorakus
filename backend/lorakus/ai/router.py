@@ -10,6 +10,11 @@ Pour chaque demande, dans cet ordre, avant de payer quoi que ce soit :
 5. Plafond mensuel de l'utilisateur : indisponible s'il est atteint.
 6. Rythme de l'utilisateur (PR 35) : reponses simultanees, appels par minute et par jour ;
    indisponible au-dela (une rafale ne peut pas vider le budget en quelques secondes).
+   Un appel de suite (`continuation`, tour suivant d'une boucle d'outils, PR 38) ne compte
+   pas dans la limite par minute (un message = un appel) mais compte dans celle du jour,
+   le budget et tous les refus ci-dessus.
+
+Une requete avec des outils n'est confiee qu'aux fournisseurs qui savent les utiliser.
 
 Puis les cibles de la chaine sont essayees dans l'ordre. Tant qu'aucun texte n'a ete
 transmis, une panne fait passer a la cible suivante ; apres le premier morceau, la
@@ -38,8 +43,9 @@ from lorakus.ai.port import (
     DataClass,
     ProviderError,
     TextDelta,
+    ToolUseEvent,
     Usage,
-    estimate_tokens,
+    request_tokens,
 )
 from lorakus.ai.usage import UsageLedger
 from lorakus.observability.metrics import (
@@ -90,19 +96,21 @@ class ChatResult:
     budget_warning: bool  # 80 % du plafond mensuel atteint avec cet appel
 
 
-RouterEvent = TextDelta | ChatResult
+RouterEvent = TextDelta | ToolUseEvent | ChatResult
 
 
 class CallQuota(Protocol):
-    """Rythme des appels d'un utilisateur. Compte l'appel et dit s'il est autorise."""
+    """Rythme des appels d'un utilisateur. Compte l'appel et dit s'il est autorise.
 
-    async def allow(self, user_id: uuid.UUID) -> bool: ...
+    continuation : appel de suite d'un meme message (boucle d'outils) ; il ne compte que dans
+    les limites longues (jour), pas dans celle par minute.
+    """
+
+    async def allow(self, user_id: uuid.UUID, *, continuation: bool = False) -> bool: ...
 
 
 def _prompt_tokens(request: ChatRequest) -> int:
-    return estimate_tokens(request.system) + sum(
-        estimate_tokens(m.content) for m in request.messages
-    )
+    return request_tokens(request)
 
 
 class ModelRouter:
@@ -129,7 +137,9 @@ class ModelRouter:
         # Reponses en cours par utilisateur, dans ce processus (une seule API aujourd'hui).
         self._in_flight: dict[uuid.UUID, int] = {}
 
-    def available_targets(self, task: str, data_class: DataClass) -> list[str]:
+    def available_targets(
+        self, task: str, data_class: DataClass, *, needs_tools: bool = False
+    ) -> list[str]:
         """Cibles de la tache utilisables pour cette classe de donnees, dans l'ordre."""
         targets: list[str] = []
         for target in self._catalog.route(task).chain:
@@ -137,6 +147,8 @@ class ModelRouter:
             provider = self._providers.get(name)
             if provider is None:
                 continue  # fournisseur non configure ici (cle absente, fake hors dev)
+            if needs_tools and not provider.capabilities().tools:
+                continue  # ne saurait pas lire les outils ni l'historique qui en contient
             if data_class == "sensitive" and provider.capabilities().external:
                 continue  # refus structurel : rien de sensible ne quitte le serveur
             allowed = self._catalog.policy(name).max_data_class
@@ -158,8 +170,11 @@ class ModelRouter:
         data_class: DataClass,
         request: ChatRequest,
         no_ai: bool = False,
+        continuation: bool = False,
     ) -> AsyncGenerator[RouterEvent]:
-        """Reponse en flux : des TextDelta, puis un ChatResult.
+        """Reponse en flux : des TextDelta et ToolUseEvent, puis un ChatResult.
+
+        continuation : tour suivant d'une boucle d'outils pour le meme message (voir l'en-tete).
 
         Leve AIRefusedError ou AIUnavailableError avant tout texte, AIInterruptedError si la reponse
         s'arrete en cours de route. Un generateur : l'appelant le ferme (aclose) si le client
@@ -174,7 +189,10 @@ class ModelRouter:
             self._refuse(task, AIRefusedError("too_long"))
 
         configured = [t for t in route.chain if split_target(t)[0] in self._providers]
-        targets = self.available_targets(task, data_class)
+        needs_tools = bool(request.tools) or any(
+            m.tool_uses or m.tool_results for m in request.messages
+        )
+        targets = self.available_targets(task, data_class, needs_tools=needs_tools)
         if not configured:
             self._refuse(task, AIUnavailableError("no_provider"))
         if not targets:
@@ -189,7 +207,9 @@ class ModelRouter:
         in_flight = self._in_flight.get(user_id, 0)
         if self._max_concurrent is not None and in_flight >= self._max_concurrent:
             self._refuse(task, AIUnavailableError("rate_limited"))
-        if self._quota is not None and not await self._quota.allow(user_id):
+        if self._quota is not None and not await self._quota.allow(
+            user_id, continuation=continuation
+        ):
             self._refuse(task, AIUnavailableError("rate_limited"))
 
         self._in_flight[user_id] = self._in_flight.get(user_id, 0) + 1
@@ -230,7 +250,10 @@ class ModelRouter:
             started = time.monotonic()
             try:
                 async for event in self._providers[name].chat_stream(model, bounded):
-                    if isinstance(event, TextDelta):
+                    if isinstance(event, ToolUseEvent):
+                        emitted = True  # deja transmis : la reponse ne peut plus changer de modele
+                        yield event
+                    elif isinstance(event, TextDelta):
                         if not emitted:
                             emitted = True
                             AI_FIRST_TOKEN.labels(provider=name, model=model).observe(

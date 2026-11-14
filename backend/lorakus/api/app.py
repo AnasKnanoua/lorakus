@@ -23,6 +23,7 @@ from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.modules.service import ModuleService
 from lorakus.core.ratelimit.service import AICallQuota, Limit, RateLimiter
 from lorakus.core.tools.runtime import ToolRuntime
+from lorakus.core.tools.spec import ToolPorts
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -40,7 +41,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.database = database
     app.state.identity = IdentityService(database, settings)
     app.state.modules = ModuleService(database, app.state.registry)
-    app.state.tools = ToolRuntime(database, app.state.modules)
     app.state.agents = AgentService(database, app.state.modules)
     app.state.rate_limiter = RateLimiter(database)
     app.state.request_limits = RequestLimits(
@@ -64,6 +64,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Absent en staging ou en production : EmbeddingError, l'API ne demarre pas.
     app.state.embedder = await asyncio.to_thread(build_embedder, settings)
     app.state.memory = MemoryService(database, app.state.ai, app.state.embedder)
+    # Outils des modules : services du Core qu'ils peuvent utiliser (PR 38).
+    app.state.tools = ToolRuntime(database, app.state.modules, ToolPorts(memory=app.state.memory))
     app.state.background = DebouncedTasks()
     try:
         yield

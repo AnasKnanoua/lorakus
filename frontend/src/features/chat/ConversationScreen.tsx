@@ -79,13 +79,25 @@ export function ConversationScreen() {
           m.role === "user" ? (
             <UserMessage key={m.id} text={m.content} />
           ) : (
-            <AssistantMessage key={m.id} text={m.content} status={asStatus(m.status)} />
+            <AssistantMessage
+              key={m.id}
+              text={m.content}
+              status={asStatus(m.status)}
+              actions={m.actions}
+              conversationId={conversationId}
+            />
           ),
         )}
         {live && live.status !== "error" && (
           <>
             <UserMessage text={live.user} />
-            <AssistantMessage text={live.assistant} status={live.status} writing={live.status === "streaming"} />
+            <AssistantMessage
+              text={live.assistant}
+              status={live.status}
+              writing={live.status === "streaming"}
+              actions={live.actions}
+              conversationId={conversationId}
+            />
           </>
         )}
         {live?.status === "error" && (

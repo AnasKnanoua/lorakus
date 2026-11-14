@@ -1,5 +1,6 @@
 """Outils et specialistes : /api/v1/tools/... et /api/v1/agents/..."""
 
+from datetime import datetime
 from typing import Annotated, Any, cast
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 
 from lorakus.api.auth import REAUTH_REQUIRED, client_ip, current_user, get_identity
+from lorakus.api.tools import get_tools
 from lorakus.core.agents.contract import SpecialistReport
 from lorakus.core.agents.service import AgentError, AgentService
 from lorakus.core.identity.service import CurrentUser, IdentityService
@@ -15,10 +17,6 @@ from lorakus.core.tools.runtime import ToolError, ToolResult, ToolRuntime
 router = APIRouter(prefix="/v1", tags=["outils et specialistes"])
 User = Annotated[CurrentUser, Depends(current_user)]
 Identity = Annotated[IdentityService, Depends(get_identity)]
-
-
-def get_tools(request: Request) -> ToolRuntime:
-    return cast(ToolRuntime, request.app.state.tools)
 
 
 def get_agents(request: Request) -> AgentService:
@@ -45,6 +43,9 @@ class ToolCallResponse(BaseModel):
     risk: str
     result: dict[str, Any] | None = None
     confirmation_id: UUID | None = None
+    # Carte de confirmation (write et sensitive) : texte ecrit par l'outil, et echeance.
+    summary: str | None = None
+    expires_at: datetime | None = None
 
 
 class SpecialistInfo(BaseModel):
@@ -71,6 +72,8 @@ def _response(result: ToolResult) -> ToolCallResponse:
         risk=result.risk,
         result=result.result,
         confirmation_id=result.confirmation_id,
+        summary=result.summary,
+        expires_at=result.expires_at,
     )
 
 
@@ -114,6 +117,20 @@ async def confirm_tool(
         return _response(await tools.confirm(user.id, confirmation_id, client_ip(request)))
     except ToolError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from None
+
+
+@router.post(
+    "/tools/confirmations/{confirmation_id}/cancel", status_code=status.HTTP_204_NO_CONTENT
+)
+async def cancel_tool(
+    confirmation_id: UUID, request: Request, tools: Tools, user: User
+) -> Response:
+    """Refuse une action en attente : elle ne pourra plus etre confirmee."""
+    try:
+        await tools.cancel(user.id, confirmation_id, client_ip(request))
+    except ToolError as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/agents")

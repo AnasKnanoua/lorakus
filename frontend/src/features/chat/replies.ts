@@ -11,11 +11,14 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
 import { sendMessage, type ReplyStatus } from "@/api/assistant";
+import type { ToolAction } from "@/api/tools";
 
 export interface LiveTurn {
   user: string;
   assistant: string;
   status: ReplyStatus | "streaming" | "error";
+  /** Outils utilises et cartes proposees pendant la reponse (PR 38). */
+  actions: ToolAction[];
 }
 
 const turns = new Map<string, LiveTurn>();
@@ -60,28 +63,38 @@ export async function startReply(
     return; // une reponse a la fois par conversation
   }
   let assistant = "";
-  update(conversationId, { user: text, assistant, status: "streaming" });
+  let actions: ToolAction[] = [];
+  update(conversationId, { user: text, assistant, status: "streaming", actions });
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["assistant", "conversation", conversationId] }),
       queryClient.invalidateQueries({ queryKey: ["assistant", "conversations"] }),
     ]);
   try {
-    const done = await sendMessage(conversationId, text, (delta) => {
-      assistant += delta;
-      update(conversationId, { user: text, assistant, status: "streaming" });
-    });
+    const done = await sendMessage(
+      conversationId,
+      text,
+      (delta) => {
+        assistant += delta;
+        update(conversationId, { user: text, assistant, status: "streaming", actions });
+      },
+      undefined,
+      (action) => {
+        actions = [...actions, action];
+        update(conversationId, { user: text, assistant, status: "streaming", actions });
+      },
+    );
     if (done.budgetWarning && !budgetWarning) {
       budgetWarning = true;
     }
-    update(conversationId, { user: text, assistant, status: done.status });
+    update(conversationId, { user: text, assistant, status: done.status, actions });
     await refresh();
     update(conversationId, null);
   } catch {
     // Le serveur a peut-etre enregistre le message (et une reponse partielle) : on recharge
     // ce qu'il a, et le tour en direct ne garde que l'avis d'erreur.
     await refresh().catch(() => undefined);
-    update(conversationId, { user: "", assistant: "", status: "error" });
+    update(conversationId, { user: "", assistant: "", status: "error", actions: [] });
   }
 }
 

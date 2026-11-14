@@ -98,10 +98,11 @@ class AICallQuota:
 
     def __init__(self, limiter: RateLimiter, *, per_minute: int, per_day: int) -> None:
         self._limiter = limiter
-        self._limits = (
-            Limit("ai.minute", 60, per_minute),
-            Limit("ai.day", 86_400, per_day),
-        )
+        self._minute = Limit("ai.minute", 60, per_minute)
+        self._day = Limit("ai.day", 86_400, per_day)
 
-    async def allow(self, user_id: uuid.UUID) -> bool:
-        return (await self._limiter.hit(user_id, self._limits)).allowed
+    async def allow(self, user_id: uuid.UUID, *, continuation: bool = False) -> bool:
+        # Appel de suite d'un meme message (boucle d'outils, PR 38) : un message compte pour un
+        # seul appel par minute, mais chaque appel compte dans la limite du jour.
+        limits = (self._day,) if continuation else (self._minute, self._day)
+        return (await self._limiter.hit(user_id, limits)).allowed

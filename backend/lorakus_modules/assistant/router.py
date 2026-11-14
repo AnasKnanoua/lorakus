@@ -4,8 +4,14 @@ Le Core ajoute lui-meme la verification de session et d'activation du module. La
 a un message arrive en Server-Sent Events (text/event-stream) :
 
     event: delta   data: {"text": "..."}          (zero, une ou plusieurs fois)
+    event: tool    data: {"tool": "...", "label": "...", "ok": true}   (outil read, PR 38)
+    event: card    data: {"confirmation_id": "...", "tool": "...", "risk": "write|sensitive",
+                          "summary": "...", "expires_at": "...", "status": "pending"}
     event: done    data: {"message_id": "...", "status": "ok|interrupted|fallback",
                           "budget_warning": false}
+
+Une carte se confirme par POST /api/v1/tools/confirmations/{id} (preuve d'identite recente
+pour une action sensitive) et se refuse par .../cancel : routes du Core, jamais du modele.
 """
 
 import json
@@ -13,7 +19,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Final, cast
+from typing import Annotated, Any, Final, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
@@ -21,18 +27,22 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lorakus.ai.router import ModelRouter
 from lorakus.api.ai import get_ai
-from lorakus.api.auth import current_user
+from lorakus.api.auth import client_ip, current_user
 from lorakus.api.memory import get_background, get_memory
+from lorakus.api.tools import get_tools
 from lorakus.core.background import DebouncedTasks
 from lorakus.core.identity.service import CurrentUser
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
+from lorakus.core.tools.runtime import ToolRuntime
 from lorakus.db.database import Database
 from lorakus.settings import get_settings
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.service import (
     MAX_MESSAGE_CHARS,
+    Activity,
     AssistantService,
+    Card,
     ConversationNotFoundError,
     Delta,
     ReplyEvent,
@@ -50,6 +60,7 @@ def _service(
     ai: Annotated[ModelRouter, Depends(get_ai)],
     memory: Annotated[MemoryService, Depends(get_memory)],
     background: Annotated[DebouncedTasks, Depends(get_background)],
+    tools: Annotated[ToolRuntime, Depends(get_tools)],
 ) -> AssistantService:
     settings = get_settings()
     return AssistantService(
@@ -58,6 +69,7 @@ def _service(
         memory=memory,
         background=background,
         memory_delay_s=settings.memory_proposal_delay_seconds,
+        tools=tools,
     )
 
 
@@ -76,6 +88,20 @@ class ConversationOut(BaseModel):
     updated_at: datetime
 
 
+class ActionOut(BaseModel):
+    """Outil d'une reponse : indication (activity) ou carte de confirmation (card)."""
+
+    kind: Literal["activity", "card"]
+    tool: str
+    label: str | None = None
+    ok: bool | None = None
+    confirmation_id: uuid.UUID | None = None
+    risk: str | None = None
+    summary: str | None = None
+    expires_at: datetime | None = None
+    status: Literal["pending", "confirmed", "cancelled", "expired"] | None = None
+
+
 class MessageOut(BaseModel):
     id: uuid.UUID
     role: str
@@ -84,6 +110,7 @@ class MessageOut(BaseModel):
     model: str | None
     cost_usd: Decimal | None
     created_at: datetime
+    actions: list[ActionOut] = []
 
 
 class ConversationDetail(ConversationOut):
@@ -116,9 +143,26 @@ async def get_conversation(
         conversation, messages = await service.conversation(user.id, conversation_id)
     except ConversationNotFoundError:
         raise NOT_FOUND from None
+    statuses = await service.card_statuses(user.id, messages)
+
+    def actions(stored: list[dict[str, Any]]) -> list[ActionOut]:
+        out: list[ActionOut] = []
+        for action in stored:
+            item = ActionOut.model_validate(action)
+            if item.kind == "card" and item.confirmation_id is not None:
+                # Ligne disparue (compte efface...) : la carte ne peut plus etre confirmee.
+                item.status = statuses.get(item.confirmation_id, "expired")
+            out.append(item)
+        return out
+
     return ConversationDetail(
         **ConversationOut.model_validate(conversation, from_attributes=True).model_dump(),
-        messages=[MessageOut.model_validate(m, from_attributes=True) for m in messages],
+        messages=[
+            MessageOut.model_validate(m, from_attributes=True).model_copy(
+                update={"actions": actions(m.actions)}
+            )
+            for m in messages
+        ],
     )
 
 
@@ -132,8 +176,23 @@ async def delete_conversation(conversation_id: uuid.UUID, user: User, service: S
 
 
 def _sse(event: ReplyEvent) -> str:
+    data: dict[str, Any]
     if isinstance(event, Delta):
         name, data = "delta", {"text": event.text}
+    elif isinstance(event, Activity):
+        name, data = "tool", {"tool": event.tool, "label": event.label, "ok": event.ok}
+    elif isinstance(event, Card):
+        name, data = (
+            "card",
+            {
+                "confirmation_id": str(event.confirmation_id),
+                "tool": event.tool,
+                "risk": event.risk,
+                "summary": event.summary,
+                "expires_at": event.expires_at.isoformat(),
+                "status": "pending",
+            },
+        )
     else:
         name, data = (
             "done",
@@ -162,7 +221,9 @@ async def send_message(
 ) -> StreamingResponse:
     config = await _config(request, user)
     try:
-        turn = await service.start_turn(user.id, conversation_id, body.content, config)
+        turn = await service.start_turn(
+            user.id, conversation_id, body.content, config, ip=client_ip(request)
+        )
     except ConversationNotFoundError:
         raise NOT_FOUND from None
 
