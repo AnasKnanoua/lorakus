@@ -23,7 +23,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0015](docs/adr/0015-data-provenance.md) | Provenance et contraintes de licence des données | Accepté | À chaque nouveau connecteur |
 | [0016](docs/adr/0016-minimal-usage-collection.md) | Collecte d'usage numérique minimale | Accepté | Phase 11 |
 | [0017](docs/adr/0017-motivation-curation.md) | Motivation = curation, pas un flux | Accepté | 2 mois après la phase 10 |
-| [0018](docs/adr/0018-planning-in-core.md) | Tâches et agenda dans le Core (`planning`) | **Proposé** | Avant la phase 4 |
+| [0018](docs/adr/0018-planning-in-core.md) | Tâches et agenda dans le Core (`planning`) | Validé (2026-11-18, D-F, amendé : temps en UTC, fuseau de l'utilisateur, agenda sans récurrence) | Fin de la phase 5 |
 | [0019](docs/adr/0019-unified-signals.md) | Signaux unifiés, aucune notification directe | Accepté | — |
 | [0020](docs/adr/0020-mvp-integrations.md) | Intégrations du MVP : ICS en lecture, Telegram, Web Push | Accepté | Phase 8 |
 | [0021](docs/adr/0021-baseline-versions.md) | Socle de versions (Python 3.13, PostgreSQL 18) | Accepté | Tous les 12 mois |
@@ -52,7 +52,6 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | Id | Question | Recommandation | Bloque |
 | --- | --- | --- | --- |
 | D-E | Place du bien-être numérique | Collecte en phase 8, interventions en phase 12 | Phase 8 |
-| D-F | `planning` dans le Core (ADR 0018) | Oui | Phase 4 |
 
 ## Décisions prises
 
@@ -72,6 +71,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Alertes d'exploitation sur Discord, notifications produit sur Telegram (ADR 0035) | 2026-11-09 |
 | — | Pas de VM Azure : staging éphémère dans la CI, sentinelle healthchecks.io ; crédit Azure gardé (ADR 0037) | 2026-11-11 |
 | — | Loki reporté en P3, avec les traces (amendement de l'ADR 0010) | 2026-11-11 |
+| D-F | `planning` dans le Core (ADR 0018 validé) : tâches génériques avec module propriétaire, agenda sans récurrence (dépliée par `calendars`), fuseau de l'utilisateur en réglage du compte, planificateur déterministe qui propose ; découpage de la P4 en PR 44 à 50 | 2026-11-18 |
 | D-D | Budget IA : 10 $ prépayés sans rechargement automatique ; plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en phase 3 (amendement de l'ADR 0007) | 2026-11-12 |
 | — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |
