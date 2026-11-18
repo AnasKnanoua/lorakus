@@ -182,3 +182,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (2026-11-18, PR 45) : un serveur HTTPS de test, avec une autorité de certification créée par `cryptography`, est refusé (`CERTIFICATE_VERIFY_FAILED`) alors que le certificat paraît correct.
 - **Cause** : Python 3.13 active `VERIFY_X509_STRICT` dans `ssl.create_default_context()` ; OpenSSL exige alors les extensions Subject Key Identifier, Authority Key Identifier, et Key Usage (`keyCertSign`) sur l'autorité.
 - **Correction** : les ajouter au générateur de certificats de test (`tests/unit/test_outbound.py`). Ne pas désactiver la vérification stricte dans le client.
+
+## CodeQL : « Use of insecure SSL/TLS version » dans un test
+
+- **Symptôme** (2026-11-18, PR 45) : le job CodeQL échoue sur `ssl.create_default_context()` dans `tests/unit/test_outbound.py`, alors que le contexte par défaut de Python 3.13 refuse déjà TLS 1.0 et 1.1.
+- **Cause** : CodeQL ne déduit pas la version minimale par défaut ; il exige qu'elle soit écrite.
+- **Correction** : `context.minimum_version = ssl.TLSVersion.TLSv1_2` juste après chaque `create_default_context()`, tests compris (le client de production le fait déjà dans `OutboundHttp`). Ne pas ignorer l'alerte.

@@ -288,6 +288,7 @@ def server(tls_files: dict[str, Path]) -> Iterator[int]:
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     httpd.daemon_threads = True
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2  # jamais TLS 1.0 ni 1.1 (CodeQL)
     context.load_cert_chain(tls_files["cert"], tls_files["key"])
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -318,6 +319,7 @@ def only_loopback_or_public(address: IPAddress) -> bool:
 
 def client(tls_files: dict[str, Path], dns: FakeDns) -> OutboundHttp:
     context = ssl.create_default_context(cafile=str(tls_files["ca"]))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     return OutboundHttp(resolver=dns, ssl_context=context, address_policy=only_loopback_or_public)
 
 
@@ -373,6 +375,7 @@ async def test_the_production_policy_refuses_the_loopback_server(
 ) -> None:
     """Sans la derogation des tests, le serveur local (127.0.0.1) est injoignable."""
     context = ssl.create_default_context(cafile=str(tls_files["ca"]))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     strict = OutboundHttp(resolver=standard_dns(), ssl_context=context)
     with pytest.raises(OutboundError) as error:
         await strict.get(f"https://agenda.example.com:{server}/ok.ics")
