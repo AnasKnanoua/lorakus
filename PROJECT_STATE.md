@@ -3,7 +3,7 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : v0.3.0 (2026-11-18)
-- **Phase** : P4 — Planning, academic, projects, Sergent v0, en préparation depuis le 2026-11-18 (D-F et découpage à valider). P3 close le 2026-11-18 (v0.3.0).
+- **Phase** : P4 — Planning, academic, projects, Sergent v0, commencée le 2026-11-18 (D-F tranchée, découpage en PR 44 à 50 validé). P3 close le 2026-11-18 (v0.3.0).
 - **Dernière mise à jour** : 2026-11-18
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
@@ -34,7 +34,8 @@
 
 ## En cours (P4)
 
-- Préparation de la phase 4 (Planning, academic, projects, Sergent v0) : trancher D-F (ADR 0018, `planning` dans le Core), puis découpage en PR et critères de fin, à valider par le propriétaire avant tout code.
+- Découpage validé le 2026-11-18 (`ROADMAP.md`, P4) : PR 44 (socle `planning`), 45 (`calendars`), 46 (`academic`), 47 (planificateur et Today), 48 (Sergent v0), 49 (`projects`), 50 (préférences et clôture). PR 44 en cours.
+- Emploi du temps : pas d'ICS fourni par METU (capture d'écran reçue, créneaux de 50 minutes à HH:40) ; en attendant celui de TSP (2027), saisie des cours dans Google Agenda en événements récurrents, lus par l'adresse ICS secrète (PR 45).
 - Reporté de la P3 : palier 3 du routage, invalidation du cache des spécialistes par événements, suppression des conversations par période ; amélioration du routage par le sens et de la recherche dans la mémoire (`ROADMAP.md`, « Idées »).
 
 À faire quand c'est pratique, hors phase : clés B2 par machine (`DEPLOYMENT.md` §7.2).
@@ -44,10 +45,10 @@
 | Id | Sujet | Recommandation | Bloque |
 | --- | --- | --- | --- |
 | D-E | Place du bien-être numérique | Collecte en P8, interventions en P12 | P8 |
-| D-F | `planning` dans le Core (ADR 0018) | Oui | P4 |
 
 ## Décisions prises récemment
 
+- 2026-11-18 — D-F : `planning` dans le Core (ADR 0018 validé et amendé) ; découpage de la P4 validé ; inspirations d'OpenJarvis triées (fuseau horaire et protection SSRF dans la P4, le reste dans « Idées »).
 - 2026-11-18 — Clôture de la P3 et v0.3.0 après confirmation de l'usage quotidien par le propriétaire.
 - 2026-11-18 — Mémoire d'un conteneur qui écrit sur disque (Tempo, Loki, Prometheus) : décider d'une limite d'après `anon` dans `memory.stat`, pas d'après `docker stats` seul, qui compte aussi du cache de fichiers récupérable ; Tempo garde 256 Mo (121 Mo `anon` mesurés). Consommation IA réelle : environ 0,28 millième de dollar et 1,6 s par appel ; les 10 $ prépayés couvrent largement plus d'un an d'usage personnel.
 - 2026-11-18 — PR 41 : corpus d'injections et évaluation du modèle en pytest, sans Promptfoo (dépendances Node nombreuses, télémétrie par défaut) ; blocs de données rendus inertes par `inert()` ; export « Mes données » par un `data_exporter` optionnel du manifeste ; API à 832 Mo et alerte à 700 Mo (mesures du 2026-11-14) ; checklist `docs/avant-premier-client.md`.
