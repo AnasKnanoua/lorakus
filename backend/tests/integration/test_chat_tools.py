@@ -8,7 +8,8 @@ rien ne change sans le clic de l'utilisateur, quoi que le modele fasse.
 import asyncio
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 
@@ -31,7 +32,7 @@ from lorakus.ai.testing import FakeProvider, FakeReply
 from lorakus.ai.usage import UsageStore
 from lorakus.api.app import create_app
 from lorakus.core.identity.passwords import HASHER
-from lorakus.core.ratelimit.service import AICallQuota
+from lorakus.core.ratelimit.service import AICallQuota, RateLimiter
 from lorakus_modules.assistant.service import MAX_CARDS, MAX_MODEL_CALLS, PENDING_FOR_MODEL
 
 pytestmark = pytest.mark.integration
@@ -46,16 +47,27 @@ OTHER_PASSWORD = "un autre mot de passe long"
 
 
 # ------------------------------------------------------------------ outillage
-def use_model(client: TestClient, *replies: str | FakeReply, per_minute: int = 30) -> FakeProvider:
-    """Remplace le moteur IA par un faux modele scripte (avec un vrai quota PostgreSQL)."""
+def use_model(
+    client: TestClient,
+    *replies: str | FakeReply,
+    per_minute: int = 30,
+    clock: Callable[[], datetime] | None = None,
+) -> FakeProvider:
+    """Remplace le moteur IA par un faux modele scripte (avec un vrai quota PostgreSQL).
+
+    clock : heure vue par les limites (fixe pour un test qui ne doit pas changer de minute).
+    """
     app = cast(FastAPI, client.app)
+    limiter = (
+        app.state.rate_limiter if clock is None else RateLimiter(app.state.database, clock=clock)
+    )
     provider = FakeProvider(replies=list(replies))
     app.state.ai = ModelRouter(
         Catalog.load(),
         {"fake": provider},
         UsageStore(app.state.database),
         monthly_budget_usd=Decimal(3),
-        quota=AICallQuota(app.state.rate_limiter, per_minute=per_minute, per_day=200),
+        quota=AICallQuota(limiter, per_minute=per_minute, per_day=200),
     )
     return provider
 
@@ -338,6 +350,9 @@ def test_a_message_counts_once_in_the_per_minute_limit(
         "Trouvé.",
         "Second message.",
         per_minute=1,
+        # Fenetres alignees sur la minute : sans heure fixe, les deux messages tombaient
+        # parfois de part et d'autre d'un changement de minute (echec en CI, 2026-11-18).
+        clock=lambda: datetime(2026, 11, 18, 9, 30, 30, tzinfo=UTC),
     )
     first = send(owner, conversation, "Cherche")
     assert of(first, "done")[0]["status"] == "ok"

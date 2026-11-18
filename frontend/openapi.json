@@ -473,6 +473,19 @@
         "title": "ConversationOut",
         "type": "object"
       },
+      "DeletedOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DeletedOut",
+        "type": "object"
+      },
       "Fact": {
         "properties": {
           "data_class": {
@@ -1821,6 +1834,26 @@
       }
     },
     "/api/v1/assistant/conversations": {
+      "delete": {
+        "description": "Supprime toutes les conversations (preuve d'identite de moins de 10 minutes).\n\nLes souvenirs ne sont pas touches : « Tout oublier » est sur la page Memoire.",
+        "operationId": "delete_all_conversations_api_v1_assistant_conversations_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete All Conversations",
+        "tags": [
+          "Assistant"
+        ]
+      },
       "get": {
         "operationId": "list_conversations_api_v1_assistant_conversations_get",
         "responses": {
@@ -2446,6 +2479,31 @@
         "summary": "Totp Setup",
         "tags": [
           "authentification"
+        ]
+      }
+    },
+    "/api/v1/data/export": {
+      "get": {
+        "description": "Telecharge l'export complet (jamais d'empreinte, de secret ni de vecteur).",
+        "operationId": "export_my_data_api_v1_data_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Toutes les donnees de l'utilisateur, en piece jointe JSON."
+          },
+          "403": {
+            "description": "Preuve d'identite trop ancienne (reauth_required)."
+          }
+        },
+        "summary": "Export My Data",
+        "tags": [
+          "mes donnees"
         ]
       }
     },

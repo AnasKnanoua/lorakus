@@ -30,4 +30,4 @@ Le Majordome doit pouvoir agir (retenir, corriger, plus tard créer une tâche),
 
 - Un clic de plus pour chaque modification, voulu. Une action supprimant des données demande, en plus, le mot de passe si la dernière preuve d'identité date de plus de 10 minutes.
 - Le coût d'un message avec outil est d'environ deux appels au modèle (mesure en production après déploiement).
-- Le corpus d'injections Promptfoo (PR 41) s'appuiera sur ces tests : `backend/tests/integration/test_chat_tools.py`.
+- Le corpus d'injections (PR 41, `backend/tests/security/`, pytest plutôt que Promptfoo) rejoue chaque attaque face à un modèle qui obéit, en s'appuyant sur ces tests : `backend/tests/integration/test_chat_tools.py`.

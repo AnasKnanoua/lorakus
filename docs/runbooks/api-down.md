@@ -7,7 +7,7 @@ Préparer la session : [README](README.md#session).
 ## Symptôme
 
 - `LorakusApiDown` : Prometheus ne collecte plus les métriques de l'API depuis 2 minutes. Mesuré le 2026-11-10 : alerte Discord 2 min 21 s après l'arrêt de l'API.
-- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 650 Mo pour une limite de 768 Mo ; environ 545 Mo au repos est normal avec le modèle d'embeddings chargé, mesuré le 2026-11-13).
+- Les trois avertissements : l'API répond, mais mal (erreurs 5xx, lenteur, mémoire au-dessus de 700 Mo pour une limite de 832 Mo ; environ 566 Mo en service est normal avec le modèle d'embeddings et OpenTelemetry, mesuré le 2026-11-14).
 
 ## Vérifications
 
@@ -27,7 +27,7 @@ docker inspect -f '{{.State.Status}} redémarrages={{.RestartCount}} OOM={{.Stat
 | Constat | Cause |
 | --- | --- |
 | Conteneur `api` arrêté ou en boucle de redémarrage, juste après un déploiement | Version défectueuse (le test de santé du déploiement aurait dû la refuser : à signaler dans la note d'incident) |
-| `OOM=true` ou mémoire de l'API proche de 768 Mo | Fuite ou charge mémoire ; le conteneur est tué par sa limite |
+| `OOM=true` ou mémoire de l'API proche de 832 Mo | Fuite ou charge mémoire ; le conteneur est tué par sa limite |
 | Journal `modele d'embeddings absent` ou `modele illisible` au démarrage | Image sans le modèle ou fichier abîmé : l'API refuse de démarrer en production plutôt que de chercher avec de faux vecteurs. Retour à la version précédente, puis vérifier le test de fumée de l'image dans le workflow Publish |
 | `postgres` non `healthy`, erreurs de connexion dans les journaux de l'API | Base arrêtée, disque plein ([disk-full](disk-full.md)) ou mémoire du serveur épuisée ([host](host.md)) |
 | Tous les conteneurs arrêtés | Serveur redémarré et Docker non relancé, ou arrêt manuel |

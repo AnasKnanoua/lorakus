@@ -42,6 +42,9 @@ class Database:
             pool_timeout=5,
             pool_pre_ping=True,
             pool_recycle=1800,
+            # Valeurs des requetes absentes des erreurs (et donc des journaux exportes vers
+            # Loki) : une question ou un souvenir ne doit jamais y apparaitre (PR 41).
+            hide_parameters=True,
             connect_args={
                 "application_name": "lorakus-api",
                 "options": _SERVER_OPTIONS,

@@ -95,6 +95,12 @@ def normalize(text: str) -> str:
     return " ".join(unicodedata.normalize("NFC", text).split())
 
 
+def searchable(text: str) -> str:
+    """Question prete pour la recherche : caracteres de controle et invisibles remplaces par
+    une espace (PostgreSQL refuse l'octet NUL ; trouve par le corpus d'injections, PR 41)."""
+    return normalize("".join(c if c.isprintable() or c.isspace() else " " for c in text))
+
+
 def content_hash(text: str) -> bytes:
     """Empreinte du texte normalise, sans casse ni ponctuation finale."""
     key = normalize(text).casefold().rstrip(" .!?;")
@@ -222,6 +228,7 @@ class MemoryService:
         Jamais `sensitive` : le seul fournisseur des conversations est externe.
         Rattrape d'abord les faits sans vecteur (appele a chaque message de l'assistant).
         """
+        question = searchable(question) if question else None
         await self._index_quietly(user_id)
         vector = await self._embed_question(question) if question else None
         async with self._db.transaction(user_id) as session:
@@ -262,7 +269,7 @@ class MemoryService:
 
         Tous les faits de l'utilisateur, `sensitive` compris : ils restent sur le serveur.
         """
-        question = normalize(question)
+        question = searchable(question)
         if not question:
             return []
         await self._index_quietly(user_id)

@@ -14,11 +14,12 @@ from lorakus.ai.usage import UsageStore
 from lorakus.api.auth import RequestLimits
 from lorakus.api.modules import mount_module_routes
 from lorakus.api.origin import OriginCheckMiddleware
-from lorakus.api.routes import auth, health, memory, modules, tools
+from lorakus.api.routes import auth, data, health, memory, modules, tools
 from lorakus.core.agents.orchestrator import Orchestrator
 from lorakus.core.agents.routing import IntentRouter
 from lorakus.core.agents.service import AgentService
 from lorakus.core.background import DebouncedTasks
+from lorakus.core.data.export import DataExportService
 from lorakus.core.identity.service import IdentityService
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.registry import ModuleRegistry
@@ -79,6 +80,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.orchestrator = Orchestrator(app.state.agents)
     app.state.intent_router = IntentRouter(app.state.embedder)
     app.state.background = DebouncedTasks()
+    # Mes donnees (PR 41) : export complet, modules compris.
+    app.state.data_export = DataExportService(database, app.state.modules, app.state.memory)
     try:
         yield
     finally:
@@ -121,6 +124,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
     app.include_router(memory.router, prefix="/api")
+    app.include_router(data.router, prefix="/api")
     # Traces et journaux vers Tempo et Loki (PR 40) ; rien sans adresse configuree.
     app.state.telemetry = configure_telemetry(
         service_name="lorakus-api",

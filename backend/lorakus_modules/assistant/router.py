@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lorakus.ai.router import ModelRouter
 from lorakus.api.agents import get_intent_router, get_orchestrator
 from lorakus.api.ai import get_ai
-from lorakus.api.auth import client_ip, current_user
+from lorakus.api.auth import client_ip, current_user, recent_user
 from lorakus.api.memory import get_background, get_memory
 from lorakus.api.tools import get_tools
 from lorakus.core.agents.orchestrator import Orchestrator
@@ -55,6 +55,7 @@ MODULE_ID: Final = "assistant"
 
 router = APIRouter()
 User = Annotated[CurrentUser, Depends(current_user)]
+RecentUser = Annotated[CurrentUser, Depends(recent_user)]
 NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "Conversation introuvable.")
 
 
@@ -120,6 +121,10 @@ class MessageOut(BaseModel):
     actions: list[ActionOut] = []
 
 
+class DeletedOut(BaseModel):
+    deleted: int
+
+
 class ConversationDetail(ConversationOut):
     messages: list[MessageOut]
 
@@ -134,6 +139,17 @@ class MessageIn(BaseModel):
 async def list_conversations(user: User, service: Service) -> list[ConversationOut]:
     rows = await service.list_conversations(user.id)
     return [ConversationOut.model_validate(r, from_attributes=True) for r in rows]
+
+
+@router.delete("/conversations")
+async def delete_all_conversations(
+    request: Request, user: RecentUser, service: Service
+) -> DeletedOut:
+    """Supprime toutes les conversations (preuve d'identite de moins de 10 minutes).
+
+    Les souvenirs ne sont pas touches : « Tout oublier » est sur la page Memoire.
+    """
+    return DeletedOut(deleted=await service.delete_all_conversations(user.id, client_ip(request)))
 
 
 @router.post("/conversations", status_code=status.HTTP_201_CREATED)

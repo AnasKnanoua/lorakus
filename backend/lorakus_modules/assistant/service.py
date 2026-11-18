@@ -50,6 +50,7 @@ from lorakus.ai.router import (
 from lorakus.core.agents.orchestrator import Consultation, Orchestrator
 from lorakus.core.agents.routing import IntentRouter, Routing
 from lorakus.core.background import DebouncedTasks
+from lorakus.core.identity.service import audit
 from lorakus.core.memory.service import MemoryService, SourceMessage
 from lorakus.core.tools.runtime import ConfirmationStatus, ToolRuntime
 from lorakus.core.tools.spec import ToolError, ToolSpec
@@ -211,6 +212,18 @@ def tool_definitions(specs: Sequence[ToolSpec]) -> dict[str, ToolSpec]:
     return named
 
 
+def wire_definitions(tools: dict[str, ToolSpec]) -> tuple[ToolDefinition, ...]:
+    """Definitions envoyees au modele (production et banc d'evaluation, PR 41)."""
+    return tuple(
+        ToolDefinition(
+            name=name,
+            description=spec.description,
+            input_schema=spec.input_model.model_json_schema(),
+        )
+        for name, spec in tools.items()
+    )
+
+
 def card_note(summary: str, status: str) -> str:
     """Rappel, pour le modele, d'une carte d'un message precedent et de son issue."""
     line = " ".join(summary.split())
@@ -358,6 +371,31 @@ class AssistantService:
             # (qui citent la conversation) sont effaces.
             await self._tools.retire_origin(user_id, f"conversation:{conversation_id}")
 
+    async def delete_all_conversations(self, user_id: uuid.UUID, ip: str | None = None) -> int:
+        """Supprime toutes les conversations (messages compris) ; les souvenirs restent.
+
+        Comme pour une conversation : leurs cartes en attente sont annulees et les arguments
+        de leurs actions effaces. Le journal ne garde que le nombre (PR 41).
+        """
+        async with self._db.transaction(user_id) as session:
+            deleted = list(
+                await session.scalars(
+                    delete(AssistantConversation).returning(AssistantConversation.id)
+                )
+            )
+            await audit(
+                session,
+                user_id,
+                "assistant.conversations.delete_all",
+                "success",
+                ip,
+                {"count": len(deleted)},
+            )
+        if self._tools is not None:
+            for conversation_id in deleted:
+                await self._tools.retire_origin(user_id, f"conversation:{conversation_id}")
+        return len(deleted)
+
     # ------------------------------------------------------------------- un tour
     async def start_turn(
         self,
@@ -432,14 +470,7 @@ class AssistantService:
                 reports=reports_block(consultations),
             ),
             messages=messages,
-            tools=tuple(
-                ToolDefinition(
-                    name=name,
-                    description=spec.description,
-                    input_schema=spec.input_model.model_json_schema(),
-                )
-                for name, spec in tools.items()
-            ),
+            tools=wire_definitions(tools),
         )
         self._schedule_memory(user_id, conversation_id)
         span.set_attributes(

@@ -2,6 +2,7 @@
 
 from lorakus.core.modules.manifest import DataDeclaration, FrontendEntry, ModuleManifest
 from lorakus_modules.assistant.config import AssistantConfig
+from lorakus_modules.assistant.export import export_assistant
 from lorakus_modules.assistant.router import router
 from lorakus_modules.assistant.tools import TOOLS
 
@@ -30,5 +31,7 @@ manifest = ModuleManifest(
     frontend=FrontendEntry(route="/chat", label="Discuter", icon="message-circle"),
     # Outils du chat (PR 38) : la memoire, avec confirmation pour toute modification.
     tools=TOOLS,
+    # « Mes donnees » (PR 41) : conversations et messages, meme module desactive.
+    data_exporter=export_assistant,
     health=check_health,
 )

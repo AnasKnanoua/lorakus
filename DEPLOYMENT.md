@@ -12,7 +12,7 @@ Décisions : [ADR 0036](docs/adr/0036-environments.md), amendée par l'[ADR 0037
 | Staging | Runner GitHub ARM jetable, avant chaque déploiement (`infra/staging/staging-test.sh`) | Pile complète de production, B2 remplacé par un dossier local | Synthétiques |
 | Sentinelle externe | healthchecks.io (formule gratuite) | Reçoit le signal de vie de la production, prévient Discord s'il cesse | Aucune |
 | Production | `oracleworker` (Oracle Always Free, ARM, 1 OCPU, 6 Go, Oracle Linux 9), alias SSH `lorakus-prod`, dédié à Lorakus | API, PostgreSQL, pile d'observabilité, sauvegardes | Réelles |
-| Red Team | À redimensionner en phase 17 | ZAP, Promptfoo | Aucune donnée de production |
+| Red Team | À redimensionner en phase 17 | ZAP, corpus d'injections | Aucune donnée de production |
 
 `oraclevps` héberge Anime Notif : il est hors du périmètre de Lorakus et ne doit jamais être modifié.
 
@@ -230,6 +230,8 @@ Mesure faite après le déploiement de la PR 37a, sur le serveur en tant que `de
 dc run --rm -T --no-deps api python -m lorakus.ai.providers.check </dev/null && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
-La première commande lance un conteneur jetable de la même image (jamais `dc exec` dans `api` : une seconde copie du modèle sous la même limite de 768 Mo pourrait faire tuer l'API) et affiche la mémoire de ce seul conteneur ; la seconde donne la mémoire réelle du conteneur `api`, modèle compris. À refaire à chaque changement de modèle : reporter les chiffres ici et dans `PROJECT_STATE.md`, puis ajuster la limite de l'API (`compose.yml`) et le seuil de `LorakusApiHighMemory` en gardant au moins 30 % de marge au repos.
+La première commande lance un conteneur jetable de la même image (jamais `dc exec` dans `api` : une seconde copie du modèle sous la même limite (832 Mo depuis la PR 41) pourrait faire tuer l'API) et affiche la mémoire de ce seul conteneur ; la seconde donne la mémoire réelle du conteneur `api`, modèle compris. À refaire à chaque changement de modèle : reporter les chiffres ici et dans `PROJECT_STATE.md`, puis ajuster la limite de l'API (`compose.yml`) et le seuil de `LorakusApiHighMemory` en gardant au moins 30 % de marge au repos.
 
 Mesures du 2026-11-13 (`oracleworker`, ARM) : chargement 1,66 s ; le modèle ajoute environ 407 Mo à un processus (123 → 530 Mo) ; API au repos 545 Mo sur 768 ; question 33 ms en médiane et 38 ms au 95e centile ; 32 faits en 623 ms ; hôte 2,4 Go utilisés et 3,2 Go disponibles sur 5,6. Conséquences : limite de l'API gardée à 768 Mo (la baisser laisserait moins de 30 % de marge), `LorakusApiHighMemory` à 650 Mo ; Grafana, à 325 Mo pour 384, passe à 512 Mo.
+
+Mesures du 2026-11-14, après la PR 40 (traces et journaux) : API 566 Mo sur 768 (+21 Mo pour OpenTelemetry), Tempo 112 Mo sur 256, Loki 72 Mo sur 256, Grafana 322 Mo sur 512 ; hôte 2,4 Go utilisés sur 5,6 (3,2 Go disponibles). Conséquences (PR 41) : limite de l'API portée à 832 Mo pour retrouver environ 30 % de marge en service (32 %), `LorakusApiHighMemory` à 700 Mo ; Tempo et Loki gardent 256 Mo (plus de 50 % de marge).

@@ -1,0 +1,83 @@
+# Evaluation du comportement des reponses avec le VRAI modele (PR 41).
+#
+# Banc de 14 cas (tests/evals/reply_behaviour.json), regles automatiques sans LLM juge.
+# Objectifs fixes avant mesure : 100 % des cas security, au moins 80 % des cas quality.
+# A chaque CI, le meme banc tourne sur un faux modele (regles verifiees, gratuit) ; ici,
+# seulement a la demande et une fois par mois, car chaque passage coute (environ 0,01 $).
+#
+# Cle : secret ANTHROPIC_EVAL_API_KEY de l'environnement model-eval (restreint a main),
+# distincte de la cle de production. Elle n'est donnee qu'a l'etape d'evaluation.
+name: Model eval
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 3 * *" # le 3 de chaque mois, 05:17 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-eval
+  cancel-in-progress: false
+
+jobs:
+  reply-behaviour:
+    name: reply-behaviour
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: model-eval
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Installer les dependances (versions exactes du lockfile)
+        run: uv --directory backend sync --locked
+
+      - name: Evaluer le vrai modele
+        env:
+          LORAKUS_EVAL_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_EVAL_API_KEY }}
+          LORAKUS_REPLY_EVAL_REPORT: ${{ runner.temp }}/reply-eval.json
+        run: |
+          if [ -z "$LORAKUS_EVAL_ANTHROPIC_API_KEY" ]; then
+            echo "::error::Secret ANTHROPIC_EVAL_API_KEY absent de l'environnement model-eval"
+            exit 1
+          fi
+          # Resume ecrit meme si les objectifs ne sont pas atteints : c'est la qu'on lit pourquoi.
+          status=0
+          uv --directory backend run pytest -q -rs tests/evals/test_reply_behaviour.py || status=$?
+          uv --directory backend run python - "$LORAKUS_REPLY_EVAL_REPORT" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print("### Evaluation du modele\n\nRapport absent : voir le journal du job.")
+              raise SystemExit
+          report = json.loads(path.read_text(encoding="utf-8"))
+          scores, goals = report["scores"], report["objectives"]
+          print(f"### Evaluation du modele ({report['model']}, {report['date']})\n")
+          print("| Categorie | Score | Objectif |\n| --- | --- | --- |")
+          for name in ("security", "quality"):
+              print(f"| {name} | {scores[name]:.0%} | {goals[name]:.0%} |")
+          print(f"\nCout estime : {report['cost_usd']} $\n")
+          print("| Cas | Categorie | Reussi | Regles non respectees |\n| --- | --- | --- | --- |")
+          for case in report["cases"]:
+              failures = "; ".join(case["failures"]).replace("|", "/") or "-"
+              mark = "oui" if case["passed"] else "**non**"
+              print(f"| {case['id']} | {case['category']} | {mark} | {failures} |")
+          print("\n<details><summary>Rapport complet (reponses comprises)</summary>\n")
+          print("```json")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          print("```\n</details>")
+          PY
+          exit "$status"

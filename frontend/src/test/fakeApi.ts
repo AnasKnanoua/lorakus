@@ -71,6 +71,8 @@ export interface FakeState {
   cards: Map<string, FakeAction>;
   /** Explications des reponses (PR 39), par identifiant de message ; absente : 404. */
   traces: Map<string, unknown>;
+  /** Exports telecharges (PR 41) : contenu renvoye par GET /api/v1/data/export. */
+  exportBody: unknown;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -123,6 +125,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     reauthStale: false,
     cards: new Map(),
     traces: new Map(),
+    exportBody: { format: 1, account: { email: "anas@example.com" } },
     ...overrides,
   };
   let counter = 0;
@@ -183,6 +186,18 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       state.conversations.set(id, { id, title: "Nouvelle conversation", messages: [] });
       return json(201, { id, title: "Nouvelle conversation", created_at: NOW, updated_at: NOW });
     }
+    // Toutes les conversations (PR 41) : avant la route generale /conversations/{id}.
+    if (path === "/api/v1/assistant/conversations" && request.method === "DELETE") {
+      if (state.reauthStale) {
+        return json(403, { detail: { code: "reauth_required", message: "Confirmez votre identite." } });
+      }
+      const deleted = state.conversations.size;
+      state.conversations.clear();
+      for (const card of state.cards.values()) {
+        if (card.status === "pending") card.status = "cancelled";
+      }
+      return json(200, { deleted });
+    }
     const traceMatch = /^\/api\/v1\/assistant\/conversations\/([^/]+)\/messages\/([^/]+)\/trace$/.exec(path);
     if (traceMatch && request.method === "GET") {
       const trace = state.traces.get(traceMatch[2] ?? "");
@@ -242,6 +257,20 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
         state.holdReply,
         () => conversation.messages.push(saved),
       );
+    }
+    // --- mes donnees (PR 41)
+    if (path === "/api/v1/data/export" && request.method === "GET") {
+      if (state.reauthStale) {
+        return json(403, { detail: { code: "reauth_required", message: "Confirmez votre identite." } });
+      }
+      return new Response(JSON.stringify(state.exportBody), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "content-disposition": 'attachment; filename="lorakus-export-2026-11-18.json"',
+          "cache-control": "no-store",
+        },
+      });
     }
     // --- memoire (PR 36)
     if (path === "/api/v1/memory/search" && request.method === "GET") {

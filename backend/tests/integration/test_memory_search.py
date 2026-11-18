@@ -172,3 +172,19 @@ async def test_injection_in_the_question_is_only_data(
         await memory.search(user, question)
 
     assert [f.content for f in await memory.search(user, "thé")] == ["Aime le thé"]
+
+
+async def test_control_characters_in_a_question_do_not_break_the_search(
+    database: Database, identity: IdentityService
+) -> None:
+    """Trouve par le corpus d'injections (PR 41) : un octet NUL dans la question d'un outil
+    faisait echouer toute la reponse (PostgreSQL refuse NUL dans un texte)."""
+    user = await _owner(identity)
+    memory = MemoryService(database, embedder=FakeEmbedder())
+    await memory.add_fact(user, "Aime le thé", "preference")
+
+    found = await memory.search(user, "thé\x00\x1b[2J​")
+    given = await memory.prompt_facts(user, "thé\x00")
+
+    assert [f.content for f in found] == ["Aime le thé"]
+    assert [f.content for f in given] == ["Aime le thé"]
