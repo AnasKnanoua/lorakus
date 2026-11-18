@@ -157,3 +157,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (mesure du 2026-11-18) : `docker stats` affiche Tempo à 233 Mo pour une limite de 256 Mo, soit 91 %.
 - **Cause** : `docker stats` compte aussi le cache des fichiers que Tempo écrit (traces sur disque). Ce cache n'est pas une consommation du programme : le noyau le reprend quand le conteneur approche de sa limite. `memory.stat` donnait 121 Mo de mémoire anonyme (`anon`) et 50 Mo de cache (`file`).
 - **Correction** : aucune ; limite gardée. Avant de changer la limite d'un conteneur qui écrit sur disque (Tempo, Loki, Prometheus), lire `anon` dans `memory.stat` : commande dans `DEPLOYMENT.md`, « Mémoire des conteneurs ». Un vrai manque se voit à `OOMKilled=true` dans `docker inspect` ou à un swap de l'hôte qui grossit.
+
+## La PR de version échoue sur « Contrat OpenAPI périmé »
+
+- **Symptôme** (v0.3.0, 2026-11-18) : `make release-pr` ouvre la PR de version, puis le job `checks` échoue à `make openapi-check` ; le seul écart est `"version": "0.2.0"` contre `"0.3.0"` dans `frontend/openapi.json`.
+- **Cause** : le contrat exporté recopiait le numéro de publication, que release-please change dans `backend/lorakus/__init__.py` sans régénérer le contrat. Le faire mettre à jour par release-please (`extra-files` en JSON) ne marche pas : il réécrit tout le fichier et transforme `1.0` en `1` (essayé avec release-please 17.11.2).
+- **Correction** : le contrat porte la version de l'API (`v1`, celle de `/api/v1`), fixée dans `backend/scripts/export_openapi.py` ; l'API en service annonce toujours le vrai numéro. Test : `test_the_contract_carries_the_api_version_not_the_release`. Une PR de version déjà ouverte se met à jour en relançant `make release-pr VERSION=…` après la fusion du correctif.

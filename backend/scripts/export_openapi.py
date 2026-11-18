@@ -5,6 +5,11 @@
 Sortie deterministe (cles triees) : la CI regenere le fichier et echoue s'il differe de
 celui du depot, donc le client du frontend ne peut pas diverger de l'API.
 Aucune base de donnees n'est necessaire (le cycle de vie de l'application n'est pas lance).
+
+Le contrat porte la version de l'API (`/api/v1`), pas celle de Lorakus : le numero de
+publication change a chaque fin de phase sans que l'API change, et la PR de version de
+release-please echouait sur un contrat « perime » (v0.3.0, 2026-11-18). L'API en service,
+elle, annonce toujours le vrai numero dans /openapi.json.
 """
 
 import json
@@ -13,11 +18,14 @@ from pathlib import Path
 
 from lorakus.api.app import create_app
 
+CONTRACT_VERSION = "v1"
+
 
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit("usage : export_openapi.py FICHIER")
     schema = create_app().openapi()
+    schema["info"]["version"] = CONTRACT_VERSION
     text = json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     Path(sys.argv[1]).write_text(text, encoding="utf-8")
 

@@ -1696,7 +1696,7 @@
   },
   "info": {
     "title": "Lorakus",
-    "version": "0.2.0"
+    "version": "v1"
   },
   "openapi": "3.1.0",
   "paths": {
