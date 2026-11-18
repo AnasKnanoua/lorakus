@@ -73,6 +73,8 @@ export interface FakeState {
   traces: Map<string, unknown>;
   /** Exports telecharges (PR 41) : contenu renvoye par GET /api/v1/data/export. */
   exportBody: unknown;
+  /** Fuseau du compte (PR 44) ; par defaut celui de l'appareil de test (aucun bandeau). */
+  timezone: string;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -126,6 +128,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     cards: new Map(),
     traces: new Map(),
     exportBody: { format: 1, account: { email: "anas@example.com" } },
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     ...overrides,
   };
   let counter = 0;
@@ -155,6 +158,13 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     }
     if (!state.loggedIn) {
       return json(401, { detail: "Session absente ou expiree." });
+    }
+    if (path === "/api/v1/account/settings" && request.method === "GET") {
+      return json(200, { timezone: state.timezone, default_timezone: "Europe/Paris" });
+    }
+    if (path === "/api/v1/account/timezone" && request.method === "PUT") {
+      state.timezone = (body as { timezone: string }).timezone;
+      return json(200, { timezone: state.timezone, default_timezone: "Europe/Paris" });
     }
     if (path === "/api/v1/auth/me") {
       return json(200, { id: "u1", email: "anas@example.com", role: "owner", totp_enabled: false });

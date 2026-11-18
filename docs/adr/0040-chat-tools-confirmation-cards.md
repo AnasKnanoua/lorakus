@@ -31,3 +31,7 @@ Le Majordome doit pouvoir agir (retenir, corriger, plus tard créer une tâche),
 - Un clic de plus pour chaque modification, voulu. Une action supprimant des données demande, en plus, le mot de passe si la dernière preuve d'identité date de plus de 10 minutes.
 - Le coût d'un message avec outil est d'environ deux appels au modèle (mesure en production après déploiement).
 - Le corpus d'injections (PR 41, `backend/tests/security/`, pytest plutôt que Promptfoo) rejoue chaque attaque face à un modèle qui obéit, en s'appuyant sur ces tests : `backend/tests/integration/test_chat_tools.py`.
+
+## Amendement du 2026-11-18 (PR 44) : outils des tâches
+
+Ajoutés à `CHAT_TOOLS` après revue : `list_tasks` (read), `add_task` et `complete_task` (write), `delete_task` (sensitive). La carte d'ajout est écrite par le code avec l'échéance en date absolue, calculée dans le fuseau du compte (« vendredi 20 novembre 2026 (demain) ») : si le modèle a mal compris « vendredi », l'utilisateur le voit avant de confirmer. Une échéance passée ou à plus de 5 ans est refusée dès la proposition (aucune carte). Une tâche créée par un module ne se supprime pas depuis le chat. Le titre est nettoyé (une ligne, sans caractère invisible) : il ne peut pas imiter une ligne de la carte. Attaques rejouées dans le titre d'une tâche (corpus) et 4 cas au banc (`tests/evals/reply_behaviour.json`).

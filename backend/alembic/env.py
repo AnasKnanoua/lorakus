@@ -10,12 +10,14 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from lorakus.ai import models as _ai_models  # noqa: F401 (tables enregistrees)
+from lorakus.core.account import models as _account_models  # noqa: F401
 from lorakus.core.agents import models as _agent_models  # noqa: F401
 from lorakus.core.events import models as _event_models  # noqa: F401
 from lorakus.core.identity import models as _identity_models  # noqa: F401
 from lorakus.core.memory import models as _memory_models  # noqa: F401
 from lorakus.core.modules import models as _module_models  # noqa: F401
 from lorakus.core.modules.registry import ModuleRegistry
+from lorakus.core.planning import models as _planning_models  # noqa: F401
 from lorakus.core.ratelimit import models as _rate_limit_models  # noqa: F401
 from lorakus.core.tools import models as _tool_models  # noqa: F401
 from lorakus.db.base import SCHEMA, Base

@@ -15,6 +15,7 @@ import re
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
 from pydantic import BaseModel
@@ -28,11 +29,19 @@ MAX_RESULT_CHARS: Final = 4000
 MAX_SUMMARY_CHARS: Final = 700
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 @dataclass(frozen=True)
 class ToolPorts:
-    """Services du Core qu'un outil peut utiliser (les modules n'en construisent aucun)."""
+    """Services du Core qu'un outil peut utiliser (les modules n'en construisent aucun).
+
+    clock : l'instant present (UTC), remplace dans les tests pour fixer « aujourd'hui ».
+    """
 
     memory: MemoryService | None = None
+    clock: Callable[[], datetime] = _utc_now
 
 
 @dataclass(frozen=True)

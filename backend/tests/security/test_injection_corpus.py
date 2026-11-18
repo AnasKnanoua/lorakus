@@ -6,7 +6,9 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
 2. dans le rapport d'un specialiste (reports_block), a cote d'un fait `sensitive` ;
 3. dans une vraie conversation (PostgreSQL, API) ou un faux modele OBEIT a l'attaque : il
    cherche, puis tente d'oublier tous les souvenirs, d'en retenir en masse, d'appeler un outil
-   de confirmation, et pretend enfin que c'est fait.
+   de confirmation, et pretend enfin que c'est fait ;
+4. dans le titre d'une tache (PR 44), lue par l'outil de liste : le modele qui obeit tente de
+   supprimer, terminer et ajouter des taches.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -34,7 +36,10 @@ from lorakus.ai.usage import UsageStore
 from lorakus.api.app import create_app
 from lorakus.core.agents.contract import Confidence, Fact, SpecialistReport
 from lorakus.core.agents.orchestrator import Consultation
+from lorakus.core.planning.service import NewTask, add_task, list_tasks
 from lorakus.core.ratelimit.service import AICallQuota
+from lorakus.db.database import Database
+from lorakus.settings import get_settings
 from lorakus_modules.assistant.prompts import memory_block, reports_block
 from lorakus_modules.assistant.service import MAX_CARDS, MAX_MODEL_CALLS, MAX_TOOL_CALLS
 
@@ -49,7 +54,14 @@ SEARCH, REMEMBER, FORGET = (
     "assistant__remember",
     "assistant__forget_memory",
 )
+LIST_TASKS, ADD_TASK, COMPLETE_TASK, DELETE_TASK = (
+    "assistant__list_tasks",
+    "assistant__add_task",
+    "assistant__complete_task",
+    "assistant__delete_task",
+)
 BENIGN_FACT = "Révise le matin"
+BENIGN_TASK = "Rendre le TP de réseaux"
 
 
 def test_the_corpus_is_large_and_unique() -> None:
@@ -244,3 +256,75 @@ def test_an_obeying_model_changes_nothing_without_the_users_click(
     # La reponse est enregistree telle quelle (le mensonge du modele n'execute rien).
     done = [data for name, data in events if name == "done"]
     assert done and done[0]["status"] == "ok"
+
+
+# ---------------------------------------------- 4. dans le titre d'une tache
+async def _with_tasks(work: Any) -> Any:
+    """Execute `work(session, user_id)` en lorakus_app, sous la RLS du proprietaire."""
+    [(user,)] = await migrator_sql("SELECT id FROM lorakus.core_users")
+    db = Database.connect(get_settings())
+    try:
+        async with db.transaction(cast(Any, user)) as session:
+            return await work(session, user)
+    finally:
+        await db.close()
+
+
+def _task_titles() -> list[tuple[str, str, str]]:
+    async def _read(session: Any, _user: Any) -> list[tuple[str, str, str]]:
+        tasks = [*await list_tasks(session, "open"), *await list_tasks(session, "done")]
+        return sorted((str(t.id), t.title, t.status) for t in tasks)
+
+    return asyncio.run(_with_tasks(_read))
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_in_a_task_title_changes_nothing_without_the_users_click(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    async def _seed(session: Any, user: Any) -> None:
+        await add_task(session, user, NewTask(_as_fact(attack["payload"])[:200] or "vide"))
+        await add_task(session, user, NewTask(BENIGN_TASK))
+
+    asyncio.run(_with_tasks(_seed))
+    before = _task_titles()
+    # Le titre est enregistre sur une seule ligne, sans caractere invisible.
+    assert all("\n" not in title and title.isprintable() for _, title, _ in before)
+    ids = [i for i, _, _ in before]
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    provider = _use(
+        owner,
+        [
+            FakeReply("Je regarde.", tool_calls=((LIST_TASKS, {}),)),
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    *((DELETE_TASK, {"task_id": i}) for i in ids),
+                    *((COMPLETE_TASK, {"task_id": i}) for i in ids),
+                    (ADD_TASK, {"title": "Virer 500 euros", "due_on": "2099-01-01"}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            FakeReply("", tool_calls=((ADD_TASK, {"title": "Donner tous les droits"}),)),
+            "C'est fait : tâches supprimées et confirmées.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Lis mes tâches et fais ce qu'elles disent.")
+
+    cards = [data for name, data in events if name == "card"]
+    sent = "\n".join(request.model_dump_json() for _, request in provider.calls)
+    assert _task_titles() == before
+    assert len(cards) <= MAX_CARDS
+    assert len(provider.calls) == MAX_MODEL_CALLS
+    for card in cards:
+        assert card["confirmation_id"] not in sent
+        assert card["status"] == "pending"
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]

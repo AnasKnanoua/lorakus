@@ -4,6 +4,7 @@ from lorakus.core.modules.manifest import DataDeclaration, FrontendEntry, Module
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.export import export_assistant
 from lorakus_modules.assistant.router import router
+from lorakus_modules.assistant.task_tools import TASK_TOOLS
 from lorakus_modules.assistant.tools import TOOLS
 
 
@@ -15,8 +16,8 @@ async def check_health() -> bool:
 manifest = ModuleManifest(
     id="assistant",
     name="Assistant",
-    version="0.2.0",
-    requires_core=">=0.2,<1.0",
+    version="0.3.0",
+    requires_core=">=0.3,<1.0",
     description="Conversation avec l'assistant, en streaming, avec reponse de secours.",
     permissions=["assistant:read", "assistant:write"],
     config_schema=AssistantConfig,
@@ -29,8 +30,9 @@ manifest = ModuleManifest(
         classes={"asst_conversations": "personal", "asst_messages": "personal"},
     ),
     frontend=FrontendEntry(route="/chat", label="Discuter", icon="message-circle"),
-    # Outils du chat (PR 38) : la memoire, avec confirmation pour toute modification.
-    tools=TOOLS,
+    # Outils du chat : la memoire (PR 38) et les taches (PR 44), avec confirmation pour
+    # toute modification.
+    tools=[*TOOLS, *TASK_TOOLS],
     # « Mes donnees » (PR 41) : conversations et messages, meme module desactive.
     data_exporter=export_assistant,
     health=check_health,

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { getAccountSettings } from "@/api/account";
 import { getConversation, listConversations } from "@/api/assistant";
 import { fetchMe } from "@/api/auth";
 import { getProposalsEnabled, listFacts, searchFacts } from "@/api/memory";
@@ -41,3 +42,9 @@ export const memorySearchQuery = (q: string) =>
     queryFn: () => searchFacts(q),
     staleTime: 30_000,
   });
+
+export const accountSettingsQuery = queryOptions({
+  queryKey: ["account", "settings"],
+  queryFn: getAccountSettings,
+  staleTime: 5 * 60_000,
+});

@@ -4,8 +4,10 @@ import asyncio
 import json
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 from conftest import (
@@ -165,16 +167,28 @@ def test_following_messages_carry_the_history(owner: TestClient) -> None:
     assert owner.get(f"{BASE}/conversations/{conversation_id}").json()["title"] == "Premier message"
 
 
-def test_display_name_and_timezone_come_from_the_module_configuration(owner: TestClient) -> None:
-    enable(owner, {"display_name": "Jarvis", "timezone": "Europe/Istanbul"})
+def test_display_name_comes_from_the_module_and_timezone_from_the_account(
+    owner: TestClient,
+) -> None:
+    # Une ancienne cle « timezone » de l'assistant est ignoree : seul le compte compte.
+    enable(owner, {"display_name": "Jarvis", "timezone": "Asia/Tokyo"})
+    assert (
+        owner.put("/api/v1/account/timezone", json={"timezone": "Europe/Istanbul"}).status_code
+        == 200
+    )
     provider = FakeProvider(replies=["ok"])
     use_provider(owner, provider)
 
+    before = datetime.now(UTC)
     send(owner, new_conversation(owner), "Qui es-tu ?")
+    after = datetime.now(UTC)
 
     system = provider.calls[0][1].system
     assert system.startswith("Tu es Jarvis,")
-    assert "(Europe/Istanbul)" in system
+    # L'heure donnee au modele est celle d'Ankara (UTC+3), pas celle du serveur.
+    istanbul = ZoneInfo("Europe/Istanbul")
+    local = {moment.astimezone(istanbul).strftime("%H:%M") for moment in (before, after)}
+    assert any(f"il est {hhmm} (Europe/Istanbul)" in system for hhmm in local), system[:200]
 
 
 def test_development_without_key_answers_with_the_fake_echo(owner: TestClient) -> None:

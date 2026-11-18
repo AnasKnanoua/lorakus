@@ -79,7 +79,7 @@ Exclu volontairement : chargement à chaud, modules tiers signés, marketplace.
 | Informer d'un fait passé | Événement (outbox, asynchrone, au moins une fois) | `knowledge.item_ready` |
 | Proposer d'interrompre l'utilisateur | Signal → `InterventionPolicy` | `digital.long_session` |
 | Lire un état synchrone d'un autre domaine | Port fourni au Core (`provides`), consommé par le Core uniquement | `FitnessStateProvider` lu par `context` |
-| Créer une tâche ou un créneau | Port du Core `Tasks` / `Agenda` avec `owner_module` | `academic` crée la tâche d'un devoir |
+| Créer une tâche ou un créneau | Port du Core : `ModuleTasks("academic").upsert(session, user_id, ref, titre, …)` et `ModuleAgenda("calendars").replace_source(session, user_id, source, créneaux)` (PR 44) ; chaque requête est filtrée sur le module, qui ne voit ni les tâches personnelles ni celles d'un autre module | `academic` crée la tâche d'un devoir |
 | Exposer une action à l'assistant | Outil `@tool` | `create_project` |
 
 Événements : nom `module.sujet_au_passe`, charge utile Pydantic avec `schema_version`, jamais de suppression de champ sans nouvelle version.
