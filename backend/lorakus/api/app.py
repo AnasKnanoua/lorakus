@@ -20,6 +20,7 @@ from lorakus.core.agents.routing import IntentRouter
 from lorakus.core.agents.service import AgentService
 from lorakus.core.background import DebouncedTasks
 from lorakus.core.data.export import DataExportService
+from lorakus.core.identity.crypto import FieldCipher
 from lorakus.core.identity.service import IdentityService
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.registry import ModuleRegistry
@@ -50,6 +51,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if app.state.telemetry is not None:
         instrument_database(database.engine)
     app.state.identity = IdentityService(database, settings)
+    # Secrets des connecteurs (adresses ICS, PR 45) : absente en staging ou en production,
+    # l'API ne demarre pas (ValueError).
+    app.state.connector_cipher = FieldCipher.for_connectors(settings)
     app.state.modules = ModuleService(database, app.state.registry)
     app.state.agents = AgentService(database, app.state.modules)
     app.state.rate_limiter = RateLimiter(database)

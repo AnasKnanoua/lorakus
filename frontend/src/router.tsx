@@ -13,6 +13,7 @@ import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
 import { ConversationScreen } from "@/features/chat/ConversationScreen";
 import { NewConversationScreen } from "@/features/chat/NewConversationScreen";
+import { CalendarsScreen } from "@/features/calendars/CalendarsScreen";
 import { DataScreen } from "@/features/data/DataScreen";
 import { MemoryScreen } from "@/features/memory/MemoryScreen";
 import { meQuery } from "@/lib/queries";
@@ -79,9 +80,16 @@ const dataRoute = createRoute({
   component: DataScreen,
 });
 
+// Calendriers (PR 45) : abonnements ICS, dans le groupe « Outils » de la barre laterale.
+const calendarsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/calendriers",
+  component: CalendarsScreen,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

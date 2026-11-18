@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # hexadecimal (64 caracteres). Obligatoire en staging et en production. Elle n'est
     # PAS dans les sauvegardes : la perdre rend les secrets TOTP illisibles.
     field_encryption_key: SecretStr = SecretStr("")
+    # Cle des secrets des connecteurs (adresses ICS secretes, PR 45, ADR 0041) : meme format.
+    # Distincte de la precedente, car le worker la recoit aussi (il synchronise) et ne doit
+    # pas pouvoir lire les secrets TOTP. Obligatoire en staging et en production pour l'API
+    # et le worker. Hors sauvegardes : la perdre oblige seulement a recopier les adresses.
+    connector_encryption_key: SecretStr = SecretStr("")
 
     # Double authentification exigee pour ouvrir une session (decision du 2026-11-12).
     # Toujours vraie en production, quoi que dise la variable (voir _production_rules).

@@ -20,6 +20,7 @@ from prometheus_client import Gauge
 
 from lorakus.core.events.bus import bus
 from lorakus.core.events.relay import OutboxRelay
+from lorakus.core.identity.crypto import FieldCipher
 from lorakus.core.jobs.port import registry as job_registry
 from lorakus.core.jobs.procrastinate_queue import ProcrastinateQueue
 from lorakus.core.modules.registry import ModuleRegistry
@@ -60,6 +61,9 @@ async def run() -> None:
     )
     if settings.metrics_port is not None:
         start_metrics_server(settings.metrics_port)
+    # Cle des secrets des connecteurs (ADR 0041) : absente en staging ou en production, le
+    # worker refuse de demarrer (ValueError) plutot que d'echouer a chaque synchronisation.
+    FieldCipher.for_connectors(settings)
     # Importer les manifestes enregistre les handlers (@on) et les jobs (@job) des modules.
     modules = ModuleRegistry.from_entry_points()
     database = Database.connect(settings)

@@ -1,4 +1,4 @@
-import { ApiError, api, type Schemas } from "./client";
+import { ApiError, ModuleDisabledError, api, type Schemas } from "./client";
 import { readSse } from "./sse";
 import type { ToolAction } from "./tools";
 
@@ -15,9 +15,9 @@ export interface ReplyDone {
 }
 
 /** Le module assistant n'est pas active pour cet utilisateur (l'API repond 404). */
-export class AssistantDisabledError extends Error {
+export class AssistantDisabledError extends ModuleDisabledError {
   constructor() {
-    super("assistant desactive");
+    super("assistant");
     this.name = "AssistantDisabledError";
   }
 }

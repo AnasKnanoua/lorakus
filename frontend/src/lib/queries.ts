@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { getAccountSettings } from "@/api/account";
 import { getConversation, listConversations } from "@/api/assistant";
+import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
 import { getProposalsEnabled, listFacts, searchFacts } from "@/api/memory";
 
@@ -47,4 +48,11 @@ export const accountSettingsQuery = queryOptions({
   queryKey: ["account", "settings"],
   queryFn: getAccountSettings,
   staleTime: 5 * 60_000,
+});
+
+/** Abonnements aux calendriers (PR 45) : relus souvent tant qu'une synchronisation attend. */
+export const subscriptionsQuery = queryOptions({
+  queryKey: ["calendars", "subscriptions"],
+  queryFn: listSubscriptions,
+  refetchInterval: (query) => (query.state.data?.some((s) => s.status === "pending") ? 5_000 : 60_000),
 });

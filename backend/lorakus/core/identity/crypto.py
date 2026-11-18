@@ -26,9 +26,9 @@ class FieldEncryptionUnavailableError(RuntimeError):
 class FieldCipher:
     """Chiffre et dechiffre de petites valeurs (secrets TOTP)."""
 
-    def __init__(self, key_hex: str) -> None:
+    def __init__(self, key_hex: str, name: str = "LORAKUS_FIELD_ENCRYPTION_KEY") -> None:
         if not _KEY_PATTERN.fullmatch(key_hex):
-            raise ValueError("LORAKUS_FIELD_ENCRYPTION_KEY : 64 caracteres hexadecimaux attendus")
+            raise ValueError(f"{name} : 64 caracteres hexadecimaux attendus")
         self._aead = AESGCM(bytes.fromhex(key_hex))
 
     @classmethod
@@ -40,6 +40,18 @@ class FieldCipher:
                 raise ValueError("LORAKUS_FIELD_ENCRYPTION_KEY manquante")
             return None
         return cls(key)
+
+    @classmethod
+    def for_connectors(cls, settings: Settings) -> "FieldCipher | None":
+        """Cle des secrets des connecteurs (ADR 0041), distincte de celle des secrets TOTP :
+        le worker la recoit pour synchroniser, sans pouvoir lire les seconds facteurs.
+        None si absente, ce qui n'est admis qu'en developpement et en test."""
+        key = settings.connector_encryption_key.get_secret_value()
+        if not key:
+            if settings.environment in ("staging", "production"):
+                raise ValueError("LORAKUS_CONNECTOR_ENCRYPTION_KEY manquante")
+            return None
+        return cls(key, "LORAKUS_CONNECTOR_ENCRYPTION_KEY")
 
     def encrypt(self, plaintext: bytes, context: bytes) -> str:
         """Valeur chiffree, prefixee de la version du format."""

@@ -3,9 +3,11 @@
 import base64
 
 import pytest
+from pydantic import SecretStr
 
 from lorakus.core.identity import keys, totp
 from lorakus.core.identity.crypto import FieldCipher
+from lorakus.settings import Settings
 
 RFC_SECRET = base64.b32encode(b"12345678901234567890").decode().rstrip("=")
 KEY = "00" * 32
@@ -84,3 +86,31 @@ def test_backup_codes() -> None:
     codes = keys.new_backup_codes()
     assert len(codes) == len(set(codes)) == 10
     assert keys.normalize_backup_code(" ABCD-ef01 2345-6789 ") == "abcdef0123456789"
+
+
+def test_connector_key_is_separate_and_required_outside_development() -> None:
+    """Cle des connecteurs (ADR 0041) : distincte de celle des secrets TOTP ; un chiffre de
+    l'une ne s'ouvre pas avec l'autre ; absente, refus en staging et en production."""
+    totp_key, connector_key = "aa" * 32, "bb" * 32
+    settings = Settings(
+        environment="production",
+        field_encryption_key=SecretStr(totp_key),
+        connector_encryption_key=SecretStr(connector_key),
+    )
+    connectors = FieldCipher.for_connectors(settings)
+    fields = FieldCipher.from_settings(settings)
+    assert connectors is not None and fields is not None
+    sealed = connectors.encrypt(b"https://calendar.example.org/x.ics", b"ctx")
+    with pytest.raises(ValueError, match="invalide"):
+        fields.decrypt(sealed, b"ctx")
+    for environment in ("staging", "production"):
+        with pytest.raises(ValueError, match="LORAKUS_CONNECTOR_ENCRYPTION_KEY"):
+            FieldCipher.for_connectors(
+                Settings(environment=environment, connector_encryption_key=SecretStr(""))
+            )
+    absent = Settings(environment="development", connector_encryption_key=SecretStr(""))
+    assert FieldCipher.for_connectors(absent) is None
+    with pytest.raises(ValueError, match="LORAKUS_CONNECTOR_ENCRYPTION_KEY"):
+        FieldCipher.for_connectors(
+            Settings(environment="development", connector_encryption_key=SecretStr("zz"))
+        )

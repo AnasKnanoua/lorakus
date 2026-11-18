@@ -85,6 +85,7 @@ CHAT_TOOLS: Final = (
     "assistant.add_task",
     "assistant.complete_task",
     "assistant.delete_task",
+    "assistant.list_agenda",
 )
 MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
 MAX_TOOL_CALLS: Final = 6  # par message
