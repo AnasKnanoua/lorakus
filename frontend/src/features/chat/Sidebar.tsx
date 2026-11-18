@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, PanelLeftClose, SquarePen } from "lucide-react";
+import { LogOut, PanelLeftClose, ShieldCheck, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { logout } from "@/api/auth";
 import { Collapsible } from "@/components/Collapsible";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { groupByRecency } from "@/lib/dates";
 import { conversationsQuery, factsQuery, meQuery } from "@/lib/queries";
 import { NAV_GROUP_LABELS, NAV_ITEMS, type NavItem } from "@/navigation";
@@ -113,7 +113,7 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
         )}
       </div>
 
-      {/* Compte : sans bordure, aligne sur les lignes au-dessus ; les reglages viendront ici. */}
+      {/* Compte : sans bordure, aligne sur les lignes au-dessus ; Mes donnees et les futurs reglages ici. */}
       <div className="flex shrink-0 items-center gap-3 px-2 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex min-w-0 flex-1 items-center gap-3 px-1.5">
           <span
@@ -126,6 +126,17 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
             {email}
           </span>
         </div>
+        {/* Mes donnees (PR 41) : export et suppression, a cote du compte. */}
+        <Link
+          to="/donnees"
+          onClick={onNavigate}
+          aria-label="Mes données"
+          title="Mes données"
+          className={buttonVariants({ variant: "quiet", size: "icon-sm" })}
+          activeProps={{ "aria-current": "page", className: "bg-hover !text-ink" }}
+        >
+          <ShieldCheck aria-hidden="true" />
+        </Link>
         <Button variant="quiet" size="icon-sm" aria-label="Se déconnecter" onClick={() => void signOut()}>
           <LogOut aria-hidden="true" />
         </Button>

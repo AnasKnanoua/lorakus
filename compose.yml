@@ -90,8 +90,10 @@ services:
     deploy:
       resources:
         limits:
-          # Modele d'embeddings local compris (PR 37) ; ajustee apres mesure en production.
-          memory: 768m
+          # Modele d'embeddings local et OpenTelemetry compris. Mesure en production le
+          # 2026-11-14 (apres la PR 40) : 566 Mo en service ; 832 Mo gardent environ 30 % de
+          # marge (alerte LorakusApiHighMemory a 700 Mo). Hote : 3,2 Go disponibles.
+          memory: 832m
 
   # Worker : jobs (Procrastinate) et livraison des evenements (outbox). Meme image que l'API.
   worker:

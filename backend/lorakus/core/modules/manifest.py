@@ -101,6 +101,9 @@ class ModuleManifest(BaseModel):
     # Outils (ADR 0012) et specialiste (ADR 0026), PR 30.
     tools: list[Any] = Field(default_factory=list[Any])
     specialist: Any | None = None
+    # Export des donnees (PR 41) : async (DataExportContext) -> dict JSON, voir
+    # lorakus.core.data.export. Type libre : le manifeste ne depend pas des services du Core.
+    data_exporter: Any | None = None
 
     @field_validator("id")
     @classmethod

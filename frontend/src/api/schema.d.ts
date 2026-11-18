@@ -102,7 +102,13 @@ export interface paths {
         put?: never;
         /** Create Conversation */
         post: operations["create_conversation_api_v1_assistant_conversations_post"];
-        delete?: never;
+        /**
+         * Delete All Conversations
+         * @description Supprime toutes les conversations (preuve d'identite de moins de 10 minutes).
+         *
+         *     Les souvenirs ne sont pas touches : « Tout oublier » est sur la page Memoire.
+         */
+        delete: operations["delete_all_conversations_api_v1_assistant_conversations_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -424,6 +430,26 @@ export interface paths {
          * @description Prepare la double authentification : a scanner, puis confirmer par un code.
          */
         post: operations["totp_setup_api_v1_auth_totp_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export My Data
+         * @description Telecharge l'export complet (jamais d'empreinte, de secret ni de vecteur).
+         */
+        get: operations["export_my_data_api_v1_data_export_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -903,6 +929,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** DeletedOut */
+        DeletedOut: {
+            /** Deleted */
+            deleted: number;
         };
         /** Fact */
         Fact: {
@@ -1490,6 +1521,26 @@ export interface operations {
             };
         };
     };
+    delete_all_conversations_api_v1_assistant_conversations_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+        };
+    };
     get_conversation_api_v1_assistant_conversations__conversation_id__get: {
         parameters: {
             query?: never;
@@ -1967,6 +2018,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TotpSetupResponse"];
                 };
+            };
+        };
+    };
+    export_my_data_api_v1_data_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Toutes les donnees de l'utilisateur, en piece jointe JSON. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Preuve d'identite trop ancienne (reauth_required). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

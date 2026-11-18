@@ -13,6 +13,7 @@ import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
 import { ConversationScreen } from "@/features/chat/ConversationScreen";
 import { NewConversationScreen } from "@/features/chat/NewConversationScreen";
+import { DataScreen } from "@/features/data/DataScreen";
 import { MemoryScreen } from "@/features/memory/MemoryScreen";
 import { meQuery } from "@/lib/queries";
 
@@ -71,9 +72,16 @@ const memoryRoute = createRoute({
   component: MemoryScreen,
 });
 
+// Mes donnees (PR 41) : export et suppression, depuis l'icone du pied de la barre laterale.
+const dataRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/donnees",
+  component: DataScreen,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

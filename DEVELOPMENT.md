@@ -20,8 +20,8 @@ lorakus/
 │   ├── lorakus/              # Core : core/, ai/, connectors/, db/, api/, worker/, observability/
 │   ├── lorakus_modules/      # un package par module + _template
 │   ├── alembic/             # env.py multi-branches
-│   ├── tests/               # unit/, integration/, contract/, isolation/
-│   └── evals/               # Promptfoo : jeux de tests LLM et corpus d'injections
+│   └── tests/               # unit/, integration/, contract/, isolation/, security/ (corpus
+│                            # d'injections), evals/ (memoire, routage, comportement des reponses)
 ├── frontend/                # SPA + PWA (framework : ADR 0005)
 ├── extension/               # extension navigateur MV3 (phase 7)
 ├── android/                 # LORAKUS Sensors (phase 7)
@@ -42,7 +42,6 @@ lorakus/
 | `make security` | Bandit, Semgrep, pip-audit, Gitleaks |
 | `make migration BRANCH=core MSG="..."` | Nouvelle révision Alembic sur la branche du module (`core`, `academic`…) |
 | `make migrate` | Applique les migrations en local |
-| `make evals` | Evals Promptfoo sur `FakeProvider` |
 | `make new-module NAME=...` | Crée un module depuis le gabarit |
 | `make front-dev` | Lance l'interface sur http://localhost:5173 ; `/api` est relayé vers `localhost:8001` (tunnel SSH vers la production, ou pile locale) |
 | `make front-check` | Frontend : ESLint, TypeScript strict, tests (parcours, accessibilité) et construction |
@@ -88,7 +87,8 @@ Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 | Contrat | pytest | Manifestes, ports, événements (`schema_version`) |
 | Isolation | pytest | Chaque table et chaque route testées avec deux utilisateurs |
 | Architecture | import-linter (`make lint`) | Le Core n'importe jamais un module ; modules indépendants entre eux ; couches `api → core → db, observability → settings` |
-| LLM | Promptfoo | Comportement sur `FakeProvider` en CI ; vrais fournisseurs chaque semaine |
+| Injections | pytest (`backend/tests/security/`) | Corpus d'une trentaine d'attaques, chaque CI : l'application tient même si le modèle obéit |
+| LLM | pytest (`tests/evals/test_reply_behaviour.py`) | 14 cas, règles automatiques ; faux modèle à chaque CI (les règles elles-mêmes sont testées), vrai modèle par `model-eval.yml` (à la demande et le 3 du mois) |
 | E2E | Playwright | Scénarios d'acceptation du MVP |
 | Frontend | Vitest, axe-core | Composants et accessibilité |
 | Évaluation | pytest (`backend/tests/evals/`) | Qualité de la recherche dans la mémoire (recall@5, MRR) sur un jeu étiqueté fictif. Faux modèle dans `make check` ; vrai modèle dans la CI (étape « Évaluation de la recherche »). En local : `infra/models/fetch-embedding-model.sh /tmp/model && LORAKUS_EMBEDDING_MODEL_DIR=/tmp/model uv --directory backend run pytest -s tests/evals` |

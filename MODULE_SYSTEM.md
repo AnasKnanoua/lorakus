@@ -102,6 +102,10 @@ async def add_assessment(ctx: ToolContext, args: AddAssessmentArgs) -> Assessmen
 
 Chaque table déclare sa classe (`public`, `personal`, `sensitive`). Les contraintes de licence (`no_ai`, `owner_display_only`) sont portées par ligne quand elles dépendent de la source. Le `ModelRouter` et le pipeline ML refusent toute donnée `sensitive` vers un fournisseur externe et toute donnée `no_ai` vers un LLM ou un entraînement.
 
+### 6.1 Export des données (PR 41)
+
+Un module qui a des tables déclare `data_exporter` dans son manifeste : une fonction `async (DataExportContext) -> dict` (`lorakus.core.data.export`) qui rend ses données en JSON. Le contexte donne l'utilisateur et une transaction liée à lui (RLS : le module ne lit que ses lignes). Le Core l'appelle pour « Mes données », **que le module soit actif ou non** (désactiver ne supprime pas les données). Jamais de secret, d'empreinte ni de vecteur dans ce qui est rendu. Exemple : `lorakus_modules/assistant/export.py`.
+
 ## 7. Ports désactivés
 
 Si un module qui fournit un port est désactivé, le port renvoie `None` et le Core marque la dimension « indisponible » ; aucun autre module ne doit échouer. Exemple : `motivation` désactivé = interventions sans pièce jointe.
@@ -126,6 +130,7 @@ La commande copie `lorakus_modules/_template` (tables préfixées avec `user_id`
 - [ ] Aucun import d'un autre module ni d'un SDK d'IA
 - [ ] Toutes les tables préfixées, avec `user_id` et politique RLS
 - [ ] Classes de données et contraintes de licence déclarées
+- [ ] `data_exporter` déclaré s'il a des tables (export « Mes données », sans secret)
 - [ ] Signaux avec `dedup_key` ; aucune notification directe
 - [ ] Outils avec permission et niveau de risque corrects
 - [ ] Migration rejouable (up/down/check)

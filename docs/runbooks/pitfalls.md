@@ -144,3 +144,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** : une commande des runbooks qui commence par `dc` affiche l'aide d'un programme inconnu.
 - **Cause** : `dc` n'est défini que dans la session ouverte par le bloc « Session » de `docs/runbooks/README.md`. Sans lui, le shell lance `dc`, la calculatrice de GNU installée sur Oracle Linux.
 - **Correction** : coller d'abord le bloc « Session » (après `sudo -iu deploy`), puis la commande. Pour une commande isolée, `/opt/lorakus/app/infra/deploy/deploy.sh compose …` fait la même chose sans session.
+
+## Un octet NUL dans un texte fait échouer toute une réponse
+
+- **Symptôme** (trouvé par le corpus d'injections, PR 41, avant la production) : la réponse du chat devient « Une erreur interne m'empêche de répondre » quand le modèle passe un texte contenant l'octet NUL (`\x00`) à l'outil de recherche ; le journal contenait en prime la question complète, dans le texte de l'erreur SQL.
+- **Cause** : PostgreSQL refuse NUL dans un champ texte (`DataError`), et SQLAlchemy recopie par défaut les valeurs de la requête dans ses messages d'erreur, donc dans les journaux envoyés à Loki.
+- **Correction** : les questions de recherche passent par `searchable()` (caractères de contrôle et invisibles remplacés par une espace) ; le moteur de base est créé avec `hide_parameters=True` (aucune valeur dans une erreur SQL). Tests : `test_control_characters_in_a_question_do_not_break_the_search`, `test_database_errors_never_carry_the_values_of_the_query`.
+- **À retenir** : un ancien test écrivait `"\\x00"` (quatre caractères) au lieu de l'octet NUL : il ne testait rien. Vérifier qu'un test d'entrée hostile contient bien le caractère visé.
