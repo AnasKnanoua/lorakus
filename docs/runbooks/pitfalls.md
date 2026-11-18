@@ -151,3 +151,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : PostgreSQL refuse NUL dans un champ texte (`DataError`), et SQLAlchemy recopie par défaut les valeurs de la requête dans ses messages d'erreur, donc dans les journaux envoyés à Loki.
 - **Correction** : les questions de recherche passent par `searchable()` (caractères de contrôle et invisibles remplacés par une espace) ; le moteur de base est créé avec `hide_parameters=True` (aucune valeur dans une erreur SQL). Tests : `test_control_characters_in_a_question_do_not_break_the_search`, `test_database_errors_never_carry_the_values_of_the_query`.
 - **À retenir** : un ancien test écrivait `"\\x00"` (quatre caractères) au lieu de l'octet NUL : il ne testait rien. Vérifier qu'un test d'entrée hostile contient bien le caractère visé.
+
+## Tempo semble au bord de sa limite mémoire
+
+- **Symptôme** (mesure du 2026-11-18) : `docker stats` affiche Tempo à 233 Mo pour une limite de 256 Mo, soit 91 %.
+- **Cause** : `docker stats` compte aussi le cache des fichiers que Tempo écrit (traces sur disque). Ce cache n'est pas une consommation du programme : le noyau le reprend quand le conteneur approche de sa limite. `memory.stat` donnait 121 Mo de mémoire anonyme (`anon`) et 50 Mo de cache (`file`).
+- **Correction** : aucune ; limite gardée. Avant de changer la limite d'un conteneur qui écrit sur disque (Tempo, Loki, Prometheus), lire `anon` dans `memory.stat` : commande dans `DEPLOYMENT.md`, « Mémoire des conteneurs ». Un vrai manque se voit à `OOMKilled=true` dans `docker inspect` ou à un swap de l'hôte qui grossit.

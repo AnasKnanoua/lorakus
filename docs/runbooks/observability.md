@@ -29,14 +29,14 @@ dc ps tempo loki && dc logs --tail 50 tempo && dc logs --tail 50 loki && docker 
 
 ### Causes probables
 
-- Mémoire : le conteneur a atteint sa limite (256 Mo chacun) et a été arrêté (`OOMKilled` dans `docker inspect`).
+- Mémoire : le conteneur a atteint sa limite (256 Mo chacun) et a été arrêté (`OOMKilled` dans `docker inspect`). Un chiffre de `docker stats` proche de la limite ne suffit pas à le dire : il compte le cache des fichiers écrits, que le noyau reprend ; lire `anon` dans `memory.stat` (`DEPLOYMENT.md`, « Mémoire des conteneurs », et `pitfalls.md`).
 - Disque plein (`disk-full`) : Tempo et Loki écrivent dans leurs volumes `tempo-data` et `loki-data`.
 - Configuration refusée après une mise à jour d'image : la première ligne d'erreur de `dc logs` le dit (Tempo 3 a déjà changé de format une fois : l'ancien bloc `compactor` est refusé).
 
 ### Actions
 
 1. `dc restart tempo` ou `dc restart loki`.
-2. Limite mémoire atteinte de façon répétée : noter la mesure, PR qui ajuste la limite dans `compose.observability.yml`.
+2. Limite mémoire atteinte de façon répétée (`OOMKilled`) : noter la mesure de `anon` et `file`, PR qui ajuste la limite dans `compose.observability.yml`.
 3. Données corrompues (rare) : les volumes ne contiennent que de l'historique jetable. `dc stop loki && docker volume rm lorakus_loki-data && dc up -d loki` (même chose pour Tempo). Aucune sauvegarde à restaurer.
 
 ## Rétention et confidentialité

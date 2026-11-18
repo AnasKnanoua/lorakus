@@ -1,6 +1,6 @@
 # Déploiement
 
-État au 2026-11-11 : en production sur `lorakus-prod`, sauvegarde quotidienne active, retour arrière essayé. Staging éphémère dans la CI et sentinelle externe healthchecks.io (ADR 0037). En cas d'incident : [`docs/runbooks/`](docs/runbooks/README.md).
+État au 2026-11-18 : en production sur `lorakus-prod` (PR 41 déployée), sauvegarde quotidienne active, retour arrière essayé. Staging éphémère dans la CI et sentinelle externe healthchecks.io (ADR 0037). En cas d'incident : [`docs/runbooks/`](docs/runbooks/README.md).
 
 ## 1. Environnements
 
@@ -235,3 +235,30 @@ La première commande lance un conteneur jetable de la même image (jamais `dc e
 Mesures du 2026-11-13 (`oracleworker`, ARM) : chargement 1,66 s ; le modèle ajoute environ 407 Mo à un processus (123 → 530 Mo) ; API au repos 545 Mo sur 768 ; question 33 ms en médiane et 38 ms au 95e centile ; 32 faits en 623 ms ; hôte 2,4 Go utilisés et 3,2 Go disponibles sur 5,6. Conséquences : limite de l'API gardée à 768 Mo (la baisser laisserait moins de 30 % de marge), `LorakusApiHighMemory` à 650 Mo ; Grafana, à 325 Mo pour 384, passe à 512 Mo.
 
 Mesures du 2026-11-14, après la PR 40 (traces et journaux) : API 566 Mo sur 768 (+21 Mo pour OpenTelemetry), Tempo 112 Mo sur 256, Loki 72 Mo sur 256, Grafana 322 Mo sur 512 ; hôte 2,4 Go utilisés sur 5,6 (3,2 Go disponibles). Conséquences (PR 41) : limite de l'API portée à 832 Mo pour retrouver environ 30 % de marge en service (32 %), `LorakusApiHighMemory` à 700 Mo ; Tempo et Loki gardent 256 Mo (plus de 50 % de marge).
+
+Mesures du 2026-11-18, après la PR 41 : voir « Mémoire des conteneurs » ci-dessous.
+
+### Mémoire des conteneurs : `docker stats` et `memory.stat`
+
+`docker stats` additionne deux sortes de mémoire. La mémoire **anonyme** (`anon`) est celle du programme lui-même : ses structures, son tas ; le noyau ne peut pas la jeter. Le **cache de fichiers** (`file`) garde en mémoire des morceaux de fichiers lus ou écrits ; quand le conteneur approche de sa limite, le noyau le reprend avant de tuer quoi que ce soit. Pour un service qui écrit beaucoup sur disque (Tempo, Loki, Prometheus), `docker stats` peut donc approcher la limite sans aucun danger. Les alertes `LorakusApiHighMemory` et `LorakusWorkerHighMemory` lisent la mémoire résidente du processus (`process_resident_memory_bytes`), qui ne compte pas ce cache.
+
+Mesure, sur le serveur en tant que `deploy`, après le bloc « Session » de [`docs/runbooks/README.md`](docs/runbooks/README.md) (cgroups v2, ceux d'Oracle Linux 9 ; aucune commande ne passe par `sudo`) :
+
+```bash
+for s in api worker tempo loki prometheus grafana; do pid=$(docker inspect -f '{{.State.Pid}}' "$(dc ps -q "$s")") && cg=$(awk -F: '$1=="0"{print $3}' "/proc/$pid/cgroup") && awk -v s="$s" '$1=="anon"{a=$2} $1=="file"{f=$2} $1=="slab"{k=$2} END{printf "%-11s anon %4d Mo  file %4d Mo  slab %3d Mo\n", s, a/1048576, f/1048576, k/1048576}' "/sys/fs/cgroup$cg/memory.stat"; done && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
+```
+
+Règle : une limite se décide d'après `anon` (plus `slab`, la mémoire du noyau comptée au conteneur, par prudence), avec au moins 30 % de marge au repos ; `docker stats` sert à repérer un service à examiner, pas à fixer sa limite. Le swap de l'hôte (`free -m`) se surveille à part : s'il grossit d'une mesure à l'autre, la mémoire manque vraiment.
+
+Mesures du 2026-11-18 (`docker stats`, utilisé / limite) :
+
+| Service | Mesuré | Limite | Remarque |
+| --- | --- | --- | --- |
+| `api` | 545 Mo | 832 Mo | 34 % de marge ; alerte à 700 Mo |
+| `worker` | 80 Mo | 256 Mo | — |
+| `tempo` | 233 Mo | 256 Mo | `anon` 121 Mo, `file` 50 Mo : limite gardée |
+| `loki` | 98 Mo | 256 Mo | — |
+| `prometheus` | 122 Mo | 300 Mo | — |
+| `grafana` | 253 Mo | 512 Mo | — |
+
+Hôte : 2,3 Go utilisés sur 5,6, 3,3 Go disponibles, 531 Mo de swap utilisés. Conséquence : aucune limite ne change. Tempo est à 91 % de sa limite selon `docker stats`, mais sa mémoire anonyme laisse plus de 50 % de marge ; à remesurer avec la commande ci-dessus après chaque montée de version de Tempo, Loki ou Prometheus, ou si `docker inspect` signale un `OOMKilled`.
