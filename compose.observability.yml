@@ -41,7 +41,7 @@ services:
     deploy:
       resources:
         limits:
-          # Estimation a mesurer apres le premier deploiement (PR 40).
+          # Mesure le 2026-11-18 : 233 Mo selon docker stats, dont anon 121 Mo (DEPLOYMENT.md).
           memory: 256m
 
   # Journaux (PR 40, ADR 0010) : 7 jours, stockage local, recus en OTLP. Meme surveillance.
@@ -61,7 +61,7 @@ services:
     deploy:
       resources:
         limits:
-          # Estimation a mesurer apres le premier deploiement (PR 40).
+          # Mesure le 2026-11-18 : 98 Mo selon docker stats (DEPLOYMENT.md).
           memory: 256m
 
   prometheus:
