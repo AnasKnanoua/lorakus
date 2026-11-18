@@ -14,7 +14,7 @@ from lorakus.ai.usage import UsageStore
 from lorakus.api.auth import RequestLimits
 from lorakus.api.modules import mount_module_routes
 from lorakus.api.origin import OriginCheckMiddleware
-from lorakus.api.routes import auth, data, health, memory, modules, tools
+from lorakus.api.routes import account, auth, data, health, memory, modules, tools
 from lorakus.core.agents.orchestrator import Orchestrator
 from lorakus.core.agents.routing import IntentRouter
 from lorakus.core.agents.service import AgentService
@@ -121,6 +121,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
+    app.include_router(account.router, prefix="/api")
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
     app.include_router(memory.router, prefix="/api")

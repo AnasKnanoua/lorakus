@@ -22,7 +22,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Final, Literal, cast
-from zoneinfo import ZoneInfo
 
 import anyio
 import structlog
@@ -47,6 +46,7 @@ from lorakus.ai.router import (
     ChatResult,
     ModelRouter,
 )
+from lorakus.core.account.service import user_timezone
 from lorakus.core.agents.orchestrator import Consultation, Orchestrator
 from lorakus.core.agents.routing import IntentRouter, Routing
 from lorakus.core.background import DebouncedTasks
@@ -81,6 +81,10 @@ CHAT_TOOLS: Final = (
     "assistant.remember",
     "assistant.update_memory",
     "assistant.forget_memory",
+    "assistant.list_tasks",
+    "assistant.add_task",
+    "assistant.complete_task",
+    "assistant.delete_task",
 )
 MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
 MAX_TOOL_CALLS: Final = 6  # par message
@@ -454,7 +458,9 @@ class AssistantService:
     ) -> Turn:
         """Souvenirs, outils, specialistes et requete au modele (trace : assistant.prepare)."""
         history = await self._history(user_id, stored)
-        now_local = self._clock().astimezone(ZoneInfo(config.timezone))
+        async with self._db.transaction(user_id) as session:
+            timezone = await user_timezone(session)
+        now_local = self._clock().astimezone(timezone)
         messages = fit_history([*history, StoredMessage("user", text, "ok")], HISTORY_TOKENS)
         facts = await self._memory.prompt_facts(user_id, text) if self._memory else []
         tools = tool_definitions(await self._tools.available(user_id)) if self._tools else {}
@@ -464,7 +470,7 @@ class AssistantService:
             system=system_prompt(
                 config.display_name,
                 now_local,
-                config.timezone,
+                timezone.key,
                 [(f.category, f.content) for f in facts],
                 tools=bool(tools),
                 reports=reports_block(consultations),

@@ -138,7 +138,18 @@ def test_the_model_sees_only_the_chat_tools_with_wire_names(
     provider = use_model(owner, "Bonjour.")
     send(owner, conversation, "Salut")
     tools = requests(provider)[0].tools
-    assert sorted(t.name for t in tools) == sorted([SEARCH, REMEMBER, UPDATE, FORGET])
+    assert sorted(t.name for t in tools) == sorted(
+        [
+            SEARCH,
+            REMEMBER,
+            UPDATE,
+            FORGET,
+            "assistant__list_tasks",
+            "assistant__add_task",
+            "assistant__complete_task",
+            "assistant__delete_task",
+        ]
+    )
     assert "Une carte s'affiche" in requests(provider)[0].system
 
 

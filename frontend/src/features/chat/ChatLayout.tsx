@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { AssistantDisabledError } from "@/api/assistant";
 import { Orb } from "@/components/Orb";
+import { TimezoneBanner } from "@/features/account/TimezoneBanner";
 import { cn } from "@/lib/cn";
 import { conversationsQuery } from "@/lib/queries";
 import { useSwipeToClose, useSwipeToOpen } from "@/lib/useSwipeToClose";
@@ -110,7 +111,10 @@ export function ChatLayout() {
           ) : disabled ? (
             <EnableAssistant />
           ) : (
-            <Outlet />
+            <>
+              <TimezoneBanner />
+              <Outlet />
+            </>
           )}
         </main>
       </div>
