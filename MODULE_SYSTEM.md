@@ -4,7 +4,7 @@ Un module est un package Python autonome qui apporte un domaine métier à LORAK
 
 ## 1. Règles non négociables
 
-1. Un module **n'importe jamais** un autre module ni `lorakus.ai.providers` (vérifié par `import-linter` depuis la PR 32 ; aucun SDK d'IA hors des adaptateurs, vérifié aussi par `tests/unit/test_ai_boundaries.py`). Le Core n'importe **jamais** un module : il les découvre par leurs entry points.
+1. Un module **n'importe jamais** un autre module ni `lorakus.ai.providers` (vérifié par `import-linter` depuis la PR 32 ; aucun SDK d'IA hors des adaptateurs, vérifié aussi par `tests/unit/test_ai_boundaries.py`). Le Core n'importe **jamais** un module : il les découvre par leurs entry points. Un module ne parle **jamais** au réseau lui-même (`httpcore2`, `httpx2`, `socket`, `ssl`, `urllib`, `http` interdits par import-linter depuis la PR 45) : il passe par le client sortant du Core, `OutboundHttp` (ADR 0041).
 2. Un module **ne lit ni n'écrit** les tables d'un autre ; il possède ses tables, préfixées.
 3. Un module **n'envoie jamais de notification** : il émet des signaux (`Signals.emit`), l'`InterventionPolicy` décide.
 4. Un module **n'appelle jamais un SDK d'IA** : il passe par `ModelRouter` avec une tâche et une classe de données. Une route l'obtient par la dépendance `lorakus.api.ai.get_ai`, et lit la configuration de l'utilisateur par `ModuleService.config` (exemple : `lorakus_modules/assistant`). La mémoire (`lorakus.api.memory.get_memory`) et les travaux différés (`get_background`) s'obtiennent de la même façon ; un module ne crée jamais lui-même un fait `verified` (ADR 0039).
@@ -81,6 +81,7 @@ Exclu volontairement : chargement à chaud, modules tiers signés, marketplace.
 | Lire un état synchrone d'un autre domaine | Port fourni au Core (`provides`), consommé par le Core uniquement | `FitnessStateProvider` lu par `context` |
 | Créer une tâche ou un créneau | Port du Core : `ModuleTasks("academic").upsert(session, user_id, ref, titre, …)` et `ModuleAgenda("calendars").replace_source(session, user_id, source, créneaux)` (PR 44) ; chaque requête est filtrée sur le module, qui ne voit ni les tâches personnelles ni celles d'un autre module | `academic` crée la tâche d'un devoir |
 | Exposer une action à l'assistant | Outil `@tool` | `create_project` |
+| Aller chercher une ressource à une adresse donnée par l'utilisateur | `OutboundHttp` du Core (SSRF : adresses publiques seulement, redirections revérifiées, tailles bornées), dans un job du worker ; secret de l'adresse chiffré par `FieldCipher.for_connectors` | `calendars` lit un ICS (PR 45) |
 
 Événements : nom `module.sujet_au_passe`, charge utile Pydantic avec `schema_version`, jamais de suppression de champ sans nouvelle version.
 

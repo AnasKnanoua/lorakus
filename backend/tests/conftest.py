@@ -21,6 +21,7 @@ from lorakus.settings import get_settings
 
 # Cle de chiffrement des champs pour la duree des tests (jamais celle d'un vrai serveur).
 os.environ.setdefault("LORAKUS_FIELD_ENCRYPTION_KEY", secrets.token_hex(32))
+os.environ.setdefault("LORAKUS_CONNECTOR_ENCRYPTION_KEY", secrets.token_hex(32))
 
 OWNER_EMAIL = "anas@example.com"
 OWNER_PASSWORD = "un mot de passe assez long"

@@ -45,7 +45,8 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0037](docs/adr/0037-ci-staging-external-sentinel.md) | Staging éphémère dans la CI, sentinelle externe par signal de vie (healthchecks.io) | Validé (2026-11-11) | Phase 17 ou disparition d'un service gratuit |
 | [0038](docs/adr/0038-public-exposure-caddy.md) | Exposition publique par Caddy, limites par utilisateur dans l'application | Validé (2026-11-12) | Avant toute ouverture commerciale, ou API à plusieurs processus |
 | [0039](docs/adr/0039-memory-v1.md) | Mémoire v1 : rien n'est retenu sans confirmation ; recherche hybride des souvenirs | Validé (2026-11-12, amendé 2026-11-13) | Avant toute ouverture commerciale |
-| [0040](docs/adr/0040-chat-tools-confirmation-cards.md) | Outils dans le chat : le modèle demande, l'utilisateur confirme par une carte | Accepté (2026-11-14) | À chaque nouvel outil du chat ; avant toute ouverture commerciale |
+| [0040](docs/adr/0040-chat-tools-confirmation-cards.md) | Outils dans le chat : le modèle demande, l'utilisateur confirme par une carte | Accepté (2026-11-14, amendé 2026-11-18 : jamais deux fois la même carte) | À chaque nouvel outil du chat ; avant toute ouverture commerciale |
+| [0041](docs/adr/0041-outbound-http-and-calendars.md) | Client HTTP sortant du Core (SSRF), abonnements ICS chiffrés, `icalendar` + `recurring-ical-events` | Accepté (2026-11-18) | À chaque nouveau connecteur ; avant toute ouverture commerciale |
 
 ## Décisions en attente d'avis
 

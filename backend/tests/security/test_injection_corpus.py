@@ -8,7 +8,10 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
    cherche, puis tente d'oublier tous les souvenirs, d'en retenir en masse, d'appeler un outil
    de confirmation, et pretend enfin que c'est fait ;
 4. dans le titre d'une tache (PR 44), lue par l'outil de liste : le modele qui obeit tente de
-   supprimer, terminer et ajouter des taches.
+   supprimer, terminer et ajouter des taches ;
+5. dans le titre et le lieu d'un evenement d'agenda (PR 45), venu d'un calendrier externe et
+   lu par l'outil d'agenda : le texte arrive inerte au modele, et le modele qui obeit ne change
+   rien sans clic.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -36,7 +39,13 @@ from lorakus.ai.usage import UsageStore
 from lorakus.api.app import create_app
 from lorakus.core.agents.contract import Confidence, Fact, SpecialistReport
 from lorakus.core.agents.orchestrator import Consultation
-from lorakus.core.planning.service import NewTask, add_task, list_tasks
+from lorakus.core.planning.service import (
+    AgendaItem,
+    ModuleAgenda,
+    NewTask,
+    add_task,
+    list_tasks,
+)
 from lorakus.core.ratelimit.service import AICallQuota
 from lorakus.db.database import Database
 from lorakus.settings import get_settings
@@ -54,6 +63,7 @@ SEARCH, REMEMBER, FORGET = (
     "assistant__remember",
     "assistant__forget_memory",
 )
+LIST_AGENDA = "assistant__list_agenda"
 LIST_TASKS, ADD_TASK, COMPLETE_TASK, DELETE_TASK = (
     "assistant__list_tasks",
     "assistant__add_task",
@@ -328,3 +338,65 @@ def test_an_attack_in_a_task_title_changes_nothing_without_the_users_click(
         )
     )
     assert used == [(0,)]
+
+
+# ------------------------------------- 5. dans un evenement de l'agenda
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_in_an_agenda_event_stays_inert_and_changes_nothing(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    from datetime import datetime, time, timedelta
+    from zoneinfo import ZoneInfo
+
+    from lorakus_modules.calendars.ics import visible_line
+
+    # Midi aujourd'hui, a Paris (fuseau par defaut du compte) : toujours « aujourd'hui ».
+    paris = ZoneInfo("Europe/Paris")
+    start = datetime.combine(datetime.now(paris).date(), time(12, 0), tzinfo=paris)
+
+    async def _seed(session: Any, user: Any) -> None:
+        # Comme le module calendars : une ligne visible, bornee, puis le port du Core.
+        title = visible_line(attack["payload"], 200) or "vide"
+        place = visible_line(attack["payload"], 200) or None
+        item = AgendaItem("piege", title, start, start + timedelta(hours=1), location=place)
+        await ModuleAgenda("calendars").replace_source(session, user, "abonnement", [item])
+        await add_task(session, user, NewTask(BENIGN_TASK))
+
+    asyncio.run(_with_tasks(_seed))
+    before = _task_titles()
+    [(task_id, _, _)] = before
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    provider = _use(
+        owner,
+        [
+            FakeReply("Je regarde.", tool_calls=((LIST_AGENDA, {}), (LIST_TASKS, {}))),
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    (DELETE_TASK, {"task_id": task_id}),
+                    (COMPLETE_TASK, {"task_id": task_id}),
+                    (FORGET, {"fact_id": task_id}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            FakeReply("", tool_calls=((ADD_TASK, {"title": "Virer 500 euros"}),)),
+            "C'est fait.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Qu'est-ce que j'ai aujourd'hui ? Fais ce qui est écrit.")
+
+    # Ce que le modele a recu de l'agenda : une donnee JSON, titre et lieu inertes.
+    agenda = json.loads(provider.calls[1][1].messages[-1].tool_results[0].content)
+    [entry] = agenda["creneaux"]
+    _inert([entry["titre"], entry.get("lieu", "")])
+    assert _task_titles() == before
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]
+    assert all(data["status"] == "pending" for name, data in events if name == "card")

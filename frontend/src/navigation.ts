@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Brain } from "lucide-react";
+import { Brain, CalendarSync } from "lucide-react";
 
 /**
  * Destinations de l'application, declarees ici et nulle part ailleurs (docs/frontend.md,
@@ -18,13 +18,14 @@ export type NavGroup = "assistant" | "tools";
 export interface NavItem {
   id: string;
   label: string;
-  to: "/memoire";
+  to: "/memoire" | "/calendriers";
   icon: LucideIcon;
   group: NavGroup;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "memory", label: "Mémoire", to: "/memoire", icon: Brain, group: "assistant" },
+  { id: "calendars", label: "Calendriers", to: "/calendriers", icon: CalendarSync, group: "tools" },
 ];
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {

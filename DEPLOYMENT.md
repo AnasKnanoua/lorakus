@@ -94,6 +94,8 @@ ssh lorakus-prod 'sudo -iu deploy grep ^LORAKUS_FIELD_ENCRYPTION_KEY= /opt/lorak
 
 Sans elle, une base restaurée sur un serveur neuf garde ses comptes mais perd la double authentification : `python -m lorakus.cli recover-second-factor`, puis `python -m lorakus.cli enable-second-factor` (en production, la connexion est impossible entre les deux).
 
+`LORAKUS_CONNECTOR_ENCRYPTION_KEY` (PR 45, ADR 0041) chiffre les adresses secrètes des calendriers ICS. Créée de la même façon, au premier déploiement de la PR 45 ; donnée à l'API **et au worker** (qui synchronise), jamais la clé précédente. L'API et le worker refusent de démarrer sans elle en staging et en production. Hors sauvegardes elle aussi ; la perdre oblige seulement à supprimer les abonnements et à recopier leurs adresses : la copier dans le gestionnaire de mots de passe est conseillé, pas indispensable.
+
 ### 4.4 Staging éphémère
 
 Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la production) installe la version en production, y écrit une donnée témoin, déploie la nouvelle version par-dessus avec le vrai `deploy.sh`, essaie le retour arrière, redéploie, lance une sauvegarde et une alerte de test, puis restaure la dernière sauvegarde en suivant le [runbook](docs/runbooks/restore.md) et vérifie la donnée témoin. S'il échoue, la production n'est pas touchée.

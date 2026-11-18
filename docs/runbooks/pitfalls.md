@@ -170,3 +170,15 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Cause** : rien dans le code n'empêchait une seconde carte identique ; seule une consigne au modèle le faisait. Le modèle relit la demande d'origine dans l'historique, et la note « confirmée par l'utilisateur » pouvait se lire comme « il est d'accord, exécute ». Pour un souvenir, le doublon n'était refusé qu'au clic, donc après l'affichage de la carte.
 - **Correction** : ADR 0040, amendement du 2026-11-18 : une seule confirmation en attente par action et par conversation, souvenir déjà connu et tâche ouverte identique refusés avant toute carte, note « faite, après confirmation de l'utilisateur ».
 - **À retenir** : une règle qui ne tient que par le prompt n'est pas une règle. Tout comportement attendu du modèle qui protège l'utilisateur (pas de doublon, pas d'action répétée) doit aussi être garanti par le code et testé avec un faux modèle qui fait l'inverse.
+
+## `ipaddress` juge « globales » des adresses locales déguisées
+
+- **Constat** (2026-11-18, PR 45, avant la production) : `ipaddress.ip_address("::127.0.0.1").is_global`, `ip_address("64:ff9b::a00:1").is_global` (NAT64 de 10.0.0.1) et `ip_address("224.0.0.1").is_global` valent `True` avec Python 3.13. Un filtre anti-SSRF fondé sur `is_global` seul laisserait passer la boucle locale ou le réseau privé cachés dans de l'IPv6, et la multidiffusion.
+- **Correction** : `lorakus/core/outbound/policy.py` déballe d'abord l'IPv4 transportée (mappée, compatible, 6to4, NAT64), puis applique une liste explicite de réseaux refusés **et** `is_global`. Chaque forme est un cas de `tests/unit/test_outbound.py`.
+- **À retenir** : `getaddrinfo` accepte aussi `2130706433`, `0x7f000001`, `0177.0.0.1` et `127.1` comme 127.0.0.1 ; la politique d'URL exige donc un dernier label alphabétique.
+
+## Certificat de test refusé : « Missing Authority Key Identifier »
+
+- **Symptôme** (2026-11-18, PR 45) : un serveur HTTPS de test, avec une autorité de certification créée par `cryptography`, est refusé (`CERTIFICATE_VERIFY_FAILED`) alors que le certificat paraît correct.
+- **Cause** : Python 3.13 active `VERIFY_X509_STRICT` dans `ssl.create_default_context()` ; OpenSSL exige alors les extensions Subject Key Identifier, Authority Key Identifier, et Key Usage (`keyCertSign`) sur l'autorité.
+- **Correction** : les ajouter au générateur de certificats de test (`tests/unit/test_outbound.py`). Ne pas désactiver la vérification stricte dans le client.

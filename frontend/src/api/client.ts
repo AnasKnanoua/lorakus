@@ -31,6 +31,15 @@ export class ApiError extends Error {
   }
 }
 
+/** Module non active pour cet utilisateur (l'API repond 404 sur ses routes). Reponse
+ * definitive : jamais de nouvelle tentative, l'ecran d'activation s'affiche aussitot. */
+export class ModuleDisabledError extends Error {
+  constructor(module: string) {
+    super(`module ${module} desactive`);
+    this.name = "ModuleDisabledError";
+  }
+}
+
 /** Champ `code` d'un detail d'erreur structure ({ code, message }), s'il existe. */
 export function errorCode(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null || !("detail" in body)) {

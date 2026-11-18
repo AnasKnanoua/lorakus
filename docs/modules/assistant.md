@@ -1,6 +1,6 @@
 # Module Assistant (`assistant`)
 
-Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affichée au fil de l'eau, avec les souvenirs confirmés (ADR 0039) et les outils de mémoire (PR 38, ADR 0040). Sans agenda ni tâches pour l'instant (P4) ; le prompt système le dit au modèle, qui doit l'avouer plutôt qu'inventer.
+Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affichée au fil de l'eau, avec les souvenirs confirmés (ADR 0039), les outils de mémoire (PR 38, ADR 0040), les tâches (PR 44) et la lecture de l'agenda (PR 45, ADR 0041).
 
 ## Ce que fait le module
 
@@ -17,6 +17,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | `assistant.remember` | `write` | Carte « Retenir : « … » » ; le clic crée un souvenir confirmé (provenance `conversation:<id>`) |
 | `assistant.update_memory` | `write` | Carte « Avant / Après » ; le clic corrige le souvenir |
 | `assistant.forget_memory` | `sensitive` | Carte « Oublier : « … » » ; le clic, avec une preuve d'identité récente, efface le souvenir |
+| `assistant.list_agenda` | `read` | Créneaux de 1 à 14 jours (60 au plus), heures locales dans le fuseau du compte ; titres et lieux venus de calendriers externes passés par `inert()` (PR 45) |
 
 ## Approche (programmation classique, ML ou LLM)
 

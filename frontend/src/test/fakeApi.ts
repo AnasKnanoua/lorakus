@@ -75,6 +75,24 @@ export interface FakeState {
   exportBody: unknown;
   /** Fuseau du compte (PR 44) ; par defaut celui de l'appareil de test (aucun bandeau). */
   timezone: string;
+  /** Module calendars (PR 45) et ses abonnements ; l'adresse n'est jamais renvoyee. */
+  calendarsEnabled: boolean;
+  subscriptions: FakeSubscription[];
+}
+
+export interface FakeSubscription {
+  id: string;
+  name: string;
+  hint: string;
+  status: "pending" | "ok" | "error";
+  error: string | null;
+  entries_count: number;
+  skipped_count: number;
+  truncated: boolean;
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  next_sync_at: string;
+  created_at: string;
 }
 
 const NOW = "2026-11-12T12:00:00Z";
@@ -129,6 +147,8 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     traces: new Map(),
     exportBody: { format: 1, account: { email: "anas@example.com" } },
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    calendarsEnabled: true,
+    subscriptions: [],
     ...overrides,
   };
   let counter = 0;
@@ -365,6 +385,51 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       }
       card.status = "confirmed";
       return json(200, { tool: card.tool, risk: card.risk, result: { message: "Fait." } });
+    }
+    if (path === "/api/v1/modules/calendars" && request.method === "PUT") {
+      state.calendarsEnabled = true;
+      return json(200, { id: "calendars", enabled: true, config: {} });
+    }
+    if (path.startsWith("/api/v1/calendars/") && !state.calendarsEnabled) {
+      return json(404, { detail: "Module indisponible." });
+    }
+    if (path === "/api/v1/calendars/subscriptions" && request.method === "GET") {
+      return json(200, state.subscriptions);
+    }
+    if (path === "/api/v1/calendars/subscriptions" && request.method === "POST") {
+      const b = body as { name: string; url: string };
+      if (!b.url.startsWith("https://")) {
+        return json(422, { detail: "Adresse refusée : l'adresse doit commencer par https://." });
+      }
+      const created: FakeSubscription = {
+        id: nextId(),
+        name: b.name,
+        hint: `${new URL(b.url).host}/…`,
+        status: "pending",
+        error: null,
+        entries_count: 0,
+        skipped_count: 0,
+        truncated: false,
+        last_attempt_at: null,
+        last_success_at: null,
+        next_sync_at: NOW,
+        created_at: NOW,
+      };
+      state.subscriptions.push(created);
+      return json(201, created);
+    }
+    const subscription = /^\/api\/v1\/calendars\/subscriptions\/([^/]+)(\/sync)?$/.exec(path);
+    if (subscription) {
+      const found = state.subscriptions.find((s) => s.id === subscription[1]);
+      if (!found) return json(404, { detail: "Calendrier introuvable." });
+      if (subscription[2] && request.method === "POST") {
+        found.status = "pending";
+        return json(202, found);
+      }
+      if (request.method === "DELETE") {
+        state.subscriptions = state.subscriptions.filter((s) => s !== found);
+        return new Response(null, { status: 204 });
+      }
     }
     if (path === "/api/v1/auth/reauth") {
       const ok = (body as { password: string }).password === state.password;

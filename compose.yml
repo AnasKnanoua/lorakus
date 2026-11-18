@@ -78,6 +78,8 @@ services:
       # Chiffrement des secrets TOTP. Facultative en developpement (double authentification
       # alors indisponible) ; obligatoire en staging et en production, creee par init-env.sh.
       LORAKUS_FIELD_ENCRYPTION_KEY: ${LORAKUS_FIELD_ENCRYPTION_KEY:-}
+      # Secrets des connecteurs (adresses ICS, ADR 0041) : l'API chiffre, le worker dechiffre.
+      LORAKUS_CONNECTOR_ENCRYPTION_KEY: ${LORAKUS_CONNECTOR_ENCRYPTION_KEY:-}
       # Moteur IA (ADR 0007, D-D). Cle au SEUL service api ; vide = reponses par gabarit.
       LORAKUS_ANTHROPIC_API_KEY: ${LORAKUS_ANTHROPIC_API_KEY:-}
       LORAKUS_AI_KILL_SWITCH: ${LORAKUS_AI_KILL_SWITCH:-false}
@@ -105,6 +107,9 @@ services:
       LORAKUS_ENVIRONMENT: ${LORAKUS_ENVIRONMENT:-development}
       LORAKUS_DB_HOST: postgres
       LORAKUS_APP_DB_PASSWORD: ${LORAKUS_APP_DB_PASSWORD:?manquant dans .env}
+      # Synchronisation des calendriers (ADR 0041) : dechiffre les adresses ICS. Jamais la
+      # cle des secrets TOTP (LORAKUS_FIELD_ENCRYPTION_KEY), qui reste au seul service api.
+      LORAKUS_CONNECTOR_ENCRYPTION_KEY: ${LORAKUS_CONNECTOR_ENCRYPTION_KEY:-}
     healthcheck:
       # Battement de coeur ecrit a chaque tour de boucle : un worker bloque est detecte.
       test: ["CMD", "python", "-m", "lorakus.worker", "healthcheck"]

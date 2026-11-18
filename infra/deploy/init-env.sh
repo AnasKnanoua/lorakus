@@ -113,6 +113,9 @@ generated GRAFANA_ADMIN_PASSWORD
 # Chiffrement des secrets TOTP en base. A COPIER aussi dans le gestionnaire de mots de
 # passe : elle n'est pas dans les sauvegardes, et sans elle les secrets TOTP sont perdus.
 generated LORAKUS_FIELD_ENCRYPTION_KEY "$(random_key)"
+# Chiffrement des adresses ICS secretes (ADR 0041) : API et worker. Hors sauvegardes ; la
+# perdre oblige seulement a recopier les adresses des calendriers.
+generated LORAKUS_CONNECTOR_ENCRYPTION_KEY "$(random_key)"
 
 if [ "$GENERATED_ONLY" = 1 ]; then
   chmod 600 "$ENV_FILE"

@@ -154,6 +154,7 @@ def test_the_model_sees_only_the_chat_tools_with_wire_names(
             "assistant__add_task",
             "assistant__complete_task",
             "assistant__delete_task",
+            "assistant__list_agenda",
         ]
     )
     assert "Une carte s'affiche" in requests(provider)[0].system

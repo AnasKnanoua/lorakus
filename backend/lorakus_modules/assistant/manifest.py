@@ -1,6 +1,7 @@
 """Manifeste du module Assistant (MODULE_SYSTEM.md §2) : le Majordome (ADR 0025)."""
 
 from lorakus.core.modules.manifest import DataDeclaration, FrontendEntry, ModuleManifest
+from lorakus_modules.assistant.agenda_tools import AGENDA_TOOLS
 from lorakus_modules.assistant.config import AssistantConfig
 from lorakus_modules.assistant.export import export_assistant
 from lorakus_modules.assistant.router import router
@@ -30,9 +31,9 @@ manifest = ModuleManifest(
         classes={"asst_conversations": "personal", "asst_messages": "personal"},
     ),
     frontend=FrontendEntry(route="/chat", label="Discuter", icon="message-circle"),
-    # Outils du chat : la memoire (PR 38) et les taches (PR 44), avec confirmation pour
-    # toute modification.
-    tools=[*TOOLS, *TASK_TOOLS],
+    # Outils du chat : la memoire (PR 38), les taches (PR 44), avec confirmation pour toute
+    # modification, et la lecture de l'agenda (PR 45).
+    tools=[*TOOLS, *TASK_TOOLS, *AGENDA_TOOLS],
     # « Mes donnees » (PR 41) : conversations et messages, meme module desactive.
     data_exporter=export_assistant,
     health=check_health,
