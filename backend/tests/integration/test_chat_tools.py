@@ -32,8 +32,14 @@ from lorakus.ai.testing import FakeProvider, FakeReply
 from lorakus.ai.usage import UsageStore
 from lorakus.api.app import create_app
 from lorakus.core.identity.passwords import HASHER
+from lorakus.core.memory.service import content_hash
 from lorakus.core.ratelimit.service import AICallQuota, RateLimiter
-from lorakus_modules.assistant.service import MAX_CARDS, MAX_MODEL_CALLS, PENDING_FOR_MODEL
+from lorakus_modules.assistant.service import (
+    ALREADY_PENDING_FOR_MODEL,
+    MAX_CARDS,
+    MAX_MODEL_CALLS,
+    PENDING_FOR_MODEL,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -210,13 +216,14 @@ def test_remember_shows_a_card_and_changes_nothing_before_the_click(
     detail = owner.get(f"{BASE}/conversations/{conversation}").json()
     assert detail["messages"][-1]["actions"][0]["status"] == "confirmed"
 
-    # Au message suivant, le modele sait que la carte a ete confirmee.
+    # Au message suivant, le modele sait que l'action est FAITE (« confirmee par
+    # l'utilisateur » se lisait comme un accord a executer : le modele rappelait l'outil).
     provider = use_model(owner, "Parfait.")
     send(owner, conversation, "Merci")
     history = requests(provider)[0].messages
     assert any(
-        "[Carte proposée : Retenir : « Révise le matin » (habitude) ; confirmée par l'utilisateur]"
-        in m.content
+        "[Carte proposée : Retenir : « Révise le matin » (habitude) ; faite, après "
+        "confirmation de l'utilisateur]" in m.content
         for m in history
     )
 
@@ -231,6 +238,63 @@ def test_refused_card_is_remembered_as_refused(owner: TestClient, conversation: 
     provider = use_model(owner, "Compris.")
     send(owner, conversation, "Et maintenant ?")
     assert "refusée par l'utilisateur" in everything_sent(provider)
+
+
+def test_a_known_fact_gives_no_card(owner: TestClient, conversation: str) -> None:
+    """Un souvenir deja retenu n'est jamais repropose (avant : carte affichee, refusee au clic,
+    et reproposee a chaque message par un modele qui relisait la demande d'origine)."""
+    add_fact(owner, "Révise le matin")
+    provider = use_model(
+        owner,
+        # Meme texte a la casse et a la ponctuation finale pres : meme souvenir.
+        FakeReply("", tool_calls=((REMEMBER, {"content": "révise le matin."}),)),
+        "C'est déjà noté.",
+    )
+    events = send(owner, conversation, "Retiens que je révise le matin")
+    assert of(events, "card") == []
+    result = requests(provider)[1].messages[-1].tool_results[0]
+    assert result.is_error and result.content == '{"erreur": "Ce souvenir existe déjà."}'
+    rows = asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_tool_confirmations"))
+    assert rows[0][0] == 0
+
+
+def test_a_fact_waiting_in_the_memory_page_gives_no_card(
+    owner: TestClient, conversation: str
+) -> None:
+    # Proposition de l'analyse d'apres conversation (ADR 0039), encore sans decision.
+    asyncio.run(
+        migrator_sql(
+            "INSERT INTO lorakus.core_memory_facts (id, user_id, content, content_hash, category,"
+            " status, data_class, source_kind) SELECT gen_random_uuid(), id, 'Aime le thé', "
+            ":digest, 'preference', 'proposed', 'personal', 'conversation' "
+            "FROM lorakus.core_users",
+            {"digest": content_hash("Aime le thé")},
+        )
+    )
+    provider = use_model(
+        owner, FakeReply("", tool_calls=((REMEMBER, {"content": "Aime le thé"}),)), "OK."
+    )
+    assert of(send(owner, conversation, "Retiens que j'aime le thé"), "card") == []
+    result = requests(provider)[1].messages[-1].tool_results[0]
+    assert result.is_error and "attend déjà ta confirmation" in result.content
+
+
+def test_a_waiting_card_is_not_shown_again(owner: TestClient, conversation: str) -> None:
+    """Le modele redemande une action dont la carte attend encore : le code ne la remontre pas,
+    et le modele l'apprend par un texte ecrit par le code."""
+    tea = {"content": "Aime le thé"}
+    use_model(owner, FakeReply("", tool_calls=((REMEMBER, tea),)), "OK.")
+    [card] = of(send(owner, conversation, "Retiens que j'aime le thé"), "card")
+    provider = use_model(owner, FakeReply("", tool_calls=((REMEMBER, tea),)), "Plus haut.")
+    assert of(send(owner, conversation, "Tu as vu ?"), "card") == []
+    result = requests(provider)[1].messages[-1].tool_results[0]
+    assert not result.is_error and result.content == ALREADY_PENDING_FOR_MODEL
+    assert card["confirmation_id"] not in everything_sent(provider)
+    # Refusee, elle peut etre reproposee si l'utilisateur la redemande.
+    url = f"/api/v1/tools/confirmations/{card['confirmation_id']}"
+    assert owner.post(f"{url}/cancel").status_code == 204
+    use_model(owner, FakeReply("", tool_calls=((REMEMBER, tea),)), "OK.")
+    assert len(of(send(owner, conversation, "Finalement, retiens-le"), "card")) == 1
 
 
 def test_update_card_shows_before_and_after(owner: TestClient, conversation: str) -> None:

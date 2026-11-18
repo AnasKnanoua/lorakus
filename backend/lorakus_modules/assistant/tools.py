@@ -98,7 +98,17 @@ async def _search(call: ToolCall, args: SearchIn) -> dict[str, Any]:
 
 
 # -------------------------------------------------------------------- retenir
-async def _remember_summary(_call: ToolCall, args: RememberIn) -> str:
+async def _remember_summary(call: ToolCall, args: RememberIn) -> str:
+    # Avant toute carte : un souvenir deja connu n'en montre pas (avant, le doublon n'etait
+    # refuse qu'au clic, et le modele pouvait reproposer le meme souvenir a chaque message).
+    try:
+        known = await _memory(call).known_status(call.user_id, args.content)
+    except InvalidFactError as error:
+        raise _memory_error(error) from None
+    if known == "proposed":
+        raise ToolError("Ce souvenir attend déjà ta confirmation dans la page Mémoire.")
+    if known is not None:
+        raise _memory_error(DuplicateFactError())
     return f"Retenir : « {' '.join(args.content.split())} » ({CATEGORY_LABELS[args.category]})"
 
 

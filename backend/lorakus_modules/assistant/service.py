@@ -94,9 +94,16 @@ PENDING_FOR_MODEL: Final = (
     "Carte de confirmation affichée à l'utilisateur. Rien n'est fait tant qu'il ne l'a pas "
     "confirmée lui-même : ne dis pas que c'est fait, et ne redemande pas la même action."
 )
+# La meme action attend deja sur une carte (ToolRuntime) : aucune nouvelle carte n'est montree.
+ALREADY_PENDING_FOR_MODEL: Final = (
+    "Cette action attend déjà la confirmation de l'utilisateur sur une carte affichée plus "
+    "haut : aucune nouvelle carte. Ne la propose pas de nouveau."
+)
+# Issue d'une carte d'un message precedent. « faite » et non « confirmee » : un modele lisait
+# « confirmee par l'utilisateur » comme un accord a executer, et rappelait l'outil.
 CARD_STATUS_FOR_MODEL: Final[dict[str, str]] = {
-    "pending": "en attente de sa confirmation",
-    "confirmed": "confirmée par l'utilisateur",
+    "pending": "toujours affichée, en attente de sa confirmation",
+    "confirmed": "faite, après confirmation de l'utilisateur",
     "cancelled": "refusée par l'utilisateur",
     "expired": "expirée sans réponse",
 }
@@ -776,6 +783,8 @@ class AssistantService:
             return _for_model({"erreur": str(error)}), True, shown
         if outcome.confirmation_id is None:
             return _for_model(outcome.result or {}), False, Activity(spec.name, label)
+        if outcome.already_pending:
+            return ALREADY_PENDING_FOR_MODEL, False, None
         if outcome.summary is None or outcome.expires_at is None:  # garanti par ToolRuntime
             return _for_model({"erreur": "action impossible a decrire"}), True, None
         counters["cards"] += 1

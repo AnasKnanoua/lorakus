@@ -59,6 +59,10 @@ class TaskStateError(Exception):
     """Action impossible dans l'etat de la tache (deja terminee, sous-tache d'une sous-tache)."""
 
 
+class DuplicateTaskError(Exception):
+    """Une tache personnelle ouverte porte deja ce titre (casse ignoree) et cette echeance."""
+
+
 class InvalidAgendaEntryError(ValueError):
     """Creneau refuse (fin avant debut, titre vide, doublon dans un meme envoi...)."""
 
@@ -192,6 +196,30 @@ async def get_task(session: AsyncSession, task_id: uuid.UUID) -> TaskView:
     return _view(task, counts.get(task.id, 0))
 
 
+async def find_open_duplicate(
+    session: AsyncSession,
+    title: str,
+    due_on: date | None,
+    parent_id: uuid.UUID | None = None,
+) -> TaskView | None:
+    """Tache personnelle ouverte de meme titre (casse ignoree, comparee par PostgreSQL des deux
+    cotes) et de meme echeance, sous le meme parent ; None s'il n'y en a pas."""
+    clean = clean_line(title, MAX_TITLE_CHARS)
+    task = await session.scalar(
+        select(Task)
+        .where(
+            Task.status == "open",
+            Task.owner_module.is_(None),
+            Task.parent_id.is_not_distinct_from(parent_id),
+            Task.due_on.is_not_distinct_from(due_on),
+            func.lower(Task.title) == func.lower(clean),
+        )
+        .order_by(Task.created_at)
+        .limit(1)
+    )
+    return None if task is None else _view(task)
+
+
 # --------------------------------------------------------------- ecriture
 async def _check_room(session: AsyncSession, parent_id: uuid.UUID | None) -> None:
     opened = await session.scalar(
@@ -224,11 +252,16 @@ async def add_task(
     source_ref: str | None = None,
     ip: str | None = None,
 ) -> TaskView:
-    """Cree une tache personnelle (ou une sous-tache), apres validation et plafonds."""
+    """Cree une tache personnelle (ou une sous-tache), apres validation et plafonds.
+
+    Jamais deux taches ouvertes identiques (titre et echeance) : DuplicateTaskError.
+    """
     title = clean_line(new.title, MAX_TITLE_CHARS)
     notes = clean_notes(new.notes)
     _check_numbers(new.priority, new.estimate_minutes)
     await _check_room(session, new.parent_id)
+    if await find_open_duplicate(session, title, new.due_on, new.parent_id) is not None:
+        raise DuplicateTaskError(title)
     task = Task(
         id=uuid.uuid4(),
         user_id=user_id,
