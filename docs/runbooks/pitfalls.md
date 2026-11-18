@@ -163,3 +163,10 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (v0.3.0, 2026-11-18) : `make release-pr` ouvre la PR de version, puis le job `checks` échoue à `make openapi-check` ; le seul écart est `"version": "0.2.0"` contre `"0.3.0"` dans `frontend/openapi.json`.
 - **Cause** : le contrat exporté recopiait le numéro de publication, que release-please change dans `backend/lorakus/__init__.py` sans régénérer le contrat. Le faire mettre à jour par release-please (`extra-files` en JSON) ne marche pas : il réécrit tout le fichier et transforme `1.0` en `1` (essayé avec release-please 17.11.2).
 - **Correction** : le contrat porte la version de l'API (`v1`, celle de `/api/v1`), fixée dans `backend/scripts/export_openapi.py` ; l'API en service annonce toujours le vrai numéro. Test : `test_the_contract_carries_the_api_version_not_the_release`. Une PR de version déjà ouverte se met à jour en relançant `make release-pr VERSION=…` après la fusion du correctif.
+
+## Le chat repropose une carte déjà confirmée
+
+- **Symptôme** (production, 2026-11-18) : dans une conversation, une carte (souvenir ou tâche) confirmée revient à chaque message suivant ; une carte laissée sans réponse aussi.
+- **Cause** : rien dans le code n'empêchait une seconde carte identique ; seule une consigne au modèle le faisait. Le modèle relit la demande d'origine dans l'historique, et la note « confirmée par l'utilisateur » pouvait se lire comme « il est d'accord, exécute ». Pour un souvenir, le doublon n'était refusé qu'au clic, donc après l'affichage de la carte.
+- **Correction** : ADR 0040, amendement du 2026-11-18 : une seule confirmation en attente par action et par conversation, souvenir déjà connu et tâche ouverte identique refusés avant toute carte, note « faite, après confirmation de l'utilisateur ».
+- **À retenir** : une règle qui ne tient que par le prompt n'est pas une règle. Tout comportement attendu du modèle qui protège l'utilisateur (pas de doublon, pas d'action répétée) doit aussi être garanti par le code et testé avec un faux modèle qui fait l'inverse.

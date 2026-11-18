@@ -9,7 +9,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 - **Repli** (scénario 8) : si l'IA ne peut pas répondre (plafond atteint, fournisseur en panne, coupure générale, erreur interne), la réponse est un **message de secours fixe**, enregistré avec le statut `fallback`. Ces messages ne sont jamais renvoyés au modèle.
 - **Coût borné** : seuls les derniers messages tenant dans environ 6 000 tokens partent au modèle (environ 0,0006 $ d'entrée par message avec Haiku 5.5) ; un message fait au plus 8 000 caractères.
 
-- **Outils** (PR 38, ADR 0040) : le modèle peut demander les outils de la liste `CHAT_TOOLS`. Tous passent par le `ToolRuntime` du Core. Au plus 4 appels au modèle par message (le dernier sans outil), 6 appels d'outils et 3 cartes.
+- **Outils** (PR 38, ADR 0040) : le modèle peut demander les outils de la liste `CHAT_TOOLS`. Tous passent par le `ToolRuntime` du Core. Au plus 4 appels au modèle par message (le dernier sans outil), 6 appels d'outils et 3 cartes. **Jamais deux fois la même carte** (correctif du 2026-11-18) : si le modèle redemande une action dont la carte attend encore (même outil, mêmes arguments, même conversation), aucune nouvelle carte n'apparaît et le modèle l'apprend par un texte du code ; un souvenir déjà connu ou déjà proposé, et une tâche ouverte de même titre et de même échéance, sont refusés avant toute carte. Au message suivant, chaque carte est rappelée au modèle avec son issue : « toujours affichée », « faite, après confirmation de l'utilisateur », « refusée » ou « expirée sans réponse ».
 
 | Outil | Risque | Effet |
 | --- | --- | --- |

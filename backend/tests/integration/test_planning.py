@@ -18,6 +18,7 @@ from lorakus.core.identity.service import IdentityService
 from lorakus.core.planning import service as planning
 from lorakus.core.planning.service import (
     AgendaItem,
+    DuplicateTaskError,
     InvalidAgendaEntryError,
     InvalidTaskError,
     ModuleAgenda,
@@ -136,6 +137,29 @@ async def test_limits_on_open_tasks_and_subtasks(
         await add_task(s, user, NewTask("Troisième"))
         with pytest.raises(TaskLimitError):
             await add_task(s, user, NewTask("Quatrième"))
+
+
+async def test_two_identical_open_tasks_never_coexist(
+    database: Database, identity: IdentityService
+) -> None:
+    """Meme titre (casse et espaces ignores, accents compris) et meme echeance : refusee tant que
+    la premiere est ouverte. Une tache de module ne compte pas : elle a son propre sens."""
+    user = await _owner(identity)
+    due = date(2026, 11, 23)
+    async with database.transaction(user) as s:
+        first = await add_task(s, user, NewTask("Devoir d'Économie", due_on=due))
+        with pytest.raises(DuplicateTaskError):
+            await add_task(s, user, NewTask("  devoir  d'économie ", due_on=due))
+        # Autre echeance, sans echeance, ou sous-tache : ce n'est pas la meme tache.
+        await add_task(s, user, NewTask("Devoir d'Économie", due_on=date(2026, 11, 30)))
+        undated = await add_task(s, user, NewTask("Devoir d'Économie"))
+        with pytest.raises(DuplicateTaskError):
+            await add_task(s, user, NewTask("DEVOIR D'ÉCONOMIE"))
+        await add_task(s, user, NewTask("Devoir d'Économie", due_on=due, parent_id=undated.id))
+        await ModuleTasks("academic").upsert(s, user, "eco", "Devoir d'Économie", due_on=due)
+        # Terminee, elle ne bloque plus.
+        await complete_task(s, user, first.id, NOW)
+        await add_task(s, user, NewTask("Devoir d'Économie", due_on=due))
 
 
 async def test_every_change_is_audited_without_the_title(

@@ -88,7 +88,7 @@ Le message de livraison de chaque PR dit si l'étape 3 est nécessaire.
 | Isolation | pytest | Chaque table et chaque route testées avec deux utilisateurs |
 | Architecture | import-linter (`make lint`) | Le Core n'importe jamais un module ; modules indépendants entre eux ; couches `api → core → db, observability → settings` |
 | Injections | pytest (`backend/tests/security/`) | Corpus d'une trentaine d'attaques, chaque CI : l'application tient même si le modèle obéit |
-| LLM | pytest (`tests/evals/test_reply_behaviour.py`) | 18 cas (dont 4 sur les tâches, PR 44), règles automatiques ; faux modèle à chaque CI (les règles elles-mêmes sont testées), vrai modèle par `model-eval.yml` (à la demande et le 3 du mois) |
+| LLM | pytest (`tests/evals/test_reply_behaviour.py`) | 20 cas (dont 4 sur les tâches, PR 44, et 2 sur les cartes déjà proposées, correctif du 2026-11-18), règles automatiques ; faux modèle à chaque CI (les règles elles-mêmes sont testées), vrai modèle par `model-eval.yml` (à la demande et le 3 du mois) |
 | E2E | Playwright | Scénarios d'acceptation du MVP |
 | Frontend | Vitest, axe-core | Composants et accessibilité |
 | Évaluation | pytest (`backend/tests/evals/`) | Qualité de la recherche dans la mémoire (recall@5, MRR) sur un jeu étiqueté fictif. Faux modèle dans `make check` ; vrai modèle dans la CI (étape « Évaluation de la recherche »). En local : `infra/models/fetch-embedding-model.sh /tmp/model && LORAKUS_EMBEDDING_MODEL_DIR=/tmp/model uv --directory backend run pytest -s tests/evals` |

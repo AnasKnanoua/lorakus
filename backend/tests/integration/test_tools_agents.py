@@ -1,6 +1,7 @@
 """Outils (confirmation, audit) et specialistes factices (critere de fin de la phase 2)."""
 
 import asyncio
+import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
@@ -301,6 +302,59 @@ def _pending(client: TestClient, tool: str = "alpha.add_note", note: str = "revi
     return str(response.json()["confirmation_id"])
 
 
+def test_the_same_action_never_waits_twice(client: TestClient) -> None:
+    """Meme outil, memes arguments, meme provenance : une seule confirmation en attente."""
+    runtime: ToolRuntime = client.app.state.tools  # type: ignore[attr-defined]
+    user = uuid.UUID(client.get("/api/v1/auth/me").json()["id"])
+
+    def ask(note: str, origin: str | None = "conversation:a") -> tuple[uuid.UUID, bool]:
+        result = asyncio.run(runtime.call(user, "alpha.add_note", {"text": note}, origin=origin))
+        assert result.confirmation_id is not None and result.summary is not None
+        return result.confirmation_id, result.already_pending
+
+    first, again = ask("maths"), ask("maths")
+    assert first[1] is False and again == (first[0], True)
+    assert ask("physique")[1] is False  # autres arguments
+    assert ask("maths", "conversation:b")[1] is False  # autre provenance
+    assert ask("maths", None)[1] is False  # sans provenance : elle aussi distincte
+
+    def rows() -> int:
+        """Confirmations de la conversation a (les arguments sont effaces apres decision)."""
+        found = asyncio.run(
+            migrator_sql(
+                "SELECT count(*) FROM lorakus.core_tool_confirmations "
+                "WHERE origin = 'conversation:a'"
+            )
+        )
+        return int(found[0][0])  # type: ignore[call-overload]
+
+    assert rows() == 2  # maths (une seule fois) et physique
+    # Refusee, confirmee ou expiree, elle ne bloque plus : la meme action peut revenir.
+    client.post(f"/api/v1/tools/confirmations/{first[0]}/cancel")
+    after_cancel = ask("maths")
+    assert after_cancel[1] is False and rows() == 3
+    assert client.post(f"/api/v1/tools/confirmations/{after_cancel[0]}").status_code == 200
+    after_use = ask("maths")
+    assert after_use[1] is False and rows() == 4
+    asyncio.run(
+        migrator_sql(
+            "UPDATE lorakus.core_tool_confirmations SET expires_at = now() WHERE id = :id",
+            {"id": after_use[0]},
+        )
+    )
+    assert ask("maths")[1] is False and rows() == 5
+
+    # Outil sans argument : apres decision, ses arguments effaces ({}) ressemblent a une
+    # nouvelle demande ; seule l'issue enregistree dit qu'elle ne bloque plus.
+    for decide in ("", "/cancel"):
+        ping = asyncio.run(runtime.call(user, "alpha.ping", {}, origin="conversation:a"))
+        assert ping.already_pending is False
+        client.post(f"/api/v1/tools/confirmations/{ping.confirmation_id}{decide}")
+        after = asyncio.run(runtime.call(user, "alpha.ping", {}, origin="conversation:a"))
+        assert after.already_pending is False
+        client.post(f"/api/v1/tools/confirmations/{after.confirmation_id}/cancel")
+
+
 def test_card_text_is_written_by_the_tool_from_validated_arguments(client: TestClient) -> None:
     pending = client.post("/api/v1/tools/alpha.add_note", json={"arguments": {"text": "maths"}})
     body = pending.json()
@@ -349,11 +403,11 @@ def test_decided_actions_forget_their_arguments(client: TestClient) -> None:
 def test_statuses_and_two_simultaneous_confirmations(client: TestClient) -> None:
     runtime: ToolRuntime = client.app.state.tools  # type: ignore[attr-defined]
     me = client.get("/api/v1/auth/me").json()["id"]
-    import uuid
 
     user = uuid.UUID(me)
     double = _pending(client, "alpha.flaky")
-    cancelled, expired, waiting = _pending(client), _pending(client), _pending(client)
+    # Trois actions differentes : une meme action n'a jamais deux confirmations en attente.
+    cancelled, expired, waiting = (_pending(client, note=n) for n in ("lire", "ecrire", "compter"))
     client.post(f"/api/v1/tools/confirmations/{cancelled}/cancel")
     asyncio.run(
         migrator_sql(
@@ -390,7 +444,6 @@ def test_statuses_and_two_simultaneous_confirmations(client: TestClient) -> None
 def test_application_can_only_erase_frozen_arguments(client: TestClient) -> None:
     """Garantie de la 0006 conservee par la 0012 : en lorakus_app, changer les arguments d'une
     action en attente est refuse ; seul leur effacement passe."""
-    import uuid
 
     from lorakus.db.database import Database
     from lorakus.settings import get_settings

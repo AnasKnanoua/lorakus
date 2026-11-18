@@ -165,6 +165,85 @@ def test_the_card_text_cannot_be_written_by_the_model(owner: TestClient, convers
     )
 
 
+# ------------------------------------------- jamais deux fois la meme carte
+def test_a_confirmed_task_is_never_proposed_again_in_the_conversation(
+    owner: TestClient, conversation: str
+) -> None:
+    """Le bug du 2026-11-18 : carte confirmee, puis reproposee a chaque message suivant.
+
+    Le faux modele OBEIT a l'historique et rappelle l'outil a chaque message : le code seul
+    doit empecher la seconde carte, quoi que fasse le modele.
+    """
+    fix_clock(owner)
+    devoir = {"title": "Devoir de CSEC507", "due_on": "2026-11-23"}
+    use_model(owner, FakeReply("", tool_calls=((ADD, devoir),)), "Confirme ci-dessous.")
+    card = of(send(owner, conversation, "J'ai le devoir de CSEC507 pour le 23 nov"), "card")[0]
+    assert confirm(owner, card) == 200
+
+    for question in ("Merci ! Et demain, j'ai quoi ?", "Tu peux me redire l'heure ?"):
+        # Meme titre a la casse pres : c'est la meme tache.
+        again = {"title": "devoir de csec507", "due_on": "2026-11-23"}
+        provider = use_model(owner, FakeReply("", tool_calls=((ADD, again),)), "Déjà notée.")
+        events = send(owner, conversation, question)
+        assert of(events, "card") == []
+        result = requests(provider)[1].messages[-1].tool_results[0]
+        assert result.is_error and "déjà dans ta liste" in result.content
+        # L'historique dit au modele que l'action est faite, pas seulement « confirmee ».
+        assert any(
+            "faite, après confirmation de l'utilisateur" in m.content
+            for m in requests(provider)[0].messages
+        )
+    assert [t["title"] for t in tasks(owner)] == ["Devoir de CSEC507"]
+
+
+def test_a_waiting_task_card_is_shown_only_once(owner: TestClient, conversation: str) -> None:
+    """Carte sans reponse : le modele la redemande, le code ne la remontre pas."""
+    fix_clock(owner)
+    devoir = {"title": "Devoir de CSEC507", "due_on": "2026-11-23"}
+    use_model(owner, FakeReply("", tool_calls=((ADD, devoir),)), "Confirme ci-dessous.")
+    [card] = of(send(owner, conversation, "J'ai le devoir de CSEC507 pour le 23 nov"), "card")
+
+    # Message suivant, sans avoir repondu a la carte ; puis deux demandes dans un meme message.
+    for calls in (((ADD, devoir),), ((ADD, devoir), (ADD, devoir))):
+        provider = use_model(owner, FakeReply("", tool_calls=calls), "Elle t'attend plus haut.")
+        events = send(owner, conversation, "Au fait, je suis fatigué")
+        assert of(events, "card") == []
+        for result in requests(provider)[1].messages[-1].tool_results:
+            assert not result.is_error and "attend déjà" in result.content
+    rows = asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_tool_confirmations"))
+    assert rows[0][0] == 1
+    # La premiere carte reste valable.
+    assert confirm(owner, card) == 200
+    assert len(tasks(owner)) == 1
+
+
+def test_an_identical_task_is_proposed_again_once_the_first_is_done(
+    owner: TestClient, conversation: str
+) -> None:
+    """Seule une tache OUVERTE identique bloque : autre echeance, ou tache terminee, passent."""
+    fix_clock(owner)
+    seed(lambda s, u: add_task(s, u, NewTask(title="Lessive", due_on=date(2026, 11, 23))))
+    other_day = {"title": "Lessive", "due_on": "2026-11-30"}
+    use_model(owner, FakeReply("", tool_calls=((ADD, other_day),)), "OK.")
+    assert len(of(send(owner, conversation, "Lessive le 30 aussi"), "card")) == 1
+
+    [first] = [t for t in asyncio.run(_open_ids()) if t[1] == date(2026, 11, 23)]
+    asyncio.run(
+        migrator_sql(
+            "UPDATE lorakus.core_tasks SET status = 'done', completed_at = now() WHERE id = :id",
+            {"id": first[0]},
+        )
+    )
+    same = {"title": "Lessive", "due_on": "2026-11-23"}
+    use_model(owner, FakeReply("", tool_calls=((ADD, same),)), "OK.")
+    assert len(of(send(owner, conversation, "Encore une lessive le 23"), "card")) == 1
+
+
+async def _open_ids() -> list[tuple[uuid.UUID, date | None]]:
+    rows = await migrator_sql("SELECT id, due_on FROM lorakus.core_tasks WHERE status = 'open'")
+    return [(cast(uuid.UUID, row[0]), cast(date | None, row[1])) for row in rows]
+
+
 # ------------------------------------------------------------------ lister
 def test_list_gives_dates_delays_and_ids_as_data(owner: TestClient, conversation: str) -> None:
     fix_clock(owner)  # mercredi 18 a Paris (fuseau par defaut)

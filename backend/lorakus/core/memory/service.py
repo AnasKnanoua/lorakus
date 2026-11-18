@@ -24,7 +24,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Literal, get_args
+from typing import Final, Literal, cast, get_args
 
 import structlog
 from pydantic import BaseModel, Field
@@ -313,6 +313,16 @@ class MemoryService:
         """Un fait de l'utilisateur (FactNotFoundError s'il n'existe pas ou n'est pas a lui)."""
         async with self._db.transaction(user_id) as session:
             return _view(await self._get(session, fact_id))
+
+    async def known_status(self, user_id: uuid.UUID, content: str) -> Status | None:
+        """Statut du fait de meme texte (meme empreinte que add_fact), ou None s'il n'existe
+        pas : verifie AVANT de proposer une carte, pour n'en montrer aucune qui echouerait."""
+        digest = content_hash(clean_content(content))
+        async with self._db.transaction(user_id) as session:
+            status = await session.scalar(
+                select(MemoryFact.status).where(MemoryFact.content_hash == digest).limit(1)
+            )
+        return cast(Status | None, status)
 
     async def add_fact(
         self,

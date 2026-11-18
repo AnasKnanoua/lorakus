@@ -35,3 +35,13 @@ Le Majordome doit pouvoir agir (retenir, corriger, plus tard créer une tâche),
 ## Amendement du 2026-11-18 (PR 44) : outils des tâches
 
 Ajoutés à `CHAT_TOOLS` après revue : `list_tasks` (read), `add_task` et `complete_task` (write), `delete_task` (sensitive). La carte d'ajout est écrite par le code avec l'échéance en date absolue, calculée dans le fuseau du compte (« vendredi 20 novembre 2026 (demain) ») : si le modèle a mal compris « vendredi », l'utilisateur le voit avant de confirmer. Une échéance passée ou à plus de 5 ans est refusée dès la proposition (aucune carte). Une tâche créée par un module ne se supprime pas depuis le chat. Le titre est nettoyé (une ligne, sans caractère invisible) : il ne peut pas imiter une ligne de la carte. Attaques rejouées dans le titre d'une tâche (corpus) et 4 cas au banc (`tests/evals/reply_behaviour.json`).
+
+## Amendement du 2026-11-18 (correctif) : jamais deux fois la même carte
+
+Constaté en production le jour même : une carte confirmée était reproposée à chaque message suivant de la conversation, et une carte sans réponse aussi. Seule une consigne au modèle l'empêchait ; la note « confirmée par l'utilisateur » pouvait même se lire comme un accord à exécuter. Règles ajoutées, dans le code :
+
+1. **Une action, une confirmation en attente** (`ToolRuntime`) : même outil, mêmes arguments validés (égalité JSONB) et même provenance qu'une confirmation encore valable (ni utilisée, ni annulée, ni expirée) : la demande rend la confirmation existante (`already_pending`), sans nouvelle ligne ni nouvelle carte ; le modèle reçoit un texte fixe. Une carte refusée ou expirée ne bloque plus : l'utilisateur peut redemander.
+2. **Refus avant toute carte quand l'action est déjà faite** : `remember` vérifie l'empreinte du souvenir (déjà retenu, ou proposé dans la page Mémoire) avant d'écrire la carte, et non plus seulement au clic ; `add_task` refuse une tâche personnelle ouverte de même titre (casse ignorée) et de même échéance, au moment de la carte et dans le service `planning` (jamais deux tâches ouvertes identiques).
+3. **Issue écrite pour être comprise** : la note rappelle une carte « faite, après confirmation de l'utilisateur » (et non plus « confirmée »), « toujours affichée », « refusée » ou « expirée sans réponse » ; le prompt (`assistant-system-2026-11-18.3`) ajoute qu'une action déjà proposée ne se propose jamais une seconde fois.
+
+Tests : `test_the_same_action_never_waits_twice` (dont un outil sans argument, dont les arguments effacés après décision ressemblent à une nouvelle demande), cartes de mémoire et de tâches avec un faux modèle qui redemande l'outil à chaque message, 19 mutations détectées ; 2 cas au banc (`confirmed_card_not_again`, `waiting_card_not_again`).

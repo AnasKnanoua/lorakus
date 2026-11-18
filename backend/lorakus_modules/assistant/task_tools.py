@@ -19,6 +19,7 @@ from lorakus.core.account.service import user_timezone
 from lorakus.core.planning.service import (
     MAX_ESTIMATE_MINUTES,
     MAX_TITLE_CHARS,
+    DuplicateTaskError,
     InvalidTaskError,
     NewTask,
     TaskLimitError,
@@ -29,6 +30,7 @@ from lorakus.core.planning.service import (
     clean_line,
     complete_task,
     delete_task,
+    find_open_duplicate,
     get_task,
     list_tasks,
 )
@@ -57,6 +59,8 @@ def _error(error: Exception) -> ToolError:
         return ToolError(f"Impossible : {error}.")
     if isinstance(error, InvalidTaskError):
         return ToolError(f"Tâche refusée : {error}.")
+    if isinstance(error, DuplicateTaskError):
+        return ToolError("Cette tâche est déjà dans ta liste, avec la même échéance.")
     raise error
 
 
@@ -153,6 +157,9 @@ async def _add_summary(call: ToolCall, args: AddIn) -> str:
     except InvalidTaskError as error:
         raise _error(error) from None
     due_on, today = await _checked_due(call, args.due_on)
+    # Avant toute carte : une tache deja ouverte (meme titre, meme echeance) n'en montre pas.
+    if await find_open_duplicate(call.session, title, due_on) is not None:
+        raise _error(DuplicateTaskError(title))
     lines = [f"Ajouter une tâche : « {title} »"]
     if due_on is not None:
         lines.append(f"Échéance : {french_date(due_on)} ({relative_day(due_on, today)})")
@@ -178,7 +185,13 @@ async def _add(call: ToolCall, args: AddIn) -> dict[str, Any]:
             source_kind="conversation" if call.origin else "user",
             source_ref=call.origin,
         )
-    except (InvalidTaskError, TaskLimitError, TaskNotFoundError, TaskStateError) as error:
+    except (
+        DuplicateTaskError,
+        InvalidTaskError,
+        TaskLimitError,
+        TaskNotFoundError,
+        TaskStateError,
+    ) as error:
         raise _error(error) from None
     return {"message": "Tâche ajoutée.", "id": str(task.id)}
 

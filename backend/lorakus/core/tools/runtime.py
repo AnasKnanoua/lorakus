@@ -12,6 +12,11 @@ Confirmer reserve la ligne, execute l'outil et l'audite dans UNE transaction : s
 echoue, rien n'est consomme (la carte reste en attente) ; deux clics simultanes n'executent
 qu'une fois (le second attend le verrou, puis ne trouve plus de ligne libre).
 Apres decision, les arguments sont effaces : la ligne ne garde que l'outil et l'issue.
+
+Une meme action (meme outil, memes arguments valides, meme provenance) n'a jamais deux
+confirmations en attente : la seconde demande renvoie la premiere (`already_pending`), sans
+nouvelle carte. Le modele peut redemander ce qu'il a deja propose ; le code ne le montre
+qu'une fois.
 """
 
 import json
@@ -57,6 +62,9 @@ class ToolResult:
     risk: str = "read"
     summary: str | None = None
     expires_at: datetime | None = None
+    # La meme action attend deja une confirmation (meme provenance) : c'est celle-ci qui est
+    # rendue, aucune nouvelle carte n'est creee.
+    already_pending: bool = False
 
 
 def _clean_summary(text: str) -> str:
@@ -102,8 +110,9 @@ class ToolRuntime:
         """Execute un outil read ; met un outil write ou sensitive en attente de confirmation."""
         with _TRACER.start_as_current_span("tool.call", attributes={"lorakus.tool": name}) as span:
             result = await self._call(user_id, name, arguments, ip, origin)
+            outcome = "pending" if result.confirmation_id else "done"
             span.set_attribute(
-                "lorakus.tool.outcome", "pending" if result.confirmation_id else "done"
+                "lorakus.tool.outcome", "already_pending" if result.already_pending else outcome
             )
             return result
 
@@ -123,15 +132,40 @@ class ToolRuntime:
             raise ToolError(f"outil {tool.name} : carte non decrite")
         confirmation_id = uuid.uuid4()
         expires_at = datetime.now(UTC) + CONFIRMATION_TTL
+        arguments = validated.model_dump(mode="json")
         async with self._db.transaction(user_id) as session:
             context = ToolCall(user_id, session, self._ports, origin)
             summary = _clean_summary(await tool.summary(context, validated))
+            waiting = (
+                await session.execute(
+                    select(ToolConfirmation.id, ToolConfirmation.expires_at)
+                    .where(
+                        ToolConfirmation.tool == tool.name,
+                        ToolConfirmation.origin.is_not_distinct_from(origin),
+                        ToolConfirmation.arguments == arguments,
+                        ToolConfirmation.used_at.is_(None),
+                        ToolConfirmation.cancelled_at.is_(None),
+                        ToolConfirmation.expires_at > func.now(),
+                    )
+                    .order_by(ToolConfirmation.created_at)
+                    .limit(1)
+                )
+            ).first()
+            if waiting is not None:
+                return ToolResult(
+                    tool.name,
+                    confirmation_id=waiting.id,
+                    risk=tool.risk,
+                    summary=summary,
+                    expires_at=waiting.expires_at,
+                    already_pending=True,
+                )
             await session.execute(
                 insert(ToolConfirmation).values(
                     id=confirmation_id,
                     user_id=user_id,
                     tool=tool.name,
-                    arguments=validated.model_dump(mode="json"),
+                    arguments=arguments,
                     origin=origin,
                     expires_at=expires_at,
                 )
