@@ -4,6 +4,8 @@
  */
 import { vi } from "vitest";
 
+import type { Schemas } from "@/api/client";
+
 export interface FakeMessage {
   id: string;
   role: "user" | "assistant";
@@ -83,6 +85,26 @@ export interface FakeState {
   courses: FakeCourse[];
   assessments: FakeAssessment[];
   academicToday: string;
+  /** Ma journee (PR 47) : ce que rend GET /planning/today, tel quel ; null : refus definitif (403, sans nouvel essai). */
+  today: FakeToday | null;
+}
+
+export type FakeToday = Schemas["TodayOut"];
+
+export function emptyToday(overrides: Partial<FakeToday> = {}): FakeToday {
+  return {
+    day: "2026-11-18",
+    timezone: "Europe/Istanbul",
+    generated_at: "2026-11-18T04:30:00Z",
+    work_ends_at: "2026-11-18T19:00:00Z",
+    agenda: [],
+    plan: [],
+    planned_minutes: 0,
+    unplanned: [],
+    overdue: [],
+    upcoming: [],
+    ...overrides,
+  };
 }
 
 export interface FakeCourse {
@@ -175,6 +197,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     courses: [],
     assessments: [],
     academicToday: "2026-11-18",
+    today: emptyToday(),
     ...overrides,
   };
   let counter = 0;
@@ -460,6 +483,9 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     if (path === "/api/v1/modules/academic" && request.method === "PUT") {
       state.academicEnabled = true;
       return json(200, { id: "academic", enabled: true, config: {} });
+    }
+    if (path === "/api/v1/planning/today" && request.method === "GET") {
+      return state.today ? json(200, state.today) : json(403, { detail: "Refusé." });
     }
     if (path.startsWith("/api/v1/academic/")) {
       return academic(request.method, path, url.searchParams, body);

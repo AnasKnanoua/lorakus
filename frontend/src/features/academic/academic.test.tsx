@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { installFakeApi, type FakeAssessment, type FakeCourse } from "@/test/fakeApi";
 import { renderApp } from "@/test/renderApp";
 
-import { duration, hoursToMinutes, longDate, minutesToHours, relativeDay, weight } from "./format";
+import { duration, hoursToMinutes, longDate, minutesToHours, relativeDay, weight } from "@/lib/format";
 
 const ML: FakeCourse = { id: "c1", name: "Machine Learning" };
 const ALGO: FakeCourse = { id: "c2", name: "Algo" };

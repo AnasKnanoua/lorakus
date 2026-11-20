@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 
 import { AcademicScreen } from "@/features/academic/AcademicScreen";
+import { TodayScreen } from "@/features/today/TodayScreen";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
 import { ConversationScreen } from "@/features/chat/ConversationScreen";
@@ -95,9 +96,16 @@ const academicRoute = createRoute({
   component: AcademicScreen,
 });
 
+// Ma journee (PR 47) : agenda du jour, plan propose, retards, echeances.
+const todayRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/today",
+  component: TodayScreen,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute, todayRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

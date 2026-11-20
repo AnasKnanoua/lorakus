@@ -46,3 +46,21 @@ Arrivé avec son premier consommateur, le module `academic`.
 Déplacé à cette occasion : l'écriture des dates en français (`french_date`, `relative_day`, `duration`) passe du module `assistant` au Core (`lorakus/core/account/dates.py`), pour que la carte d'un autre module donne la date exactement comme celles des tâches sans importer un module (interdit).
 
 Tests : `tests/integration/test_academic.py` (événement de bout en bout avec le relais du worker, tâche personnelle sans événement, événements faux, rejoués, d'un autre module ou d'un autre utilisateur).
+
+## Amendement du 2026-11-20 (PR 47) : le planificateur de journée
+
+Le planificateur (`lorakus/core/planning/planner.py`) est un ensemble de fonctions pures : elles reçoivent l'instant présent, le fuseau du compte, les créneaux du jour et les tâches ouvertes, et rendent un plan. Aucune base, aucun réseau, aucun LLM. Le plan est recalculé à chaque lecture (`today.py`, route `GET /api/v1/planning/today`) et n'est écrit nulle part : la route ouvre sa transaction en lecture seule, si bien que PostgreSQL lui-même refuserait une écriture.
+
+Règles, dans l'ordre :
+
+1. **Fenêtre de travail** : de 8 h à 22 h, heure du compte, à partir de maintenant (arrondi au quart d'heure suivant). Après 22 h, plus de plan pour ce jour.
+2. **Créneaux libres** : la fenêtre moins les créneaux horaires de l'agenda, fusionnés s'ils se chevauchent ou se touchent. Une journée entière n'occupe pas d'heures. Un trou de moins de 15 minutes n'est pas un créneau.
+3. **Tâches retenues** : les tâches ouvertes sans sous-tâche ouverte. Une sous-tâche sans échéance prend celle de sa tâche.
+4. **Ordre** : échéance la plus proche d'abord (les retards sont donc en tête), tâches sans échéance à la fin ; puis priorité haute d'abord ; puis la plus courte ; puis la plus ancienne ; enfin l'identifiant, pour qu'un même état donne toujours le même plan.
+5. **Durée** : la durée estimée, sinon 30 minutes, signalées « durée supposée ».
+6. **Placement** : chaque tâche, dans l'ordre, prend le premier temps libre. Un bloc dure 2 h au plus et 30 minutes au moins, sauf s'il termine la tâche ; 15 minutes de pause suivent chaque bloc ; une tâche trop longue pour un créneau continue dans le suivant.
+7. **Plafond** : 6 h de travail proposées par jour. Ce qui ne tient pas est rendu avec le temps restant (« Pas de place aujourd'hui »), jamais caché.
+
+Ces nombres sont des constantes : la PR 50 en fera des préférences confirmées (plage de travail, heure limite, jours sans travail). Limites connues, voulues pour l'instant : le plan ne regarde que le jour même (pas de répartition sur la semaine) ; il ne tient pas compte des trajets ni de l'énergie ; une tâche lointaine est proposée dès qu'il reste de la place.
+
+Tests : `tests/unit/test_planner.py` (chaque règle, puis 60 journées tirées au hasard à graine fixe : jamais deux blocs en même temps, jamais pendant un créneau de l'agenda, toujours la pause, jamais plus de 6 h, aucune minute perdue ni inventée), `tests/integration/test_today.py` (fuseau du compte, RLS, lecture seule, scénario 2).

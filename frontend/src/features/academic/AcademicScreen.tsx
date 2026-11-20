@@ -25,7 +25,7 @@ import { TopBar } from "@/features/chat/layout";
 import { cn } from "@/lib/cn";
 import { assessmentsQuery, coursesQuery } from "@/lib/queries";
 
-import { duration, hoursToMinutes, longDate, minutesToHours, relativeDay, weight } from "./format";
+import { duration, hoursToMinutes, longDate, minutesToHours, relativeDay, weight } from "@/lib/format";
 
 const KIND_LABEL: Record<AssessmentKind, string> = { assignment: "Devoir", exam: "Examen" };
 const SELECT =
