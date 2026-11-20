@@ -109,7 +109,7 @@ Les ports de `context`, `signals` et `device_ingest` existent dès la phase 2 so
 | --- | --- | --- |
 | `assistant` | Conversations, outils du chat (liste explicite, cartes de confirmation, ADR 0040), routage vers les spécialistes et trace « Pourquoi ? » (PR 39), briefing | 3 |
 | `calendars` | Abonnements ICS en lecture vers l'`Agenda` | 4 |
-| `academic` | Cours, examens, devoirs (crée des tâches), coefficients, retards | 4 |
+| `academic` | Cours, examens et devoirs avec coefficient ; chaque évaluation crée sa tâche par le port `ModuleTasks` et se termine quand l'utilisateur termine la tâche (événement `planning.task_completed`) ; retards ; outil du chat `academic.add_assessment` (PR 46) | 4 |
 | `projects` | Idées, projets, tâches de projet, projets inactifs, capture Telegram | 4 |
 | `focus` (ex-`digital_activity`) | Spécialiste Sergent : échéances et découpage de tâches (v0), puis sessions d'apps et de pages web, lignes de base, signaux d'attention | 4 (v0), 8 (collecte), 12 (interventions) |
 | `sentinel` | Spécialiste Veilleur : inventaire des hôtes déclarés, vulnérabilités, exposition | 7 |

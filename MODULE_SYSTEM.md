@@ -76,14 +76,14 @@ Exclu volontairement : chargement à chaud, modules tiers signés, marketplace.
 
 | Besoin | Mécanisme | Exemple |
 | --- | --- | --- |
-| Informer d'un fait passé | Événement (outbox, asynchrone, au moins une fois) | `knowledge.item_ready` |
+| Informer d'un fait passé | Événement (outbox, asynchrone, au moins une fois) ; le Core en publie aussi : `planning.task_completed` quand l'utilisateur termine la tâche d'un module (PR 46, ADR 0018) | `academic` termine le devoir dont la tâche vient d'être terminée |
 | Proposer d'interrompre l'utilisateur | Signal → `InterventionPolicy` | `digital.long_session` |
 | Lire un état synchrone d'un autre domaine | Port fourni au Core (`provides`), consommé par le Core uniquement | `FitnessStateProvider` lu par `context` |
 | Créer une tâche ou un créneau | Port du Core : `ModuleTasks("academic").upsert(session, user_id, ref, titre, …)` et `ModuleAgenda("calendars").replace_source(session, user_id, source, créneaux)` (PR 44) ; chaque requête est filtrée sur le module, qui ne voit ni les tâches personnelles ni celles d'un autre module | `academic` crée la tâche d'un devoir |
 | Exposer une action à l'assistant | Outil `@tool` | `create_project` |
 | Aller chercher une ressource à une adresse donnée par l'utilisateur | `OutboundHttp` du Core (SSRF : adresses publiques seulement, redirections revérifiées, tailles bornées), dans un job du worker ; secret de l'adresse chiffré par `FieldCipher.for_connectors` | `calendars` lit un ICS (PR 45) |
 
-Événements : nom `module.sujet_au_passe`, charge utile Pydantic avec `schema_version`, jamais de suppression de champ sans nouvelle version.
+Événements : nom `module.sujet_au_passe`, charge utile Pydantic avec `schema_version`, jamais de suppression de champ sans nouvelle version. Un handler (`@on`, nom stable donné par `name=`) filtre ce qui le concerne, relit l'état avant d'agir (l'événement est un signal, pas une preuve) et reste sans effet s'il est rejoué ; il est importé par le manifeste pour être abonné dans le worker.
 
 Signaux : `Signal(name, kind, strength ∈ [0,1], subject_ref, context_hints, dedup_key, expires_at)`. `kind` ∈ `scheduled` (rappel planifié), `contextual` (situation détectée), `proactive` (suggestion). La `dedup_key` empêche deux interventions pour la même cause.
 

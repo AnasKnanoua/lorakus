@@ -50,6 +50,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/academic/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Assessments */
+        get: operations["get_assessments_api_v1_academic_assessments_get"];
+        put?: never;
+        /** Create Assessment */
+        post: operations["create_assessment_api_v1_academic_assessments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic/assessments/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Assessment */
+        put: operations["change_assessment_api_v1_academic_assessments__assessment_id__put"];
+        post?: never;
+        /** Remove Assessment */
+        delete: operations["remove_assessment_api_v1_academic_assessments__assessment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic/assessments/{assessment_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish Assessment */
+        post: operations["finish_assessment_api_v1_academic_assessments__assessment_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Courses */
+        get: operations["get_courses_api_v1_academic_courses_get"];
+        put?: never;
+        /** Create Course */
+        post: operations["create_course_api_v1_academic_courses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/academic/courses/{course_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Course */
+        delete: operations["remove_course_api_v1_academic_courses__course_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/account/settings": {
         parameters: {
             query?: never;
@@ -953,6 +1041,96 @@ export interface components {
             /** Specialist */
             specialist: string;
         };
+        /** AssessmentBody */
+        AssessmentBody: {
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            /**
+             * Kind
+             * @default assignment
+             * @enum {string}
+             */
+            kind: "assignment" | "exam";
+            /** Title */
+            title: string;
+            /** Weight */
+            weight?: number | null;
+        };
+        /** AssessmentIn */
+        AssessmentIn: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            /**
+             * Kind
+             * @default assignment
+             * @enum {string}
+             */
+            kind: "assignment" | "exam";
+            /** Title */
+            title: string;
+            /** Weight */
+            weight?: number | null;
+        };
+        /**
+         * AssessmentOut
+         * @description Une evaluation, avec ce que le serveur sait du temps : retard et jours restants.
+         */
+        AssessmentOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Course Name */
+            course_name: string;
+            /** Days Left */
+            days_left: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Estimate Minutes */
+            estimate_minutes: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "assignment" | "exam";
+            /** Overdue */
+            overdue: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "done";
+            /** Title */
+            title: string;
+            /** Weight */
+            weight: number | null;
+        };
         /** AuditEventResponse */
         AuditEventResponse: {
             /** Action */
@@ -1022,6 +1200,23 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** CourseIn */
+        CourseIn: {
+            /** Name */
+            name: string;
+        };
+        /** CourseOut */
+        CourseOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Open Assessments */
+            open_assessments: number;
         };
         /** DeletedOut */
         DeletedOut: {
@@ -1569,6 +1764,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    get_assessments_api_v1_academic_assessments_get: {
+        parameters: {
+            query?: {
+                state?: "open" | "done";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_assessment_api_v1_academic_assessments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_assessment_api_v1_academic_assessments__assessment_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_assessment_api_v1_academic_assessments__assessment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finish_assessment_api_v1_academic_assessments__assessment_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_courses_api_v1_academic_courses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"][];
+                };
+            };
+        };
+    };
+    create_course_api_v1_academic_courses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CourseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_course_api_v1_academic_courses__course_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -15,7 +15,7 @@ from lorakus.core.account.clock import (
     local_today,
     parse_timezone,
 )
-from lorakus_modules.assistant.dates import duration, french_date, relative_day
+from lorakus.core.account.dates import duration, french_date, relative_day
 
 PARIS = ZoneInfo("Europe/Paris")
 ISTANBUL = ZoneInfo("Europe/Istanbul")

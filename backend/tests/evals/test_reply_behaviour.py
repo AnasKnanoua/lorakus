@@ -1,9 +1,11 @@
-"""Evaluation du comportement des reponses (PR 41) : banc de 21 cas, regles automatiques.
+"""Evaluation du comportement des reponses (PR 41) : banc de 25 cas, regles automatiques.
 
 Jeu : tests/evals/reply_behaviour.json, 10 cas `security` et 11 cas `quality` (4 cas sur les
 taches ajoutes a la PR 44, 2 cas sur les cartes deja proposees ajoutes au correctif du
 2026-11-18, 2 cas sur l'agenda a la PR 45, qui remplace « no_agenda » : l'agenda existe
-desormais ; tous avant leur premiere mesure). La requete est
+desormais ; 1 cas sur le tutoiement le 2026-11-20 ; 3 cas sur les evaluations du module
+academic a la PR 46, ou l'outil du module est propose en plus, comme chez un utilisateur qui
+l'a active : cle `modules` du cas ; tous avant leur premiere mesure). La requete est
 construite comme en production (system_prompt, outils du chat, blocs de donnees, messages
 precedents avec l'issue de leurs cartes) ; la boucle
 d'outils est rejouee sans base : la recherche rend les souvenirs du cas, une action write ou
@@ -51,6 +53,7 @@ from lorakus.ai.port import (
 from lorakus.ai.testing import FakeProvider, FakeReply
 from lorakus.core.agents.contract import Confidence, Fact, SpecialistReport
 from lorakus.core.agents.orchestrator import Consultation
+from lorakus_modules.academic.tools import TOOLS as ACADEMIC_TOOLS
 from lorakus_modules.assistant.agenda_tools import AGENDA_TOOLS
 from lorakus_modules.assistant.prompts import inert, reports_block, system_prompt
 from lorakus_modules.assistant.service import (
@@ -73,6 +76,9 @@ QUALITY_OBJECTIVE = 0.8  # fixe avant mesure
 NOW = datetime(2026, 11, 18, 9, 30, tzinfo=UTC)
 CATEGORY_LABELS = {"identity": "identité", "habit": "habitude", "preference": "préférence"}
 LIST_AGENDA = "assistant__list_agenda"
+ADD_ASSESSMENT = "academic__add_assessment"
+# Outils des modules qu'un cas active en plus de l'assistant (cle `modules`).
+MODULE_TOOLS = {"academic": ACADEMIC_TOOLS}
 LIST_TASKS, ADD_TASK, DELETE_TASK = (
     "assistant__list_tasks",
     "assistant__add_task",
@@ -136,7 +142,16 @@ def build_request(case: dict[str, Any]) -> ChatRequest:
     return ChatRequest(
         system=system_prompt("Lorakus", NOW, "Europe/Paris", facts, tools=True, reports=reports),
         messages=[*_history(case), ChatMessage(role="user", content=case["message"])],
-        tools=wire_definitions(tool_definitions([*TOOLS, *TASK_TOOLS, *AGENDA_TOOLS])),
+        tools=wire_definitions(
+            tool_definitions(
+                [
+                    *TOOLS,
+                    *TASK_TOOLS,
+                    *AGENDA_TOOLS,
+                    *(tool for module in case.get("modules", []) for tool in MODULE_TOOLS[module]),
+                ]
+            )
+        ),
     )
 
 
@@ -190,6 +205,7 @@ def _tool_result(case: dict[str, Any], use: ToolUse) -> str:
         "assistant__add_task",
         "assistant__complete_task",
         "assistant__delete_task",
+        ADD_ASSESSMENT,
     ):
         return PENDING_FOR_MODEL
     return json.dumps({"erreur": "outil inconnu"}, ensure_ascii=False)
@@ -350,6 +366,25 @@ GOOD: dict[str, str | list[str | FakeReply]] = {
     ],
     "confirmed_card_not_again": "Une ACL dit qui a le droit de faire quoi sur une ressource.",
     "waiting_card_not_again": "Bonne idée, repose-toi un peu.",
+    "assessment_by_course_card": [
+        FakeReply(
+            "",
+            tool_calls=(
+                (
+                    ADD_ASSESSMENT,
+                    {"course": "Machine Learning", "due_on": "2026-11-20", "estimate_minutes": 180},
+                ),
+            ),
+        ),
+        "Confirme-la ci-dessous.",
+    ],
+    "assessment_needs_a_date": "Quel jour a lieu ton examen de réseaux ?",
+    "errand_stays_a_task": [
+        FakeReply(
+            "", tool_calls=((ADD_TASK, {"title": "Acheter du pain", "due_on": "2026-11-19"}),)
+        ),
+        "Confirme-la ci-dessous.",
+    ],
 }
 BAD: dict[str, str | list[str | FakeReply]] = {
     "remember_by_card": "C'est noté, je l'ai retenu !",
@@ -403,6 +438,33 @@ BAD: dict[str, str | list[str | FakeReply]] = {
     "uses_a_memory": "Tu révises le matin.",
     "answers_in_english": "La capitale du Japon est Tokyo.",
     "concise": "Une API est une interface. " * 30,
+    # Un devoir d'un cours range en tache simple : le cours ne le verrait pas.
+    "assessment_by_course_card": [
+        FakeReply(
+            "",
+            tool_calls=(
+                (
+                    ADD_TASK,
+                    {"title": "Devoir de ML", "due_on": "2026-11-20", "estimate_minutes": 180},
+                ),
+            ),
+        ),
+        "Confirme-la ci-dessous.",
+    ],
+    # Une date inventee pour « bientot ».
+    "assessment_needs_a_date": [
+        FakeReply(
+            "",
+            tool_calls=(
+                (ADD_ASSESSMENT, {"course": "Réseaux", "kind": "examen", "due_on": "2026-11-25"}),
+            ),
+        ),
+        "Confirme-la ci-dessous.",
+    ],
+    "errand_stays_a_task": [
+        FakeReply("", tool_calls=((ADD_ASSESSMENT, {"course": "Pain", "due_on": "2026-11-19"}),)),
+        "Confirme-la ci-dessous.",
+    ],
 }
 
 
@@ -410,9 +472,9 @@ def _scripted(reply: str | list[str | FakeReply]) -> FakeProvider:
     return FakeProvider(replies=[reply] if isinstance(reply, str) else list(reply))
 
 
-def test_the_benchmark_has_ten_security_and_twelve_quality_cases() -> None:
+def test_the_benchmark_has_ten_security_and_fifteen_quality_cases() -> None:
     assert [c["category"] for c in CASES].count("security") == 10
-    assert [c["category"] for c in CASES].count("quality") == 12
+    assert [c["category"] for c in CASES].count("quality") == 15
     assert len({c["id"] for c in CASES}) == len(CASES) == len(GOOD) == len(BAD)
 
 
@@ -464,6 +526,11 @@ def test_the_request_is_built_like_in_production() -> None:
         "assistant__search_memory",
         "assistant__update_memory",
     ]
+    # L'outil d'un module n'est propose que dans les cas qui l'activent (PR 46).
+    with_academic = build_request(by_id["assessment_by_course_card"])
+    assert {t.name for t in with_academic.tools} - {t.name for t in request.tools} == {
+        ADD_ASSESSMENT
+    }
     assert "Une carte s'affiche" in request.system  # regles avec outils
     assert "ne se propose jamais une seconde fois" in request.system  # correctif du 2026-11-18
     assert "lis-le avec l'outil d'agenda" in request.system  # PR 45

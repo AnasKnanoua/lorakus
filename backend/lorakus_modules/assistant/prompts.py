@@ -9,8 +9,8 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Final
 
+from lorakus.core.account.dates import french_date
 from lorakus.core.agents.orchestrator import Consultation
-from lorakus_modules.assistant.dates import french_date
 
 PROMPT_VERSION: Final = "assistant-system-2026-11-20.1"
 

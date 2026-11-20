@@ -15,6 +15,7 @@ from typing import Any, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from lorakus.core.account.clock import local_today
+from lorakus.core.account.dates import duration, french_date, relative_day
 from lorakus.core.account.service import user_timezone
 from lorakus.core.planning.service import (
     MAX_ESTIMATE_MINUTES,
@@ -35,7 +36,6 @@ from lorakus.core.planning.service import (
     list_tasks,
 )
 from lorakus.core.tools.spec import ToolCall, ToolError, ToolSpec
-from lorakus_modules.assistant.dates import duration, french_date, relative_day
 
 LIST_LIMIT: Final = 30
 # Une echeance plus lointaine est presque toujours une erreur de date du modele.

@@ -163,5 +163,6 @@ allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas ap
 
 # Modules decouverts par le Core.
 [project.entry-points."lorakus.modules"]
+academic = "lorakus_modules.academic.manifest:manifest"
 assistant = "lorakus_modules.assistant.manifest:manifest"
 calendars = "lorakus_modules.calendars.manifest:manifest"

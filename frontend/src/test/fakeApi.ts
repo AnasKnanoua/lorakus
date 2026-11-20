@@ -78,6 +78,28 @@ export interface FakeState {
   /** Module calendars (PR 45) et ses abonnements ; l'adresse n'est jamais renvoyee. */
   calendarsEnabled: boolean;
   subscriptions: FakeSubscription[];
+  /** Module academic (PR 46) : cours, evaluations, et le jour qu'il est « chez l'utilisateur ». */
+  academicEnabled: boolean;
+  courses: FakeCourse[];
+  assessments: FakeAssessment[];
+  academicToday: string;
+}
+
+export interface FakeCourse {
+  id: string;
+  name: string;
+}
+
+export interface FakeAssessment {
+  id: string;
+  course_id: string;
+  kind: "assignment" | "exam";
+  title: string;
+  due_on: string;
+  weight: number | null;
+  estimate_minutes: number | null;
+  status: "open" | "done";
+  completed_at: string | null;
 }
 
 export interface FakeSubscription {
@@ -149,6 +171,10 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     calendarsEnabled: true,
     subscriptions: [],
+    academicEnabled: true,
+    courses: [],
+    assessments: [],
+    academicToday: "2026-11-18",
     ...overrides,
   };
   let counter = 0;
@@ -431,6 +457,13 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
         return new Response(null, { status: 204 });
       }
     }
+    if (path === "/api/v1/modules/academic" && request.method === "PUT") {
+      state.academicEnabled = true;
+      return json(200, { id: "academic", enabled: true, config: {} });
+    }
+    if (path.startsWith("/api/v1/academic/")) {
+      return academic(request.method, path, url.searchParams, body);
+    }
     if (path === "/api/v1/auth/reauth") {
       const ok = (body as { password: string }).password === state.password;
       if (ok) {
@@ -440,6 +473,99 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     }
     return json(404, { detail: `route inconnue du faux backend : ${request.method} ${path}` });
   };
+
+  // Module academic : memes regles que le serveur pour ce que la page affiche (retard et jours
+  // restants calcules ici, doublons refuses, cours emportant ses evaluations).
+  const daysLeft = (due: string) =>
+    Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${state.academicToday}T00:00:00Z`)) / 86_400_000);
+  const assessmentOut = (a: FakeAssessment) => ({
+    ...a,
+    course_name: state.courses.find((c) => c.id === a.course_id)?.name ?? "",
+    overdue: a.status === "open" && daysLeft(a.due_on) < 0,
+    days_left: daysLeft(a.due_on),
+  });
+  const duplicate = (courseId: string, title: string, due: string, except?: string) =>
+    state.assessments.some(
+      (a) =>
+        a.id !== except &&
+        a.status === "open" &&
+        a.course_id === courseId &&
+        a.due_on === due &&
+        a.title.toLowerCase() === title.toLowerCase(),
+    );
+  const DUPLICATE = { detail: "Cette évaluation existe déjà, avec la même échéance." };
+
+  function academic(method: string, path: string, query: URLSearchParams, body: unknown): Response {
+    if (!state.academicEnabled) {
+      return json(404, { detail: "Module indisponible." });
+    }
+    if (path === "/api/v1/academic/courses" && method === "GET") {
+      const sorted = [...state.courses].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+      return json(
+        200,
+        sorted.map((c) => ({
+          ...c,
+          open_assessments: state.assessments.filter((a) => a.course_id === c.id && a.status === "open").length,
+        })),
+      );
+    }
+    if (path === "/api/v1/academic/courses" && method === "POST") {
+      const name = (body as { name: string }).name.trim();
+      if (state.courses.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+        return json(422, { detail: "Tu as déjà un cours de ce nom." });
+      }
+      const created: FakeCourse = { id: nextId(), name };
+      state.courses.push(created);
+      return json(201, { ...created, open_assessments: 0 });
+    }
+    const course = /^\/api\/v1\/academic\/courses\/([^/]+)$/.exec(path);
+    if (course && method === "DELETE") {
+      if (!state.courses.some((c) => c.id === course[1])) return json(404, { detail: "Cours introuvable." });
+      state.courses = state.courses.filter((c) => c.id !== course[1]);
+      state.assessments = state.assessments.filter((a) => a.course_id !== course[1]);
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/academic/assessments" && method === "GET") {
+      const wanted = query.get("state") ?? "open";
+      const rows = state.assessments.filter((a) => a.status === wanted);
+      rows.sort((a, b) =>
+        wanted === "open"
+          ? a.due_on.localeCompare(b.due_on)
+          : (b.completed_at ?? "").localeCompare(a.completed_at ?? ""),
+      );
+      return json(200, rows.map(assessmentOut));
+    }
+    if (path === "/api/v1/academic/assessments" && method === "POST") {
+      const b = body as Omit<FakeAssessment, "id" | "status" | "completed_at">;
+      if (!state.courses.some((c) => c.id === b.course_id)) return json(404, { detail: "Cours introuvable." });
+      if (duplicate(b.course_id, b.title, b.due_on)) return json(422, DUPLICATE);
+      const created: FakeAssessment = { ...b, id: nextId(), status: "open", completed_at: null };
+      state.assessments.push(created);
+      return json(201, assessmentOut(created));
+    }
+    const one = /^\/api\/v1\/academic\/assessments\/([^/]+)(\/complete)?$/.exec(path);
+    const found = one ? state.assessments.find((a) => a.id === one[1]) : undefined;
+    if (one && !found) return json(404, { detail: "Évaluation introuvable." });
+    if (one && found) {
+      if (one[2] && method === "POST") {
+        if (found.status === "done") return json(422, { detail: "Cette évaluation est déjà terminée." });
+        found.status = "done";
+        found.completed_at = `${state.academicToday}T12:00:00Z`;
+        return json(200, assessmentOut(found));
+      }
+      if (method === "PUT") {
+        const b = body as Pick<FakeAssessment, "kind" | "title" | "due_on" | "weight" | "estimate_minutes">;
+        if (duplicate(found.course_id, b.title, b.due_on, found.id)) return json(422, DUPLICATE);
+        Object.assign(found, b);
+        return json(200, assessmentOut(found));
+      }
+      if (method === "DELETE") {
+        state.assessments = state.assessments.filter((a) => a !== found);
+        return new Response(null, { status: 204 });
+      }
+    }
+    return json(404, { detail: `route inconnue du faux backend : ${method} ${path}` });
+  }
 
   vi.stubGlobal("fetch", vi.fn(handler));
   return state;
