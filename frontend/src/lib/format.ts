@@ -1,6 +1,7 @@
 /**
- * Dates et durees d'une evaluation, ecrites en francais. « Aujourd'hui » n'est jamais calcule
- * ici : le nombre de jours restants vient du serveur (fuseau du compte).
+ * Dates, heures et durees ecrites en francais (pages Cours et Ma journee). « Aujourd'hui »
+ * n'est jamais calcule ici : le jour, le nombre de jours restants et le fuseau viennent du
+ * serveur (reglage du compte), pas de l'horloge de l'appareil.
  */
 
 const DAY = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
@@ -50,4 +51,9 @@ export function hoursToMinutes(text: string): number | null {
 /** Minutes vers la valeur du champ « heures » (« 1,5 »). */
 export function minutesToHours(minutes: number | null): string {
   return minutes === null ? "" : weight(Math.round((minutes / 60) * 100) / 100);
+}
+
+/** « 09:00 » dans le fuseau donne (celui du compte), pas dans celui de l'appareil. */
+export function clockTime(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(new Date(iso));
 }

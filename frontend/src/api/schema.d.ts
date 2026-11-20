@@ -839,6 +839,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/planning/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today */
+        get: operations["today_api_v1_planning_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tools": {
         parameters: {
             query?: never;
@@ -956,6 +973,24 @@ export interface components {
             summary?: string | null;
             /** Tool */
             tool: string;
+        };
+        /**
+         * AgendaEntryOut
+         * @description Un creneau du jour : horaire (instants UTC) ou journee entiere (pas d'heures).
+         */
+        AgendaEntryOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Ends At */
+            ends_at: string | null;
+            /** Location */
+            location: string | null;
+            /** Module */
+            module: string | null;
+            /** Starts At */
+            starts_at: string | null;
+            /** Title */
+            title: string;
         };
         /** ApiKeyCreateRequest */
         ApiKeyCreateRequest: {
@@ -1319,6 +1354,15 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * LeftoverOut
+         * @description Ce qui n'a pas trouve de place aujourd'hui.
+         */
+        LeftoverOut: {
+            /** Minutes */
+            minutes: number;
+            task: components["schemas"]["TaskOut"];
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -1425,6 +1469,27 @@ export interface components {
              * Format: password
              */
             new_password: string;
+        };
+        /**
+         * PlanBlockOut
+         * @description Un bloc de travail propose. `assumed_duration` : la tache n'a pas de duree estimee.
+         */
+        PlanBlockOut: {
+            /** Assumed Duration */
+            assumed_duration: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Minutes */
+            minutes: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            task: components["schemas"]["TaskOut"];
         };
         /**
          * ReadinessResponse
@@ -1550,10 +1615,61 @@ export interface components {
             /** Why */
             why: string;
         };
+        /** TaskOut */
+        TaskOut: {
+            /** Days Left */
+            days_left: number | null;
+            /** Due On */
+            due_on: string | null;
+            /** Estimate Minutes */
+            estimate_minutes: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Module */
+            module: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Priority */
+            priority: number;
+            /** Title */
+            title: string;
+        };
         /** TimezoneIn */
         TimezoneIn: {
             /** Timezone */
             timezone: string;
+        };
+        /** TodayOut */
+        TodayOut: {
+            /** Agenda */
+            agenda: components["schemas"]["AgendaEntryOut"][];
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Overdue */
+            overdue: components["schemas"]["TaskOut"][];
+            /** Plan */
+            plan: components["schemas"]["PlanBlockOut"][];
+            /** Planned Minutes */
+            planned_minutes: number;
+            /** Timezone */
+            timezone: string;
+            /** Unplanned */
+            unplanned: components["schemas"]["LeftoverOut"][];
+            /** Upcoming */
+            upcoming: components["schemas"]["TaskOut"][];
+            /** Work Ends At */
+            work_ends_at: string | null;
         };
         /** ToolCallRequest */
         ToolCallRequest: {
@@ -3155,6 +3271,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    today_api_v1_planning_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayOut"];
                 };
             };
         };

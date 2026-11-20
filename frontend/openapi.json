@@ -127,6 +127,75 @@
         "title": "ActionOut",
         "type": "object"
       },
+      "AgendaEntryOut": {
+        "description": "Un creneau du jour : horaire (instants UTC) ou journee entiere (pas d'heures).",
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "module": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Module"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "location",
+          "all_day",
+          "starts_at",
+          "ends_at",
+          "module"
+        ],
+        "title": "AgendaEntryOut",
+        "type": "object"
+      },
       "ApiKeyCreateRequest": {
         "properties": {
           "expires_in_days": {
@@ -1028,6 +1097,24 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "LeftoverOut": {
+        "description": "Ce qui n'a pas trouve de place aujourd'hui.",
+        "properties": {
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskOut"
+          }
+        },
+        "required": [
+          "task",
+          "minutes"
+        ],
+        "title": "LeftoverOut",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -1305,6 +1392,41 @@
           "new_password"
         ],
         "title": "PasswordChangeRequest",
+        "type": "object"
+      },
+      "PlanBlockOut": {
+        "description": "Un bloc de travail propose. `assumed_duration` : la tache n'a pas de duree estimee.",
+        "properties": {
+          "assumed_duration": {
+            "title": "Assumed Duration",
+            "type": "boolean"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskOut"
+          }
+        },
+        "required": [
+          "task",
+          "starts_at",
+          "ends_at",
+          "minutes",
+          "assumed_duration"
+        ],
+        "title": "PlanBlockOut",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -1631,6 +1753,84 @@
         "title": "SuggestedAction",
         "type": "object"
       },
+      "TaskOut": {
+        "properties": {
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "module": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Module"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "due_on",
+          "days_left",
+          "overdue",
+          "estimate_minutes",
+          "priority",
+          "module"
+        ],
+        "title": "TaskOut",
+        "type": "object"
+      },
       "TimezoneIn": {
         "additionalProperties": false,
         "properties": {
@@ -1645,6 +1845,89 @@
           "timezone"
         ],
         "title": "TimezoneIn",
+        "type": "object"
+      },
+      "TodayOut": {
+        "properties": {
+          "agenda": {
+            "items": {
+              "$ref": "#/components/schemas/AgendaEntryOut"
+            },
+            "title": "Agenda",
+            "type": "array"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "overdue": {
+            "items": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Overdue",
+            "type": "array"
+          },
+          "plan": {
+            "items": {
+              "$ref": "#/components/schemas/PlanBlockOut"
+            },
+            "title": "Plan",
+            "type": "array"
+          },
+          "planned_minutes": {
+            "title": "Planned Minutes",
+            "type": "integer"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "unplanned": {
+            "items": {
+              "$ref": "#/components/schemas/LeftoverOut"
+            },
+            "title": "Unplanned",
+            "type": "array"
+          },
+          "upcoming": {
+            "items": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Upcoming",
+            "type": "array"
+          },
+          "work_ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Ends At"
+          }
+        },
+        "required": [
+          "day",
+          "timezone",
+          "generated_at",
+          "work_ends_at",
+          "agenda",
+          "plan",
+          "planned_minutes",
+          "unplanned",
+          "overdue",
+          "upcoming"
+        ],
+        "title": "TodayOut",
         "type": "object"
       },
       "ToolCallRequest": {
@@ -3937,6 +4220,27 @@
         "summary": "Update Module",
         "tags": [
           "modules"
+        ]
+      }
+    },
+    "/api/v1/planning/today": {
+      "get": {
+        "operationId": "today_api_v1_planning_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Today",
+        "tags": [
+          "planning"
         ]
       }
     },

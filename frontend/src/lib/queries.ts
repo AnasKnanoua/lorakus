@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { listAssessments, listCourses } from "@/api/academic";
 import { getAccountSettings } from "@/api/account";
+import { getToday } from "@/api/planning";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
@@ -72,3 +73,10 @@ export const assessmentsQuery = (state: "open" | "done") =>
     queryFn: () => listAssessments(state),
     refetchInterval: 60_000,
   });
+
+/** Ma journee (PR 47) ; relue chaque minute : le plan part de « maintenant ». */
+export const todayQuery = queryOptions({
+  queryKey: ["planning", "today"],
+  queryFn: getToday,
+  refetchInterval: 60_000,
+});
