@@ -8,7 +8,7 @@ Cours et évaluations (devoirs, examens). Chaque évaluation crée **sa tâche**
 - **Évaluations** : type (`assignment` ou `exam`), titre (110 caractères), **échéance obligatoire** (un jour local), durée estimée et coefficient facultatifs. 200 ouvertes au plus ; jamais deux évaluations ouvertes du même cours avec le même titre (casse ignorée) et la même échéance.
 - **Tâche de l'évaluation** : créée par le port `ModuleTasks("academic")`, `owner_ref` = identifiant de l'évaluation, titre « cours : titre », même échéance et même durée. Corriger l'évaluation met la tâche à jour ; la supprimer la supprime. Tout se fait dans la même transaction : jamais d'évaluation sans tâche, ni l'inverse.
 - **Terminer, dans les deux sens** :
-  - depuis la page, l'évaluation et sa tâche sont terminées ensemble (par le port : aucun événement en retour) ;
+  - depuis la page, après une fenêtre de confirmation (terminer ne se défait pas), l'évaluation et sa tâche sont terminées ensemble (par le port : aucun événement en retour) ;
   - depuis le chat, l'utilisateur termine la **tâche** (carte) ; le Core publie `planning.task_completed` dans la même transaction, et le worker livre l'événement au module, qui termine l'évaluation (le relais du worker passe toutes les 2 secondes au repos).
 - **Retards** : une évaluation ouverte est en retard quand son jour d'échéance est passé (à rendre aujourd'hui : pas encore en retard). « Aujourd'hui » est calculé par le serveur dans le fuseau du compte, jamais par la page ni à l'heure du serveur.
 

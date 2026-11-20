@@ -154,12 +154,26 @@ describe("cours", () => {
     expect(within(coming).getByText("Machine Learning · 3 h")).toBeVisible();
   });
 
-  it("termine une évaluation, qui passe dans les terminés", async () => {
+  it("ne termine une évaluation qu'après confirmation", async () => {
     const state = installFakeApi({ loggedIn: true, courses: [ML], assessments: [homework()] });
     renderApp("/academic");
     const user = userEvent.setup();
 
+    // Toucher le rond « pour voir » ne termine rien : une fenêtre demande, et Annuler suffit.
     await user.click(await screen.findByRole("button", { name: "Marquer « TP 2 » comme terminé" }));
+    const asked = await screen.findByRole("alertdialog", { name: "Terminer « TP 2 » ?" });
+    expect(asked).toHaveTextContent("Tu ne pourras pas la rouvrir.");
+    expect(state.assessments[0]?.status).toBe("open");
+    await user.click(within(asked).getByRole("button", { name: "Annuler" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+    expect(state.requests.some((r) => r.path.endsWith("/complete"))).toBe(false);
+    expect(within(screen.getByRole("list", { name: "À venir" })).getByText("TP 2")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Marquer « TP 2 » comme terminé" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Terminer « TP 2 » ?" });
+    await user.click(within(dialog).getByRole("button", { name: "Terminer" }));
 
     expect(await screen.findByText("Rien à rendre pour l'instant.")).toBeVisible();
     expect(state.assessments[0]?.status).toBe("done");
@@ -167,6 +181,23 @@ describe("cours", () => {
     const done = await screen.findByRole("list", { name: "Terminés" });
     expect(within(done).getByText("TP 2")).toBeVisible();
     expect(within(done).getByText(/Machine Learning · terminé le mercredi 18 novembre/)).toBeVisible();
+  });
+
+  it("dit que terminer a échoué, sans fermer la fenêtre", async () => {
+    const state = installFakeApi({ loggedIn: true, courses: [ML], assessments: [homework()] });
+    renderApp("/academic");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Marquer « TP 2 » comme terminé" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Terminer « TP 2 » ?" });
+    // Terminée entre-temps ailleurs (chat) : le serveur refuse la seconde fin.
+    const [row] = state.assessments;
+    if (row) row.status = "done";
+    await user.click(within(dialog).getByRole("button", { name: "Terminer" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Impossible de terminer cette évaluation. Réessaie.",
+    );
   });
 
   it("corrige une évaluation en touchant sa ligne", async () => {
