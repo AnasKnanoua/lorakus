@@ -118,12 +118,11 @@ describe("calendriers", () => {
     expect(state.subscriptions.map((s) => s.id)).toEqual(["s2"]);
   });
 
-  it("s'ouvre depuis le groupe Outils de la barre latérale", async () => {
+  it("s'ouvre directement depuis la barre latérale", async () => {
     installFakeApi({ loggedIn: true });
     renderApp("/");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: /Outils/ }));
     await user.click(await screen.findByRole("link", { name: "Calendriers" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Calendriers" })).toBeVisible();

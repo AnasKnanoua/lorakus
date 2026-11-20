@@ -5,8 +5,9 @@ import type { ToolAction } from "@/api/tools";
 import { CopyButton } from "@/components/CopyButton";
 import { Markdown } from "@/components/Markdown";
 import { Orb } from "@/components/Orb";
+import { useSmoothText } from "@/lib/useSmoothText";
 
-import { ToolActions } from "./ToolActions";
+import { ToolActions, ToolActivity } from "./ToolActions";
 import { WhyButton } from "./WhyButton";
 
 export function UserMessage({ text }: { text: string }) {
@@ -40,19 +41,23 @@ export function AssistantMessage({
   /** Reponse enregistree : son explication (« Pourquoi ? ») peut etre ouverte (PR 39). */
   messageId?: string;
 }) {
+  const visible = useSmoothText(text, writing);
   const done = !writing && status !== "fallback" && text.length > 0;
-  const thinking = !text && actions.length === 0;
+  const hasCards = actions.some((action) => action.kind !== "activity");
+  // Avant le premier mot : « réfléchit », meme si une consultation est deja affichee au-dessus.
+  const thinking = !visible && !hasCards && (writing || actions.length === 0);
   return (
     <div className="group/answer flex animate-fade-up gap-3.5 sm:gap-4">
       <Orb thinking={writing} className="mt-1 size-[22px]" />
       <div className="min-w-0 flex-1">
+        <ToolActivity actions={actions} />
         {status === "fallback" ? (
           <p className="flex gap-2 text-reading text-ink-muted">
             <Info className="mt-1.5 size-4 shrink-0" aria-hidden="true" />
             <span>{text}</span>
           </p>
-        ) : text ? (
-          <Markdown text={text} />
+        ) : visible ? (
+          <Markdown text={visible} />
         ) : thinking ? (
           <p className="text-reading">
             <span className="shimmer-text">Lorakus réfléchit…</span>

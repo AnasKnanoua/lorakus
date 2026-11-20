@@ -6,6 +6,7 @@ import { useState } from "react";
 import { deleteConversation, type ReplyStatus } from "@/api/assistant";
 import { Button } from "@/components/ui/button";
 import { conversationQuery } from "@/lib/queries";
+import { displayTitle } from "@/lib/titles";
 
 import { Composer } from "./Composer";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -65,7 +66,7 @@ export function ConversationScreen() {
           </Button>
         }
       >
-        <h1 className="truncate text-[0.9375rem] font-medium text-ink-muted">{conversation.data?.title ?? ""}</h1>
+        <h1 className="truncate text-[0.9375rem] font-medium text-ink-muted">{displayTitle(conversation.data?.title ?? "")}</h1>
       </TopBar>
 
       {budgetWarning && (

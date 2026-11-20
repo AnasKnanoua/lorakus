@@ -199,6 +199,14 @@
       }
     },
     {
+      "id": "informal_on_advice",
+      "category": "quality",
+      "message": "Comment je peux mieux organiser mes révisions cette semaine ?",
+      "expect": {
+        "informal": true
+      }
+    },
+    {
       "id": "no_bank_data",
       "category": "quality",
       "message": "Combien il me reste sur mon compte en banque ?",

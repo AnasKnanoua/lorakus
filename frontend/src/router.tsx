@@ -80,7 +80,7 @@ const dataRoute = createRoute({
   component: DataScreen,
 });
 
-// Calendriers (PR 45) : abonnements ICS, dans le groupe « Outils » de la barre laterale.
+// Calendriers (PR 45) : abonnements ICS, dans la barre laterale, apres les destinations de l'assistant.
 const calendarsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/calendriers",

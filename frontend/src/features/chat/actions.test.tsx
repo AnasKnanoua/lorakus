@@ -131,6 +131,25 @@ describe("cartes de confirmation", () => {
     expect(screen.queryByRole("region", { name: "Action à confirmer" })).toBeNull();
   });
 
+  it("regroupe les consultations en une seule ligne, sans doublon, au-dessus du texte", async () => {
+    await ask(
+      [
+        { kind: "activity", tool: "assistant.read_agenda", label: "A consulté ton agenda", ok: true },
+        { kind: "activity", tool: "assistant.search_memory", label: "A consulté ta mémoire", ok: true },
+        { kind: "activity", tool: "assistant.read_agenda", label: "A consulté ton agenda", ok: true },
+        { kind: "activity", tool: "notes.search", label: "A cherché dans tes notes", ok: false },
+      ],
+      ["Mardi, tu as cours."],
+    );
+
+    const line = await screen.findByText("A consulté ton agenda et a consulté ta mémoire");
+    expect(screen.getAllByText(/A consulté ton agenda/)).toHaveLength(1);
+    expect(screen.getByText("A cherché dans tes notes : échec")).toBeVisible();
+    const answer = await screen.findByText("Mardi, tu as cours.");
+    // La ligne precede la reponse dans le document (lecture dans l'ordre : consulte, puis repond).
+    expect(line.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("le texte de la carte est affiche brut, sans balisage interprete", async () => {
     await ask([card({ summary: "Retenir : « **gras** <b>html</b> [lien](https://exemple.fr) »" })]);
 

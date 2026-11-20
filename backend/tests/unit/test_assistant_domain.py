@@ -82,6 +82,7 @@ def test_system_prompt_gives_the_local_date_in_french_and_the_name() -> None:
     assert "vendredi 13 novembre 2026" in prompt  # 00:30 a Ankara : deja le lendemain
     assert "00:30 (Europe/Istanbul)" in prompt
     assert "Ne demande jamais de mot de passe" in prompt
+    assert "tutoie toujours l'utilisateur" in prompt  # sans cette regle, le modele vouvoyait
     assert PROMPT_VERSION.startswith("assistant-system-")
 
 

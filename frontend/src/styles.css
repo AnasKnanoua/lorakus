@@ -111,9 +111,9 @@
   --text-2xl: 1.75rem;
   --text-2xl--line-height: 2.125rem;
   --text-2xl--letter-spacing: -0.022em;
-  /* Lecture : 16 px, interligne 1,75 (confort des longues reponses). */
+  /* Lecture : 16 px, interligne 1,65 (1,75 espacait trop les lignes sur telephone). */
   --text-reading: 1rem;
-  --text-reading--line-height: 1.75;
+  --text-reading--line-height: 1.65;
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-fade-up: fade-up 360ms var(--ease-out-soft) both;
   --animate-fade-in: fade-in 240ms ease-out both;
@@ -134,6 +134,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Pas de rectangle gris au toucher (Android) : le retour visuel vient des composants. */
+    -webkit-tap-highlight-color: transparent;
   }
   ::selection {
     background: color-mix(in srgb, var(--accent) 30%, transparent);
@@ -143,9 +145,13 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
-  /* Barres de defilement discretes. */
+  /* Barres de defilement invisibles au repos, visibles au survol de la zone qui defile
+     (comme macOS et les interfaces de reference) : aucun trait gris permanent. */
   * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover {
     scrollbar-color: var(--line) transparent;
   }
 }
@@ -436,7 +442,10 @@
   overflow-wrap: anywhere;
 }
 .prose-lorakus > * + * {
-  margin-top: 0.9em;
+  margin-top: 0.75em;
+}
+.prose-lorakus > :first-child {
+  margin-top: 0;
 }
 .prose-lorakus h1,
 .prose-lorakus h2,
@@ -469,7 +478,10 @@
   list-style: decimal;
 }
 .prose-lorakus li + li {
-  margin-top: 0.35em;
+  margin-top: 0.3em;
+}
+.prose-lorakus li > p + p {
+  margin-top: 0.3em;
 }
 .prose-lorakus li::marker {
   color: var(--ink-muted);
