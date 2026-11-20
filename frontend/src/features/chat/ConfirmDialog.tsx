@@ -3,7 +3,11 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-/** Confirmation d'une action destructive (Radix Dialog : focus piege, Echap, annonce). */
+/**
+ * Confirmation d'une action qu'on ne peut pas defaire (Radix Dialog : focus piege, Echap,
+ * annonce). Destructive par defaut (bouton rouge) ; `tone="plain"` pour une action definitive
+ * qui ne detruit rien, comme terminer un devoir.
+ */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -11,6 +15,8 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   onConfirm,
+  tone = "danger",
+  failure = "La suppression a échoué. Réessaie.",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -18,6 +24,9 @@ export function ConfirmDialog({
   description: string;
   confirmLabel: string;
   onConfirm: () => Promise<void>;
+  tone?: "danger" | "plain";
+  /** Message affiche si `onConfirm` echoue. */
+  failure?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -25,7 +34,7 @@ export function ConfirmDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="scrim fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px]" />
-        {/* alertdialog : confirmation destructive, annoncee comme une alerte qui attend une reponse. */}
+        {/* alertdialog : confirmation definitive, annoncee comme une alerte qui attend une reponse. */}
         <Dialog.Content
           role="alertdialog"
           className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md animate-fade-up rounded-3xl border border-line bg-raised p-6 shadow-float sm:top-1/3 sm:bottom-auto"
@@ -34,7 +43,7 @@ export function ConfirmDialog({
           <Dialog.Description className="mt-2 text-ink-muted">{description}</Dialog.Description>
           {failed && (
             <p role="alert" className="mt-3 text-sm text-danger">
-              La suppression a échoué. Réessaie.
+              {failure}
             </p>
           )}
           <div className="mt-6 flex justify-end gap-2">
@@ -42,7 +51,7 @@ export function ConfirmDialog({
               <Button variant="outline">Annuler</Button>
             </Dialog.Close>
             <Button
-              variant="danger"
+              variant={tone === "danger" ? "danger" : "primary"}
               disabled={busy}
               onClick={() => {
                 setBusy(true);

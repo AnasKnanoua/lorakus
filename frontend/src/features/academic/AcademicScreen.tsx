@@ -268,7 +268,8 @@ function AssessmentLine({ item }: { item: Assessment }) {
   const refresh = useRefresh();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const complete = useMutation({ mutationFn: () => completeAssessment(item.id), onSuccess: refresh });
+  // Terminer ne se defait pas (ni ici, ni pour la tache) : jamais sur un simple toucher.
+  const [completing, setCompleting] = useState(false);
 
   if (editing) {
     return (
@@ -317,9 +318,8 @@ function AssessmentLine({ item }: { item: Assessment }) {
         variant="quiet"
         size="icon"
         aria-label={`Marquer « ${item.title} » comme terminé`}
-        disabled={complete.isPending}
         onClick={() => {
-          complete.mutate();
+          setCompleting(true);
         }}
         className="group/check"
       >
@@ -343,12 +343,20 @@ function AssessmentLine({ item }: { item: Assessment }) {
         <span className={cn("block truncate text-sm", item.overdue ? "text-danger" : "text-ink-muted")}>
           {longDate(item.due_on)} ({relativeDay(item.days_left)})
         </span>
-        {complete.isError && (
-          <span role="alert" className="block text-sm text-danger">
-            {message(complete.error)}
-          </span>
-        )}
       </button>
+      <ConfirmDialog
+        open={completing}
+        onOpenChange={setCompleting}
+        tone="plain"
+        title={`Terminer « ${item.title} » ?`}
+        description="Sa tâche sera terminée aussi. Tu ne pourras pas la rouvrir."
+        confirmLabel="Terminer"
+        failure="Impossible de terminer cette évaluation. Réessaie."
+        onConfirm={async () => {
+          await completeAssessment(item.id);
+          await refresh();
+        }}
+      />
     </li>
   );
 }
