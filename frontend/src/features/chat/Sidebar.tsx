@@ -4,11 +4,11 @@ import { LogOut, PanelLeftClose, ShieldCheck, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { logout } from "@/api/auth";
-import { Collapsible } from "@/components/Collapsible";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { groupByRecency } from "@/lib/dates";
+import { displayTitle } from "@/lib/titles";
 import { conversationsQuery, factsQuery, meQuery } from "@/lib/queries";
-import { NAV_GROUP_LABELS, NAV_ITEMS, type NavItem } from "@/navigation";
+import { NAV_ITEMS, type NavItem } from "@/navigation";
 
 /** Conversations affichees d'abord ; « Afficher plus » en ajoute autant. */
 const PAGE = 25;
@@ -38,7 +38,12 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
   const email = me.data?.email ?? "";
   const all = conversations.data ?? [];
   const groups = groupByRecency(all.slice(0, shown), (c) => c.updated_at);
-  const tools = NAV_ITEMS.filter((item) => item.group === "tools");
+  // Assistant puis outils, a plat : deux ou trois destinations ne justifient pas un groupe
+  // replie (il cachait Calendriers derriere un clic de plus).
+  const destinations = [
+    ...NAV_ITEMS.filter((item) => item.group === "assistant"),
+    ...NAV_ITEMS.filter((item) => item.group === "tools"),
+  ];
 
   async function signOut() {
     await logout();
@@ -63,22 +68,15 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
           <SquarePen aria-hidden="true" className="size-[18px]" />
           Nouvelle conversation
         </Link>
-        {NAV_ITEMS.filter((item) => item.group === "assistant").map((item) => (
+        {destinations.map((item) => (
           <NavLink key={item.id} item={item} onNavigate={onNavigate} />
         ))}
-        {tools.length > 0 && (
-          <Collapsible title={NAV_GROUP_LABELS.tools} defaultOpen={false} headerClassName="px-3">
-            {tools.map((item) => (
-              <NavLink key={item.id} item={item} onNavigate={onNavigate} />
-            ))}
-          </Collapsible>
-        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
         {groups.map((group) => (
-          <section key={group.label} aria-label={group.label} className="pt-5 first:pt-3">
-            <h2 className="px-3 pb-1.5 text-sm font-medium text-ink-faint">{group.label}</h2>
+          <section key={group.label} aria-label={group.label} className="pt-5 first:pt-2">
+            <h2 className="px-3 pb-1 text-[0.8125rem] font-medium text-ink-faint">{group.label}</h2>
             <ul className="flex flex-col gap-px">
               {group.items.map((c) => (
                 <li key={c.id}>
@@ -87,10 +85,10 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
                     params={{ conversationId: c.id }}
                     onClick={onNavigate}
                     title={c.title}
-                    className="flex h-10 items-center rounded-full px-3 text-base text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
+                    className="flex h-9 items-center rounded-full px-3 text-sm text-ink-muted transition-colors duration-150 hover:bg-hover hover:text-ink"
                     activeProps={ACTIVE}
                   >
-                    <span className="truncate">{c.title}</span>
+                    <span className="truncate">{displayTitle(c.title)}</span>
                   </Link>
                 </li>
               ))}
@@ -122,8 +120,9 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
           >
             {email.charAt(0).toUpperCase() || "?"}
           </span>
+          {/* Le nom avant « @ » suffit a se reconnaitre ; l'adresse complete reste en infobulle. */}
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted" title={email}>
-            {email}
+            {email.split("@")[0]}
           </span>
         </div>
         {/* Mes donnees (PR 41) : export et suppression, a cote du compte. */}

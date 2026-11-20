@@ -78,8 +78,9 @@ export function Composer({
       className={cn(
         "group/composer flex items-end gap-1 rounded-[26px] border border-line bg-raised p-2 pl-4 shadow-float",
         "transition-[border-color,box-shadow] duration-200",
-        "focus-within:border-[color-mix(in_srgb,var(--accent)_45%,var(--line))]",
-        "focus-within:shadow-[var(--elevation-float),0_0_0_4px_color-mix(in_srgb,var(--accent)_12%,transparent)]",
+        // Focus calme : la bordure s'eclaircit a peine, sans halo colore. Le champ est souvent
+        // focalise d'office (ecran d'accueil) : un cadre vert permanent attirait l'oeil a tort.
+        "focus-within:border-[color-mix(in_srgb,var(--ink)_22%,var(--line))]",
         tooLong && "border-danger",
       )}
     >

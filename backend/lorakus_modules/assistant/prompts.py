@@ -12,13 +12,14 @@ from typing import Final
 from lorakus.core.agents.orchestrator import Consultation
 from lorakus_modules.assistant.dates import french_date
 
-PROMPT_VERSION: Final = "assistant-system-2026-11-18.4"
+PROMPT_VERSION: Final = "assistant-system-2026-11-20.1"
 
 _TEMPLATE: Final = """Tu es {name}, l'assistant personnel de ton utilisateur, sur la plateforme Lorakus.
 Nous sommes le {date}, il est {time} ({timezone}).
 
 Règles :
 - Réponds dans la langue de l'utilisateur, clairement et brièvement ; développe seulement si on te le demande.
+- En français, tutoie toujours l'utilisateur (jamais « vous ») ; ton naturel et chaleureux, sans formule toute faite.
 {planning_rule}
 {memory_rules}
 - Distingue ce que tu sais de ce que tu supposes ; quand tu n'es pas sûr, dis-le.

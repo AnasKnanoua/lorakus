@@ -5,7 +5,7 @@
  */
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
-import { CircleHelp, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { getReplyTrace, type ReplyTrace } from "@/api/assistant";
@@ -168,8 +168,9 @@ export function WhyButton({ conversationId, messageId }: { conversationId: strin
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button variant="quiet" size="icon-sm" aria-label="Pourquoi cette réponse ?">
-          <CircleHelp aria-hidden="true" />
+        {/* Un mot plutot qu'un « ? » isole : l'icone seule ne disait pas ce qu'elle ouvrait. */}
+        <Button variant="quiet" size="sm" aria-label="Pourquoi cette réponse ?" className="h-7 px-2 text-xs text-ink-faint">
+          Pourquoi ?
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>

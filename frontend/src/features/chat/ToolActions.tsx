@@ -15,31 +15,72 @@ import { cancelCard, confirmCard, type CardOutcome, type CardStatus, type ToolAc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function ToolActions({ actions, conversationId }: { actions: readonly ToolAction[]; conversationId: string }) {
-  if (actions.length === 0) {
+/**
+ * Ce que Lorakus a consulte, sur une seule ligne discrete au-dessus de la reponse (comme
+ * « Recherche effectuee » chez les assistants de reference) : une etiquette par outil, sans
+ * doublon, dans l'ordre d'utilisation. Un echec est signale a part, en clair.
+ */
+export function ToolActivity({ actions }: { actions: readonly ToolAction[] }) {
+  const labels: string[] = [];
+  const failures: string[] = [];
+  for (const action of actions) {
+    if (action.kind !== "activity") {
+      continue;
+    }
+    const label = action.label ?? "Outil";
+    const target = action.ok === false ? failures : labels;
+    if (!target.includes(label)) {
+      target.push(label);
+    }
+  }
+  if (labels.length === 0 && failures.length === 0) {
     return null;
   }
   return (
-    <div className="mt-3 flex flex-col gap-3">
-      {actions.map((action, index) =>
-        action.kind === "activity" ? (
-          <Activity key={`${action.tool}-${String(index)}`} action={action} />
-        ) : (
-          <ActionCard key={action.confirmation_id ?? String(index)} action={action} conversationId={conversationId} />
-        ),
+    <div className="mb-2 flex flex-col gap-1 text-sm text-ink-faint">
+      {labels.length > 0 && (
+        <p className="flex items-center gap-1.5">
+          <Search aria-hidden="true" className="size-3.5 shrink-0" />
+          <span>{joinLabels(labels)}</span>
+        </p>
       )}
+      {failures.map((label) => (
+        <p key={label} className="flex items-center gap-1.5">
+          <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />
+          <span>{label} : échec</span>
+        </p>
+      ))}
     </div>
   );
 }
 
-function Activity({ action }: { action: ToolAction }) {
-  const failed = action.ok === false;
-  const Icon = failed ? CircleAlert : Search;
+/** « A consulté ton agenda », « A consulté ton agenda et ta mémoire »… : phrase lisible. */
+export function joinLabels(labels: readonly string[]): string {
+  const [first, ...rest] = labels;
+  if (first === undefined) {
+    return "";
+  }
+  // Les etiquettes suivantes perdent leur majuscule : elles prolongent la meme phrase.
+  const tail = rest.map((label) => label.charAt(0).toLowerCase() + label.slice(1));
+  if (tail.length === 0) {
+    return first;
+  }
+  const last = tail.pop() ?? "";
+  return [first, ...tail].join(", ") + " et " + last;
+}
+
+/** Cartes de confirmation de la reponse, sous le texte. */
+export function ToolActions({ actions, conversationId }: { actions: readonly ToolAction[]; conversationId: string }) {
+  const cards = actions.filter((action) => action.kind !== "activity");
+  if (cards.length === 0) {
+    return null;
+  }
   return (
-    <p className="flex items-center gap-2 text-sm text-ink-faint">
-      <Icon aria-hidden="true" className="size-4 shrink-0" />
-      <span>{failed ? `${action.label ?? "Outil"} : échec` : action.label}</span>
-    </p>
+    <div className="mt-4 flex flex-col gap-3">
+      {cards.map((action, index) => (
+        <ActionCard key={action.confirmation_id ?? String(index)} action={action} conversationId={conversationId} />
+      ))}
+    </div>
   );
 }
 

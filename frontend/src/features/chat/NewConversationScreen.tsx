@@ -48,6 +48,7 @@ export function NewConversationScreen() {
           <h1 className="mb-8 text-center text-[1.75rem] leading-tight font-medium tracking-[-0.025em] text-balance sm:text-[2.125rem]">
             Que puis-je faire pour toi aujourd'hui&nbsp;?
           </h1>
+          {/* Rien sous le champ hors erreur : l'accueil se limite a la question et au champ. */}
           <Composer
             variant="hero"
             onSend={(text) => void start(text)}
@@ -58,11 +59,7 @@ export function NewConversationScreen() {
                 <p role="alert" className="mt-3 text-center text-sm text-danger">
                   La conversation n'a pas pu être créée. Vérifie ta connexion, puis réessaie.
                 </p>
-              ) : (
-                <p className="mt-4 text-center text-[0.8125rem] text-ink-faint">
-                  Lorakus n'a pas encore accès à ton agenda ni à tes notes.
-                </p>
-              )
+              ) : null
             }
           />
         </div>

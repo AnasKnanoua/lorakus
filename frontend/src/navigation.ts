@@ -7,8 +7,9 @@ import { Brain, CalendarSync } from "lucide-react";
  *
  * - "assistant" : ce que Lorakus sait et gere pour toi (Memoire ; puis Aujourd'hui, Taches,
  *   Agenda...). Toujours visible, quatre ou cinq entrees au plus.
- * - "tools" : services secondaires et modules (veille, finances, echecs...). Groupe repliable,
- *   absent tant qu'il est vide.
+ * - "tools" : services secondaires et modules (Calendriers ; puis veille, finances...). Affiches
+ *   a plat sous l'assistant tant qu'ils sont peu nombreux : un groupe replie cachait chaque
+ *   outil derriere un clic. Un regroupement reviendra si la liste depasse six entrees.
  *
  * Les reglages et le compte vivent dans le menu du profil, en bas : jamais dans la liste.
  * Une nouvelle fonctionnalite = une entree ici, sans toucher a la barre laterale.
@@ -27,8 +28,3 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "memory", label: "Mémoire", to: "/memoire", icon: Brain, group: "assistant" },
   { id: "calendars", label: "Calendriers", to: "/calendriers", icon: CalendarSync, group: "tools" },
 ];
-
-export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
-  assistant: "Assistant",
-  tools: "Outils",
-};

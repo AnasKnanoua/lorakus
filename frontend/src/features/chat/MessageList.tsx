@@ -3,7 +3,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 /**
  * Fil des messages. Defile vers le bas quand du contenu arrive, sauf si l'utilisateur est
  * remonte lire plus haut. role="log" : les lecteurs d'ecran annoncent les ajouts, mais pas
- * chaque morceau pendant l'ecriture (aria-busy). Le bas est degage pour le champ flottant.
+ * chaque morceau pendant l'ecriture (aria-busy). Le bas est degage pour le champ flottant ;
+ * en haut, un fondu fait disparaitre le texte sous la barre au lieu de le couper net.
  */
 export function MessageList({ children, busy }: { children: ReactNode; busy: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -23,7 +24,7 @@ export function MessageList({ children, busy }: { children: ReactNode; busy: boo
         const el = e.currentTarget;
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       }}
-      className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]"
+      className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none] [mask-image:linear-gradient(to_bottom,transparent,#000_1.25rem)]"
     >
       <div
         role="log"
