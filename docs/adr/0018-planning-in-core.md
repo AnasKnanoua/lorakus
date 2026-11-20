@@ -64,3 +64,17 @@ Règles, dans l'ordre :
 Ces nombres sont des constantes : la PR 50 en fera des préférences confirmées (plage de travail, heure limite, jours sans travail). Limites connues, voulues pour l'instant : le plan ne regarde que le jour même (pas de répartition sur la semaine) ; il ne tient pas compte des trajets ni de l'énergie ; une tâche lointaine est proposée dès qu'il reste de la place.
 
 Tests : `tests/unit/test_planner.py` (chaque règle, puis 60 journées tirées au hasard à graine fixe : jamais deux blocs en même temps, jamais pendant un créneau de l'agenda, toujours la pause, jamais plus de 6 h, aucune minute perdue ni inventée), `tests/integration/test_today.py` (fuseau du compte, RLS, lecture seule, scénario 2).
+
+## Amendement du 2026-11-20 (PR 48) : préférences de planification
+
+Retour d'usage le jour de la PR 47 : le plan ignore les repas et les horaires réels de la personne. Les préférences, prévues en fin de phase (PR 50), passent avant le Sergent, qui résume un plan : autant qu'il soit juste.
+
+1. **Catalogue fermé** (`lorakus/core/planning/preferences.py`, table `core_planning_preferences`, migration 0014, RLS forcée) : `work_start` et `work_end` (bornes de la journée de travail, 8 h et 22 h par défaut), `lunch` et `dinner` (plages de repas, aucune par défaut), `rest_days` (jours sans travail, aucun), `daily_cap` (travail proposé par jour, 6 h). Chaque valeur est typée et bornée : un repas dure de 15 minutes à 3 heures, la journée de travail au moins une heure, le plafond de 30 minutes à 12 heures, et jamais sept jours sans travail. Aucun texte libre.
+2. **Confirmation par carte, pas par la mémoire.** La roadmap prévoyait des préférences « proposées par la mémoire » (analyse quelques minutes après la conversation, confirmation dans `/memoire`). Décision : une **carte de confirmation dans le chat** (ADR 0040), outils `assistant.set_preference` et `assistant.clear_preference`. Raisons : la confirmation est immédiate, au moment où la personne le dit ; la valeur est validée par le code avant la carte ; la carte montre la valeur proposée et la valeur actuelle ; aucun nouveau schéma d'extraction à évaluer. La règle de l'ADR 0039 est respectée : rien n'est retenu sans confirmation. L'extraction par la mémoire pourra s'y ajouter plus tard comme second producteur, sans changer le stockage ni le planificateur.
+3. **Lecture tolérante.** Une ligne dont la valeur ne se lit plus est ignorée ; si l'ensemble est incohérent, tous les défauts s'appliquent : le planificateur ne tombe jamais à cause d'une préférence.
+4. **Effet sur le plan** : fenêtre de travail tirée des bornes ; repas ajoutés au temps occupé et montrés dans le déroulé ; aucun plan un jour sans travail (les échéances restent visibles) ; plafond du jour.
+5. **Page « Ma journée »** : section « Mes préférences » (les six, confirmées ou par défaut), où l'on peut en retirer une ; `GET /api/v1/planning/preferences`, `DELETE /api/v1/planning/preferences/{key}`. Les régler se fait en le disant à Lorakus.
+
+Non couvert : les activités récurrentes (sport, trajets) sont des créneaux d'agenda, pas des préférences ; les préférences par jour de la semaine (déjeuner plus tard le vendredi) attendront un besoin réel.
+
+Tests : `tests/unit/test_preference_catalogue.py`, `tests/unit/test_planner.py` (préférences), `tests/integration/test_planning_preferences.py` (service sous RLS, lignes illisibles, cartes, routes, scénario 6), corpus d'injections (position 7), banc (3 cas).

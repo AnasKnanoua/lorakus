@@ -18,6 +18,9 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | `assistant.update_memory` | `write` | Carte « Avant / Après » ; le clic corrige le souvenir |
 | `assistant.forget_memory` | `sensitive` | Carte « Oublier : « … » » ; le clic, avec une preuve d'identité récente, efface le souvenir |
 | `assistant.list_agenda` | `read` | Créneaux de 1 à 14 jours (60 au plus), heures locales dans le fuseau du compte ; titres et lieux venus de calendriers externes passés par `inert()` (PR 45) |
+| `assistant.list_preferences` | `read` | Préférences de planification (PR 48) : les six du catalogue, confirmées ou par défaut |
+| `assistant.set_preference` | `write` | Carte « Préférence de planification / Déjeuner : de 12 h 30 à 13 h 30 / Actuellement : aucun » ; valeurs typées et bornées par le Core (ADR 0018) |
+| `assistant.clear_preference` | `write` | Carte « Retirer la préférence « … » », avec la valeur actuelle et la valeur par défaut qui reviendra |
 | `academic.add_assessment` | `write` | Outil du module `academic` (PR 46), proposé seulement si ce module est activé : carte « Ajouter un devoir » ou « un examen », avec le cours et la date exacte ; voir `docs/modules/academic.md` |
 
 ## Approche (programmation classique, ML ou LLM)

@@ -86,6 +86,10 @@ CHAT_TOOLS: Final = (
     "assistant.complete_task",
     "assistant.delete_task",
     "assistant.list_agenda",
+    # Preferences de planification (PR 48), revus : catalogue ferme, une carte, rien sans clic.
+    "assistant.list_preferences",
+    "assistant.set_preference",
+    "assistant.clear_preference",
     # Module academic (PR 46), revu : une carte, rien sans clic.
     "academic.add_assessment",
 )

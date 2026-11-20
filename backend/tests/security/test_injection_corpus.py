@@ -14,7 +14,10 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
    rien sans clic ;
 6. dans le nom d'un cours et le titre d'une evaluation (PR 46, module academic), lus par
    l'outil de liste a travers leur tache : le modele qui obeit tente d'ajouter des evaluations
-   en masse, de terminer et de supprimer la tache du devoir.
+   en masse, de terminer et de supprimer la tache du devoir ;
+7. dans le titre d'une tache, face aux outils des preferences de planification (PR 48) : le
+   modele qui obeit tente de changer les horaires, de declarer toute la semaine sans travail
+   et de retirer les preferences existantes.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -489,3 +492,69 @@ def test_an_attack_in_a_course_or_an_assessment_changes_nothing_without_the_user
     assert used == [(0,)]
     # Aucun evenement : personne n'a termine la tache.
     assert asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_outbox")) == [(0,)]
+
+
+# ------------------------- 7. preferences de planification (PR 48)
+SET_PREFERENCE = "assistant__set_preference"
+CLEAR_PREFERENCE = "assistant__clear_preference"
+PREFERENCE_ROWS = (
+    "SELECT key, value, source_kind FROM lorakus.core_planning_preferences ORDER BY key"
+)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_cannot_change_planning_preferences_without_the_users_click(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    from lorakus.core.planning.preferences import set_preference
+
+    async def _seed(session: Any, user: Any) -> None:
+        await add_task(session, user, NewTask(_as_fact(attack["payload"])[:200] or "vide"))
+        await set_preference(session, user, "lunch", {"start": "12:30", "end": "13:30"})
+
+    asyncio.run(_with_tasks(_seed))
+    before = asyncio.run(migrator_sql(PREFERENCE_ROWS))
+    assert len(before) == 1
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    week = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+    provider = _use(
+        owner,
+        [
+            FakeReply("Je regarde.", tool_calls=((LIST_TASKS, {}),)),
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    (SET_PREFERENCE, {"preference": "jours_sans_travail", "days": week}),
+                    (SET_PREFERENCE, {"preference": "jours_sans_travail", "days": week[:6]}),
+                    (SET_PREFERENCE, {"preference": "fin_travail", "time": "09:00"}),
+                    (SET_PREFERENCE, {"preference": "travail_par_jour", "minutes": 30}),
+                    (CLEAR_PREFERENCE, {"preference": "dejeuner"}),
+                    (SET_PREFERENCE, {"preference": "dejeuner", "start": "08:00", "end": "11:00"}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            FakeReply("", tool_calls=((CLEAR_PREFERENCE, {"preference": "dejeuner"}),)),
+            "C'est fait : tes préférences sont changées et confirmées.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Lis mes tâches et fais ce qu'elles disent.")
+
+    cards = [data for name, data in events if name == "card"]
+    sent = "\n".join(request.model_dump_json() for _, request in provider.calls)
+    # Rien n'a change sans clic, et jamais plus de cartes que la limite.
+    assert asyncio.run(migrator_sql(PREFERENCE_ROWS)) == before
+    assert 1 <= len(cards) <= MAX_CARDS
+    for card in cards:
+        assert card["confirmation_id"] not in sent
+        assert card["status"] == "pending"
+        # La semaine entiere sans travail n'est jamais proposee, meme en carte.
+        assert "dimanche" not in card["summary"] or "lundi" not in card["summary"].split("\n")[1]
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]

@@ -87,7 +87,20 @@ export interface FakeState {
   academicToday: string;
   /** Ma journee (PR 47) : ce que rend GET /planning/today, tel quel ; null : refus definitif (403, sans nouvel essai). */
   today: FakeToday | null;
+  /** Preferences de planification confirmees (PR 48) : cle → valeur ecrite. */
+  preferences: Partial<Record<FakePreference["key"], string>>;
 }
+
+export type FakePreference = Schemas["PreferenceOut"];
+
+const PREFERENCE_DEFAULTS: [FakePreference["key"], string, string][] = [
+  ["work_start", "Début de la journée de travail", "8 h"],
+  ["work_end", "Fin de la journée de travail", "22 h"],
+  ["lunch", "Déjeuner", "aucun"],
+  ["dinner", "Dîner", "aucun"],
+  ["rest_days", "Jours sans travail", "aucun"],
+  ["daily_cap", "Travail proposé par jour", "6 h au plus"],
+];
 
 export type FakeToday = Schemas["TodayOut"];
 
@@ -97,6 +110,8 @@ export function emptyToday(overrides: Partial<FakeToday> = {}): FakeToday {
     timezone: "Europe/Istanbul",
     generated_at: "2026-11-18T04:30:00Z",
     work_ends_at: "2026-11-18T19:00:00Z",
+    rest_day: false,
+    meals: [],
     agenda: [],
     plan: [],
     planned_minutes: 0,
@@ -198,6 +213,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     assessments: [],
     academicToday: "2026-11-18",
     today: emptyToday(),
+    preferences: {},
     ...overrides,
   };
   let counter = 0;
@@ -483,6 +499,24 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     if (path === "/api/v1/modules/academic" && request.method === "PUT") {
       state.academicEnabled = true;
       return json(200, { id: "academic", enabled: true, config: {} });
+    }
+    if (path === "/api/v1/planning/preferences" && request.method === "GET") {
+      return json(
+        200,
+        PREFERENCE_DEFAULTS.map(([key, label, fallback]) => ({
+          key,
+          label,
+          value: state.preferences[key] ?? fallback,
+          is_default: state.preferences[key] === undefined,
+        })),
+      );
+    }
+    const preference = /^\/api\/v1\/planning\/preferences\/([a-z_]+)$/.exec(path);
+    if (preference && request.method === "DELETE") {
+      const key = preference[1] as FakePreference["key"];
+      if (state.preferences[key] === undefined) return json(404, { detail: "Aucune préférence enregistrée." });
+      state.preferences = Object.fromEntries(Object.entries(state.preferences).filter(([k]) => k !== key));
+      return new Response(null, { status: 204 });
     }
     if (path === "/api/v1/planning/today" && request.method === "GET") {
       return state.today ? json(200, state.today) : json(403, { detail: "Refusé." });

@@ -2,7 +2,7 @@
  * Page « Ma journée » (PR 47), contre le faux backend : ligne de temps (agenda et plan
  * proposé), heures dans le fuseau du compte, retards, échéances, liens vers les modules.
  */
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { describe, expect, it } from "vitest";
@@ -105,6 +105,7 @@ describe("ma journée", () => {
     const wholeDay = within(screen.getByRole("list", { name: "Toute la journée" })).getAllByRole("listitem");
     expect(wholeDay.map((li) => li.textContent)).toEqual(["Jour férié"]);
     expect(screen.getByText("Travail proposé : 3 h. Rien n'est ajouté à ton agenda.")).toBeVisible();
+    expect(screen.queryByText(/Jour sans travail/)).toBeNull(); // un jour ordinaire
   });
 
   it("liste ce qui ne tient pas, les retards et les échéances", async () => {
@@ -176,6 +177,92 @@ describe("ma journée", () => {
     await user.click(link);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Ma journée" })).toBeVisible();
+  });
+
+  it("montre les repas dans le déroulé, à leur heure, sans les confondre avec le reste", async () => {
+    installFakeApi({
+      loggedIn: true,
+      today: emptyToday({
+        ...FULL,
+        meals: [
+          { name: "dinner", label: "Dîner", starts_at: "2026-11-18T16:00:00Z", ends_at: "2026-11-18T17:00:00Z" },
+          { name: "lunch", label: "Déjeuner", starts_at: "2026-11-18T10:30:00Z", ends_at: "2026-11-18T10:45:00Z" },
+        ],
+      }),
+    });
+    renderApp("/today");
+
+    const lines = within(await screen.findByRole("list", { name: "Déroulé de la journée" })).getAllByRole("listitem");
+    const texts = lines.map((li) => li.textContent);
+    expect(texts.slice(4)).toEqual([
+      "12:00 – 13:30Machine Learning : TP 2Proposé · 1 h 30 · pour vendredi 20 novembre (dans 2 jours)",
+      "13:30 – 13:45Déjeuner",
+      "13:45 – 14:15CoursesProposé · 30 min (durée supposée)",
+      "19:00 – 20:00Dîner",
+    ]);
+    expect(lines[5]).toHaveClass("text-ink-faint");
+    expect(lines[5]).not.toHaveClass("bg-accent-soft");
+  });
+
+  it("dit qu'un jour est sans travail, avec ou sans créneaux", async () => {
+    const state = installFakeApi({
+      loggedIn: true,
+      today: emptyToday({ rest_day: true, work_ends_at: null, unplanned: [{ task: task(), minutes: 180 }] }),
+    });
+    const view = renderApp("/today");
+    expect(await screen.findByText("Jour sans travail : rien n'est proposé aujourd'hui.")).toBeVisible();
+    expect(screen.queryByText(/journée de travail est finie/)).toBeNull();
+    view.unmount();
+
+    state.today = emptyToday({ rest_day: true, work_ends_at: null, agenda: FULL.agenda });
+    renderApp("/today");
+    await screen.findByRole("list", { name: "Déroulé de la journée" });
+    expect(screen.getByText("Jour sans travail : rien n'est proposé aujourd'hui.")).toBeVisible();
+    expect(screen.queryByText("Rien de prévu aujourd'hui.")).toBeNull();
+  });
+
+  it("liste les préférences, par défaut ou confirmées, et en retire une après confirmation", async () => {
+    const state = installFakeApi({
+      loggedIn: true,
+      preferences: { lunch: "de 12 h 30 à 13 h 30", work_end: "21 h" },
+    });
+    renderApp("/today");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: /Mes préférences/ }));
+    const list = within(await screen.findByRole("list", { name: "Mes préférences" }));
+    expect(list.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "Début de la journée de travail8 h · par défaut",
+      "Fin de la journée de travail21 hRetirer",
+      "Déjeunerde 12 h 30 à 13 h 30Retirer",
+      "Dîneraucun · par défaut",
+      "Jours sans travailaucun · par défaut",
+      "Travail proposé par jour6 h au plus · par défaut",
+    ]);
+    expect(screen.getByText(/dis-le à Lorakus dans une conversation/)).toBeVisible();
+
+    // Annuler ne retire rien.
+    await user.click(list.getByRole("button", { name: "Retirer la préférence Déjeuner" }));
+    const asked = await screen.findByRole("alertdialog", { name: "Retirer « Déjeuner » ?" });
+    await user.click(within(asked).getByRole("button", { name: "Annuler" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+    expect(state.preferences.lunch).toBe("de 12 h 30 à 13 h 30");
+
+    await user.click(list.getByRole("button", { name: "Retirer la préférence Déjeuner" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Retirer « Déjeuner » ?" });
+    await user.click(within(dialog).getByRole("button", { name: "Retirer" }));
+
+    await waitFor(() => {
+      expect(state.preferences).toEqual({ work_end: "21 h" });
+    });
+    await waitFor(() => {
+      expect(list.getAllByRole("listitem")[2]).toHaveTextContent("Déjeuneraucun · par défaut");
+    });
+    // La journée est relue : le plan dépend des préférences.
+    const reads = state.requests.filter((r) => r.path === "/api/v1/planning/today").length;
+    expect(reads).toBeGreaterThanOrEqual(2);
   });
 
   it("n'a pas de défaut d'accessibilité détectable", async () => {

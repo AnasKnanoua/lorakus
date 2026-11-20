@@ -34,7 +34,7 @@ from lorakus.core.identity.service import CurrentUser, audit
 from lorakus.core.memory.models import MemoryRejection
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
-from lorakus.core.planning.models import AgendaEntry, Task
+from lorakus.core.planning.models import AgendaEntry, PlanningPreference, Task
 from lorakus.db.database import Database
 
 log = structlog.get_logger("lorakus.data")
@@ -210,9 +210,27 @@ class DataExportService:
                 .mappings()
                 .all()
             )
+            preferences = (
+                (
+                    await session.execute(
+                        select(
+                            PlanningPreference.key,
+                            PlanningPreference.value,
+                            PlanningPreference.source_ref,
+                            PlanningPreference.updated_at,
+                        ).order_by(PlanningPreference.key)
+                    )
+                )
+                .mappings()
+                .all()
+            )
         return {
             "tasks": [{**row, "source_ref": _source(row["source_ref"])} for row in tasks],
             "agenda": [dict(row) for row in agenda],
+            # Preferences de planification confirmees (PR 48).
+            "preferences": [
+                {**row, "source_ref": _source(row["source_ref"])} for row in preferences
+            ],
         }
 
     async def _identity_data(self, user_id: uuid.UUID) -> dict[str, Any]:
