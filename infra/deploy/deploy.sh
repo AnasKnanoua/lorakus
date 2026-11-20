@@ -167,6 +167,38 @@ activate() {
   wait_ready || return 1
 }
 
+# Supprime les images Lorakus qui ne servent plus : tout ce qui, dans NOTRE registre, n'est ni
+# la version en service ni la precedente (gardee pour un retour arriere sans telechargement).
+# Sans cela, chaque deploiement laisse ses images sur le disque jusqu'a le remplir.
+# Jamais un volume, jamais une image d'un autre projet ou d'un autre registre. docker refuse de
+# lui-meme une image qu'un conteneur utilise encore. Au mieux : une erreur ici ne change rien
+# au deploiement, deja reussi.
+prune_images() {
+  local file keep="" ref removed=0
+  for file in "$RELEASE" "$PREVIOUS"; do
+    if [ -f "$file" ]; then
+      keep+=$(sed -n 's/^LORAKUS_[A-Z]*_IMAGE=//p' "$file")$'\n'
+    fi
+  done
+  # Sans version connue, on ne sait pas quoi garder : on ne supprime rien.
+  if ! grep -q . <<<"$keep"; then
+    return 0
+  fi
+  while read -r ref; do
+    case "$ref" in
+      "$REGISTRY"/lorakus-*@sha256:*) ;;
+      *) continue ;;
+    esac
+    if grep -qxF -- "$ref" <<<"$keep"; then
+      continue
+    fi
+    if docker image rm "$ref" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    fi
+  done < <(docker image ls --digests --format '{{.Repository}}@{{.Digest}}' 2>/dev/null || true)
+  say "Anciennes images supprimees : $removed"
+}
+
 # Remet en service la version enregistree dans release.env.
 restore_current() {
   local commit
@@ -275,6 +307,7 @@ cmd_apply() {
   fi
   say "Version en service :"
   cat "$RELEASE"
+  prune_images || say "Nettoyage des anciennes images impossible (sans effet sur le deploiement)"
 }
 
 # Sauvegarde de la version en service. Lancee chaque nuit par le minuteur lorakus-backup.timer.
