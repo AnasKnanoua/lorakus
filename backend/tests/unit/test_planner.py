@@ -7,7 +7,7 @@ des tests sont des heures locales, converties par `at`.
 import itertools
 import random
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -26,6 +26,7 @@ from lorakus.core.planning.planner import (
     round_up,
     work_window,
 )
+from lorakus.core.planning.preferences import DEFAULTS, PlanningPrefs, TimeRange
 from lorakus.core.planning.service import AgendaView, TaskView
 
 ANKARA = ZoneInfo("Europe/Istanbul")
@@ -368,7 +369,7 @@ def test_the_plan_starts_now_and_skips_what_is_already_over() -> None:
 def test_after_ten_pm_nothing_is_planned_and_everything_is_left() -> None:
     homework = task("TP", minutes=120)
     plan = plan_day(at(22, 10), DAY, ANKARA, [], [homework])
-    assert (plan.window, plan.free, plan.blocks) == (None, (), ())
+    assert (plan.window, plan.rest_day, plan.free, plan.blocks) == (None, False, (), ())
     assert plan.leftovers == (Leftover(homework.id, 120),)
     assert plan.planned_minutes == 0
 
@@ -422,7 +423,7 @@ def test_every_plan_respects_the_rules(seed: int) -> None:
     wanted = {c.task.id: c.minutes for c in plan.candidates}
     left = {item.task_id: item.minutes for item in plan.leftovers}
     blocks = list(plan.blocks)
-    assert plan.planned_minutes <= planner.DAILY_CAP_MINUTES
+    assert plan.planned_minutes <= DEFAULTS.daily_cap
     assert blocks == sorted(blocks, key=lambda b: b.start)
     for first, second in itertools.pairwise(blocks):
         # Jamais deux blocs en meme temps, et toujours la pause entre deux.
@@ -439,3 +440,77 @@ def test_every_plan_respects_the_rules(seed: int) -> None:
         assert done + left.get(task_id, 0) == minutes  # rien de perdu, rien d'invente
     assert set(left) <= set(wanted) and all(m > 0 for m in left.values())
     assert {b.task_id for b in blocks} <= set(wanted)
+
+
+# -------------------------------------------------- preferences (PR 48)
+def test_the_window_follows_the_work_hours_preference() -> None:
+    prefs = PlanningPrefs(work_start=time(10, 30), work_end=time(19, 0))
+    assert work_window(at(6, 0), DAY, ANKARA, prefs) == span((10, 30), (19, 0))
+    assert work_window(at(12, 5), DAY, ANKARA, prefs) == span((12, 15), (19, 0))
+    assert work_window(at(19, 0), DAY, ANKARA, prefs) is None
+    assert work_window(at(20, 0), DAY, ANKARA) is not None  # sans preference : jusqu'a 22 h
+
+
+def test_no_work_is_proposed_on_a_rest_day() -> None:
+    homework = task("TP", minutes=60)
+    wednesday = PlanningPrefs(rest_days=frozenset({2}))  # le 18 novembre 2026 est un mercredi
+    plan = plan_day(at(9, 0), DAY, ANKARA, [], [homework], wednesday)
+    assert (plan.window, plan.rest_day, plan.blocks) == (None, True, ())
+    assert plan.leftovers == (Leftover(homework.id, 60),)
+    # Un autre jour de repos ne change rien a ce mercredi.
+    sunday = PlanningPrefs(rest_days=frozenset({6}))
+    plan = plan_day(at(9, 0), DAY, ANKARA, [], [homework], sunday)
+    assert (plan.rest_day, hours(list(plan.blocks))) == (False, [("09:00", "10:00")])
+    # Le jour local decide : a 23 h UTC mardi, il est deja mercredi a Ankara.
+    late = datetime(2026, 11, 17, 23, 0, tzinfo=UTC)
+    assert plan_day(late, DAY, ANKARA, [], [homework], wednesday).rest_day is True
+
+
+def test_meals_are_kept_free_and_listed_in_order() -> None:
+    prefs = PlanningPrefs(
+        lunch=TimeRange(time(12, 30), time(13, 30)), dinner=TimeRange(time(19, 0), time(20, 0))
+    )
+    homework = task("TP", minutes=360)
+    plan = plan_day(at(10, 0), DAY, ANKARA, [], [homework], prefs)
+    assert [(name, *hours([Block(homework.id, m.start, m.end)])[0]) for name, m in plan.meals] == [
+        ("lunch", "12:30", "13:30"),
+        ("dinner", "19:00", "20:00"),
+    ]
+    assert list(plan.free) == [
+        span((10, 0), (12, 30)),
+        span((13, 30), (19, 0)),
+        span((20, 0), (22, 0)),
+    ]
+    assert hours(list(plan.blocks)) == [
+        ("10:00", "12:00"),
+        ("13:30", "15:30"),
+        ("15:45", "17:45"),
+    ]
+    for block in plan.blocks:
+        for _, meal in plan.meals:
+            assert block.end <= meal.start or block.start >= meal.end
+    # Sans la preference, le meme travail passerait sur l'heure du dejeuner.
+    assert hours(list(plan_day(at(10, 0), DAY, ANKARA, [], [homework]).blocks))[1] == (
+        "12:15",
+        "14:15",
+    )
+
+
+def test_a_meal_and_a_class_that_overlap_are_one_busy_time() -> None:
+    prefs = PlanningPrefs(lunch=TimeRange(time(12, 30), time(13, 30)))
+    agenda = [event((11, 0), (13, 0))]
+    plan = plan_day(at(10, 0), DAY, ANKARA, agenda, [], prefs)
+    assert list(plan.free) == [span((10, 0), (11, 0)), span((13, 30), (22, 0))]
+    # Un repas hors de la fenetre de travail reste affiche, sans rien bloquer.
+    early = PlanningPrefs(lunch=TimeRange(time(6, 0), time(7, 0)))
+    plan = plan_day(at(5, 0), DAY, ANKARA, [], [], early)
+    assert (len(plan.meals), list(plan.free)) == (1, [span((8, 0), (22, 0))])
+
+
+def test_the_daily_cap_preference_replaces_six_hours() -> None:
+    work = [task(str(n), minutes=120, number=n + 1) for n in range(4)]
+    short = plan_day(at(8, 0), DAY, ANKARA, [], work, PlanningPrefs(daily_cap=150))
+    assert [b.minutes for b in short.blocks] == [120, 30]
+    assert short.planned_minutes == 150
+    long = plan_day(at(8, 0), DAY, ANKARA, [], work, PlanningPrefs(daily_cap=480))
+    assert long.planned_minutes == 480 and long.leftovers == ()

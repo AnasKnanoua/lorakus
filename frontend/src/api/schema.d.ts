@@ -839,6 +839,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/planning/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preferences
+         * @description Le catalogue entier, dans son ordre : la valeur confirmee, sinon celle par defaut.
+         */
+        get: operations["preferences_api_v1_planning_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/planning/preferences/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Preference
+         * @description Retire une preference confirmee : sa valeur par defaut s'applique de nouveau.
+         */
+        delete: operations["remove_preference_api_v1_planning_preferences__key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/planning/today": {
         parameters: {
             query?: never;
@@ -1389,6 +1429,29 @@ export interface components {
             /** Totp Enabled */
             totp_enabled: boolean;
         };
+        /**
+         * MealOut
+         * @description Un repas du jour (preference confirmee) : aucun travail n'y est propose.
+         */
+        MealOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Label */
+            label: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "lunch" | "dinner";
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
         /** MessageIn */
         MessageIn: {
             /** Content */
@@ -1490,6 +1553,23 @@ export interface components {
              */
             starts_at: string;
             task: components["schemas"]["TaskOut"];
+        };
+        /**
+         * PreferenceOut
+         * @description Une preference de planification, confirmee ou a sa valeur par defaut.
+         */
+        PreferenceOut: {
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "work_start" | "work_end" | "lunch" | "dinner" | "rest_days" | "daily_cap";
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
         };
         /**
          * ReadinessResponse
@@ -1656,12 +1736,16 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+            /** Meals */
+            meals: components["schemas"]["MealOut"][];
             /** Overdue */
             overdue: components["schemas"]["TaskOut"][];
             /** Plan */
             plan: components["schemas"]["PlanBlockOut"][];
             /** Planned Minutes */
             planned_minutes: number;
+            /** Rest Day */
+            rest_day: boolean;
             /** Timezone */
             timezone: string;
             /** Unplanned */
@@ -3263,6 +3347,55 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModuleResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preferences_api_v1_planning_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferenceOut"][];
+                };
+            };
+        };
+    };
+    remove_preference_api_v1_planning_preferences__key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "work_start" | "work_end" | "lunch" | "dinner" | "rest_days" | "daily_cap";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

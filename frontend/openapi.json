@@ -1181,6 +1181,41 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MealOut": {
+        "description": "Un repas du jour (preference confirmee) : aucun travail n'y est propose.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "lunch",
+              "dinner"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "MealOut",
+        "type": "object"
+      },
       "MessageIn": {
         "additionalProperties": false,
         "properties": {
@@ -1427,6 +1462,43 @@
           "assumed_duration"
         ],
         "title": "PlanBlockOut",
+        "type": "object"
+      },
+      "PreferenceOut": {
+        "description": "Une preference de planification, confirmee ou a sa valeur par defaut.",
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "key": {
+            "enum": [
+              "work_start",
+              "work_end",
+              "lunch",
+              "dinner",
+              "rest_days",
+              "daily_cap"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "value",
+          "is_default"
+        ],
+        "title": "PreferenceOut",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -1866,6 +1938,13 @@
             "title": "Generated At",
             "type": "string"
           },
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/MealOut"
+            },
+            "title": "Meals",
+            "type": "array"
+          },
           "overdue": {
             "items": {
               "$ref": "#/components/schemas/TaskOut"
@@ -1883,6 +1962,10 @@
           "planned_minutes": {
             "title": "Planned Minutes",
             "type": "integer"
+          },
+          "rest_day": {
+            "title": "Rest Day",
+            "type": "boolean"
           },
           "timezone": {
             "title": "Timezone",
@@ -1920,6 +2003,8 @@
           "timezone",
           "generated_at",
           "work_ends_at",
+          "rest_day",
+          "meals",
           "agenda",
           "plan",
           "planned_minutes",
@@ -4220,6 +4305,76 @@
         "summary": "Update Module",
         "tags": [
           "modules"
+        ]
+      }
+    },
+    "/api/v1/planning/preferences": {
+      "get": {
+        "description": "Le catalogue entier, dans son ordre : la valeur confirmee, sinon celle par defaut.",
+        "operationId": "preferences_api_v1_planning_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PreferenceOut"
+                  },
+                  "title": "Response Preferences Api V1 Planning Preferences Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preferences",
+        "tags": [
+          "planning"
+        ]
+      }
+    },
+    "/api/v1/planning/preferences/{key}": {
+      "delete": {
+        "description": "Retire une preference confirmee : sa valeur par defaut s'applique de nouveau.",
+        "operationId": "remove_preference_api_v1_planning_preferences__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "enum": [
+                "work_start",
+                "work_end",
+                "lunch",
+                "dinner",
+                "rest_days",
+                "daily_cap"
+              ],
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Preference",
+        "tags": [
+          "planning"
         ]
       }
     },

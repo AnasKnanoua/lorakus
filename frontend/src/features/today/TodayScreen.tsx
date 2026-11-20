@@ -1,12 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
-import type { AgendaEntry, PlanBlock, PlannedTask, Today } from "@/api/planning";
+import {
+  removePreference,
+  type AgendaEntry,
+  type Meal,
+  type PlanBlock,
+  type PlannedTask,
+  type Preference,
+  type Today,
+} from "@/api/planning";
+import { Collapsible } from "@/components/Collapsible";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/features/chat/ConfirmDialog";
 import { TopBar } from "@/features/chat/layout";
 import { cn } from "@/lib/cn";
 import { clockTime, duration, longDate, relativeDay } from "@/lib/format";
-import { todayQuery } from "@/lib/queries";
+import { preferencesQuery, todayQuery } from "@/lib/queries";
 import { NAV_ITEMS } from "@/navigation";
 
 /**
@@ -47,6 +58,7 @@ export function TodayScreen() {
 
 type Moment =
   | { kind: "event"; at: string; end: string; entry: AgendaEntry }
+  | { kind: "meal"; at: string; meal: Meal }
   | { kind: "block"; at: string; block: PlanBlock };
 
 function Day({ data }: { data: Today }) {
@@ -58,6 +70,7 @@ function Day({ data }: { data: Today }) {
         ? [{ kind: "event", at: entry.starts_at, end: entry.ends_at, entry }]
         : [],
     ),
+    ...data.meals.map((meal): Moment => ({ kind: "meal", at: meal.starts_at, meal })),
     ...data.plan.map((block): Moment => ({ kind: "block", at: block.starts_at, block })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
@@ -75,9 +88,11 @@ function Day({ data }: { data: Today }) {
         )}
         {moments.length === 0 ? (
           <p className="px-3 text-base text-ink-muted">
-            {data.work_ends_at === null && data.unplanned.length > 0
-              ? "La journée de travail est finie : le plan reprendra demain matin."
-              : "Rien de prévu aujourd'hui."}
+            {data.rest_day
+              ? "Jour sans travail : rien n'est proposé aujourd'hui."
+              : data.work_ends_at === null && data.unplanned.length > 0
+                ? "La journée de travail est finie : le plan reprendra demain matin."
+                : "Rien de prévu aujourd'hui."}
           </p>
         ) : (
           <ol aria-label="Déroulé de la journée" className="flex flex-col gap-0.5">
@@ -90,11 +105,18 @@ function Day({ data }: { data: Today }) {
                   end={moment.end}
                   data={data}
                 />
+              ) : moment.kind === "meal" ? (
+                <MealLine key={`m-${moment.meal.name}`} meal={moment.meal} timeZone={data.timezone} />
               ) : (
                 <BlockLine key={`b-${moment.at}`} block={moment.block} timeZone={data.timezone} />
               ),
             )}
           </ol>
+        )}
+        {data.rest_day && moments.length > 0 && (
+          <p className="px-3 pt-3 text-sm text-ink-faint">
+            Jour sans travail : rien n'est proposé aujourd'hui.
+          </p>
         )}
         {data.plan.length > 0 && (
           <p className="px-3 pt-3 text-sm text-ink-faint">
@@ -134,7 +156,69 @@ function Day({ data }: { data: Today }) {
           />
         )}
       </Section>
+      <Preferences />
     </div>
+  );
+}
+
+/**
+ * Ce que le planificateur sait de toi (PR 48) : horaires de travail, repas, jours sans travail,
+ * maximum par jour. On les RÈGLE en le disant à Lorakus (une carte demande confirmation) ; ici
+ * on les lit et on peut en retirer une.
+ */
+function Preferences() {
+  const queryClient = useQueryClient();
+  const preferences = useQuery(preferencesQuery);
+  const [removing, setRemoving] = useState<Preference | null>(null);
+  if (!preferences.data) return null;
+  return (
+    <Collapsible title="Mes préférences" defaultOpen={false} headerClassName="px-3">
+      <ul aria-label="Mes préférences" className="flex flex-col gap-0.5 pb-2">
+        {preferences.data.map((preference) => (
+          <li key={preference.key} className="flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base text-ink">{preference.label}</span>
+              <span className="block truncate text-sm text-ink-muted">
+                {preference.value}
+                {preference.is_default && <span className="text-ink-faint"> · par défaut</span>}
+              </span>
+            </span>
+            {!preference.is_default && (
+              <Button
+                variant="quiet"
+                size="sm"
+                aria-label={`Retirer la préférence ${preference.label}`}
+                onClick={() => {
+                  setRemoving(preference);
+                }}
+              >
+                Retirer
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="px-3 pb-3 text-sm text-ink-faint">
+        Pour en changer, dis-le à Lorakus dans une conversation, par exemple : « je déjeune de 12 h 30 à 13 h 30 »
+        ou « pas de travail après 21 h ». Une carte te demandera de confirmer.
+      </p>
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setRemoving(null);
+        }}
+        tone="plain"
+        title={`Retirer « ${removing?.label ?? ""} » ?`}
+        description="La valeur par défaut s'appliquera de nouveau. Tu pourras la redire à Lorakus."
+        confirmLabel="Retirer"
+        failure="Impossible de retirer cette préférence. Réessaie."
+        onConfirm={async () => {
+          if (removing) await removePreference(removing.key);
+          setRemoving(null);
+          await queryClient.invalidateQueries({ queryKey: ["planning"] });
+        }}
+      />
+    </Collapsible>
   );
 }
 
@@ -173,6 +257,16 @@ function EventLine({ entry, start, end, data }: { entry: AgendaEntry; start: str
         <span className="block truncate text-base text-ink">{entry.title}</span>
         {entry.location && <span className="block truncate text-sm text-ink-faint">{entry.location}</span>}
       </span>
+    </li>
+  );
+}
+
+function MealLine({ meal, timeZone }: { meal: Meal; timeZone: string }) {
+  return (
+    // Un repas (preference) : ni un creneau de l'agenda, ni du travail ; en retrait.
+    <li className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-ink-faint">
+      <Hours start={meal.starts_at} end={meal.ends_at} timeZone={timeZone} />
+      <span className="min-w-0 flex-1 truncate text-base">{meal.label}</span>
     </li>
   );
 }

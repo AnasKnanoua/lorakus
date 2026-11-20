@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lorakus.core.account.clock import local_today
 from lorakus.core.account.service import timezone_name, user_timezone
 from lorakus.core.planning.planner import DayPlan, plan_day
+from lorakus.core.planning.preferences import load
 from lorakus.core.planning.service import (
     MAX_LIST,
     AgendaView,
@@ -55,7 +56,7 @@ async def read_today(session: AsyncSession, now: datetime) -> TodayView:
         timezone=await timezone_name(session),
         now=now,
         agenda=tuple(agenda),
-        plan=plan_day(now, day, tz, agenda, tasks),
+        plan=plan_day(now, day, tz, agenda, tasks, await load(session)),
         tasks={str(t.id): t for t in tasks},
         overdue=tuple(t for t in tasks if t.overdue(day)),
         upcoming=upcoming_tasks(tasks, day),

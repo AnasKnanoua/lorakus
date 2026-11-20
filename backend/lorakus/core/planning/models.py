@@ -1,4 +1,4 @@
-"""Tables du planning (migration 0013). RLS forcee : chacun ne voit que ses lignes.
+"""Tables du planning (migrations 0013 et 0014). RLS forcee : chacun ne voit que ses lignes.
 
 Generiques (ADR 0018) : une tache ne connait ni devoir ni projet. `owner_module` et
 `owner_ref` disent quel module l'a creee et a quel objet elle correspond ; nuls pour une
@@ -8,6 +8,7 @@ repetition : `calendars` deplie les recurrences avant de les y ecrire.
 
 import uuid
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     Date,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lorakus.db.base import Base
@@ -111,3 +113,23 @@ class AgendaEntry(Base):
     source_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     external_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanningPreference(Base):
+    """Une preference de planification confirmee (migration 0014) : une ligne par cle.
+
+    Le catalogue des cles est ferme (preferences.py) ; la valeur est un petit objet JSON type
+    par la cle, valide par le code a l'ecriture ET a la lecture.
+    """
+
+    __tablename__ = "core_planning_preferences"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("core_users.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # Provenance (ADR 0015) : carte confirmee d'une conversation, ou saisie directe.
+    source_kind: Mapped[str] = mapped_column(Text)
+    source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
