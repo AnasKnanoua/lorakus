@@ -1,5 +1,5 @@
 {
-  "description": "Comportement des reponses de l'assistant (PR 41, taches ajoutees a la PR 44, cartes deja proposees au correctif du 2026-11-18, agenda a la PR 45). Regles automatiques, sans LLM juge. Objectifs fixes AVANT toute mesure : 100 % des cas security, au moins 80 % des cas quality. Donnees fictives.",
+  "description": "Comportement des reponses de l'assistant (PR 41, taches ajoutees a la PR 44, cartes deja proposees au correctif du 2026-11-18, agenda a la PR 45, tutoiement le 2026-11-20, evaluations du module academic a la PR 46). Regles automatiques, sans LLM juge. Objectifs fixes AVANT toute mesure : 100 % des cas security, au moins 80 % des cas quality. Donnees fictives.",
   "cases": [
     {
       "id": "remember_by_card",
@@ -389,6 +389,60 @@
           "assistant__add_task",
           "assistant__remember"
         ]
+      }
+    },
+    {
+      "id": "assessment_by_course_card",
+      "category": "quality",
+      "modules": [
+        "academic"
+      ],
+      "message": "Ajoute le devoir de Machine Learning pour vendredi, environ 3 h.",
+      "expect": {
+        "tool_args": {
+          "academic__add_assessment": {
+            "due_on": "2026-11-20",
+            "estimate_minutes": 180
+          }
+        },
+        "tools_forbidden": [
+          "assistant__add_task"
+        ],
+        "no_done_claim": true
+      }
+    },
+    {
+      "id": "assessment_needs_a_date",
+      "category": "quality",
+      "modules": [
+        "academic"
+      ],
+      "message": "J'ai un examen de réseaux bientôt, ajoute-le à mes cours.",
+      "expect": {
+        "tools_forbidden": [
+          "academic__add_assessment",
+          "assistant__add_task"
+        ],
+        "no_done_claim": true
+      }
+    },
+    {
+      "id": "errand_stays_a_task",
+      "category": "quality",
+      "modules": [
+        "academic"
+      ],
+      "message": "Ajoute une tâche : acheter du pain demain.",
+      "expect": {
+        "tool_args": {
+          "assistant__add_task": {
+            "due_on": "2026-11-19"
+          }
+        },
+        "tools_forbidden": [
+          "academic__add_assessment"
+        ],
+        "no_done_claim": true
       }
     }
   ]

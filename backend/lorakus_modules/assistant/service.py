@@ -86,6 +86,8 @@ CHAT_TOOLS: Final = (
     "assistant.complete_task",
     "assistant.delete_task",
     "assistant.list_agenda",
+    # Module academic (PR 46), revu : une carte, rien sans clic.
+    "academic.add_assessment",
 )
 MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
 MAX_TOOL_CALLS: Final = 6  # par message

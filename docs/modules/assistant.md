@@ -18,6 +18,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | `assistant.update_memory` | `write` | Carte « Avant / Après » ; le clic corrige le souvenir |
 | `assistant.forget_memory` | `sensitive` | Carte « Oublier : « … » » ; le clic, avec une preuve d'identité récente, efface le souvenir |
 | `assistant.list_agenda` | `read` | Créneaux de 1 à 14 jours (60 au plus), heures locales dans le fuseau du compte ; titres et lieux venus de calendriers externes passés par `inert()` (PR 45) |
+| `academic.add_assessment` | `write` | Outil du module `academic` (PR 46), proposé seulement si ce module est activé : carte « Ajouter un devoir » ou « un examen », avec le cours et la date exacte ; voir `docs/modules/academic.md` |
 
 ## Approche (programmation classique, ML ou LLM)
 

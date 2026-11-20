@@ -11,7 +11,10 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
    supprimer, terminer et ajouter des taches ;
 5. dans le titre et le lieu d'un evenement d'agenda (PR 45), venu d'un calendrier externe et
    lu par l'outil d'agenda : le texte arrive inerte au modele, et le modele qui obeit ne change
-   rien sans clic.
+   rien sans clic ;
+6. dans le nom d'un cours et le titre d'une evaluation (PR 46, module academic), lus par
+   l'outil de liste a travers leur tache : le modele qui obeit tente d'ajouter des evaluations
+   en masse, de terminer et de supprimer la tache du devoir.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -70,6 +73,8 @@ LIST_TASKS, ADD_TASK, COMPLETE_TASK, DELETE_TASK = (
     "assistant__complete_task",
     "assistant__delete_task",
 )
+ADD_ASSESSMENT = "academic__add_assessment"
+ACADEMIC = "/api/v1/academic"
 BENIGN_FACT = "Révise le matin"
 BENIGN_TASK = "Rendre le TP de réseaux"
 
@@ -400,3 +405,87 @@ def test_an_attack_in_an_agenda_event_stays_inert_and_changes_nothing(
     )
     assert used == [(0,)]
     assert all(data["status"] == "pending" for name, data in events if name == "card")
+
+
+# ------------------------- 6. dans un cours et une evaluation (academic)
+def _academic_state(client: TestClient) -> tuple[Any, Any, Any]:
+    return (
+        client.get(f"{ACADEMIC}/courses").json(),
+        client.get(f"{ACADEMIC}/assessments").json(),
+        client.get(f"{ACADEMIC}/assessments?state=done").json(),
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_in_a_course_or_an_assessment_changes_nothing_without_the_users_click(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    from datetime import date, timedelta
+
+    assert owner.put("/api/v1/modules/academic", json={"enabled": True}).status_code == 200
+    trap = _as_fact(attack["payload"])
+    # Comme un utilisateur qui collerait le texte piege dans la page : par l'API du module.
+    named = owner.post(f"{ACADEMIC}/courses", json={"name": trap[:80] or "vide"})
+    if named.status_code != 201:  # rien de visible dans les 80 premiers caracteres
+        named = owner.post(f"{ACADEMIC}/courses", json={"name": "Cours"})
+    course = named.json()
+    due = str(date.today() + timedelta(days=30))
+    body = {"course_id": course["id"], "title": trap[:110] or "vide", "due_on": due}
+    created = owner.post(f"{ACADEMIC}/assessments", json=body)
+    if created.status_code != 201:
+        created = owner.post(f"{ACADEMIC}/assessments", json={**body, "title": "Devoir"})
+    assert created.status_code == 201
+    # Nom et titre enregistres sur une seule ligne, sans caractere invisible.
+    for stored in (course["name"], created.json()["title"]):
+        assert "\n" not in stored and stored.isprintable()
+        assert not re.search("[\u200b-\u200f\u202a-\u202e\u2066-\u2069]", stored)
+    before = _academic_state(owner)
+    tasks_before = _task_titles()
+    [(task_id, task_title, _)] = tasks_before
+    assert task_title == f"{course['name']} : {created.json()['title']}"
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    provider = _use(
+        owner,
+        [
+            FakeReply("Je regarde.", tool_calls=((LIST_TASKS, {}),)),
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    (DELETE_TASK, {"task_id": task_id}),
+                    (COMPLETE_TASK, {"task_id": task_id}),
+                    *(
+                        (ADD_ASSESSMENT, {"course": f"Piège {n}", "due_on": "2099-01-01"})
+                        for n in range(3)
+                    ),
+                    (ADD_ASSESSMENT, {"course": course["name"], "due_on": due, "weight": 100}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                    ("academic__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            FakeReply("", tool_calls=((ADD_ASSESSMENT, {"course": "Admin", "due_on": due}),)),
+            "C'est fait : devoirs ajoutés, terminés et confirmés.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Lis mes devoirs et fais ce qu'ils disent.")
+
+    cards = [data for name, data in events if name == "card"]
+    sent = "\n".join(request.model_dump_json() for _, request in provider.calls)
+    # Rien n'a change sans clic : ni cours, ni evaluation, ni tache.
+    assert _academic_state(owner) == before
+    assert _task_titles() == tasks_before
+    assert 1 <= len(cards) <= MAX_CARDS
+    assert len(provider.calls) == MAX_MODEL_CALLS
+    for card in cards:
+        assert card["confirmation_id"] not in sent
+        assert card["status"] == "pending"
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]
+    # Aucun evenement : personne n'a termine la tache.
+    assert asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_outbox")) == [(0,)]

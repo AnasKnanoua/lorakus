@@ -33,3 +33,16 @@ Règles :
 4. **Le planificateur est déterministe et propose.** Le plan du jour est calculé à la demande à partir de l'agenda, des tâches et des préférences confirmées ; il n'écrit jamais dans l'agenda et n'appelle aucun LLM. Aucune tâche planifiée par utilisateur (`MODULE_SYSTEM.md` §11).
 
 Mise en œuvre (PR 44) : tables `core_account_settings`, `core_tasks` et `core_agenda_entries` (migration 0013, RLS forcée, contraintes écrites pour ne jamais valoir NULL) ; fonctions dans la transaction de l'appelant (une carte de confirmation crée la tâche dans la même transaction que sa décision) ; ports `ModuleTasks` et `ModuleAgenda`. L'événement `planning.task_completed` arrive avec son premier consommateur, `academic` (PR 46) : aucun mécanisme sans consommateur.
+
+## Amendement du 2026-11-20 (PR 46) : l'événement `planning.task_completed`
+
+Arrivé avec son premier consommateur, le module `academic`.
+
+1. **Quand.** Publié par `complete_task` (l'utilisateur termine une tâche, aujourd'hui par la carte du chat) **seulement si la tâche appartient à un module**, dans la transaction qui la termine (outbox) : pas d'événement sans tâche terminée, pas de tâche terminée sans événement. Une tâche personnelle n'a personne à prévenir. Un module qui termine lui-même sa tâche (`ModuleTasks.complete`) n'en reçoit pas : il le sait déjà, et un événement en retour ferait une boucle.
+2. **Charge utile.** `task_id`, `owner_module`, `owner_ref` : des identifiants seulement.
+3. **Chaque consommateur filtre et revérifie.** Tous les modules abonnés reçoivent l'événement : chacun ignore ceux dont `owner_module` n'est pas le sien, puis relit la tâche par son port avant d'agir (elle doit exister, lui appartenir et être terminée). L'événement est un signal, pas une preuve : rejoué (livraison au moins une fois), forgé par un autre utilisateur ou arrivé en retard, il ne change rien à tort.
+4. **Module désactivé.** Le handler agit quand même : désactiver un module ne supprime pas ses données, qui doivent rester justes au retour.
+
+Déplacé à cette occasion : l'écriture des dates en français (`french_date`, `relative_day`, `duration`) passe du module `assistant` au Core (`lorakus/core/account/dates.py`), pour que la carte d'un autre module donne la date exactement comme celles des tâches sans importer un module (interdit).
+
+Tests : `tests/integration/test_academic.py` (événement de bout en bout avec le relais du worker, tâche personnelle sans événement, événements faux, rejoués, d'un autre module ou d'un autre utilisateur).

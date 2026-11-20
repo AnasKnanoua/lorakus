@@ -9,6 +9,7 @@ import {
   useParams,
 } from "@tanstack/react-router";
 
+import { AcademicScreen } from "@/features/academic/AcademicScreen";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
 import { ConversationScreen } from "@/features/chat/ConversationScreen";
@@ -87,9 +88,16 @@ const calendarsRoute = createRoute({
   component: CalendarsScreen,
 });
 
+// Cours (PR 46) : devoirs et examens du module academic.
+const academicRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/academic",
+  component: AcademicScreen,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

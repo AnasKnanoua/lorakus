@@ -140,8 +140,8 @@ def test_the_export_holds_everything_and_no_real_secret(owner: TestClient) -> No
     assert data["account"]["email"] == OWNER_EMAIL
     assert data["account"]["second_factor_enabled"] is True
     assert data["account"]["backup_codes_remaining"] == 10
-    # Tous les modules connus, actives ou non (calendars : PR 45).
-    assert [m["id"] for m in data["modules"]] == ["assistant", "calendars"]
+    # Tous les modules connus, actives ou non (calendars : PR 45 ; academic : PR 46).
+    assert [m["id"] for m in data["modules"]] == ["academic", "assistant", "calendars"]
     assert [f["content"] for f in data["memory"]["facts"]] == ["Révise le matin"]
     assert data["memory"]["settings"] == {"propose_after_conversations": True}
     assert data["ai_usage"][0]["task"] == "chat" and data["ai_usage"][0]["calls"] == 2
@@ -167,7 +167,7 @@ def test_the_export_holds_everything_and_no_real_secret(owner: TestClient) -> No
     [(details,)] = _sql(
         "SELECT details FROM lorakus.core_audit_events WHERE action = 'data.export'"
     )
-    assert details == {"modules": ["assistant", "calendars"]}
+    assert details == {"modules": ["academic", "assistant", "calendars"]}
 
 
 def test_the_export_needs_a_recent_proof_of_identity(owner: TestClient) -> None:
@@ -202,7 +202,8 @@ def test_the_export_holds_a_disabled_module_and_only_my_data(owner: TestClient) 
     raw = owner.get(EXPORT).text
     data = json.loads(raw)
 
-    assert data["modules"][0]["enabled"] is False
+    enabled = {m["id"]: m["enabled"] for m in data["modules"]}
+    assert enabled["assistant"] is False
     assert [c["id"] for c in data["modules_data"]["assistant"]["conversations"]] == [mine]
     assert theirs not in raw and OTHER_EMAIL not in raw and "tennis" not in raw
     their_data = other.get(EXPORT).json()

@@ -26,6 +26,7 @@ from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lorakus.core.account.clock import day_bounds
+from lorakus.core.events.bus import publish
 from lorakus.core.identity.service import audit
 from lorakus.core.planning.models import AgendaEntry, Task
 
@@ -41,6 +42,9 @@ MAX_LIST: Final = 200
 MAX_ENTRIES_PER_SOURCE: Final = 2000
 MAX_LOCATION_CHARS: Final = 200
 MODULE_ID: Final = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
+# Evenement : l'UTILISATEUR a termine une tache creee par un module (PR 46). Charge utile :
+# task_id, owner_module, owner_ref (des identifiants seulement).
+TASK_COMPLETED: Final = "planning.task_completed"
 
 
 class InvalidTaskError(ValueError):
@@ -288,7 +292,13 @@ async def complete_task(
     now: datetime,
     ip: str | None = None,
 ) -> int:
-    """Termine une tache et ses sous-taches encore ouvertes ; rend le nombre de taches closes."""
+    """Termine une tache et ses sous-taches encore ouvertes ; rend le nombre de taches closes.
+
+    Si la tache vient d'un module, l'evenement `planning.task_completed` le previent, dans la
+    meme transaction (outbox) : son devoir ou son projet suit. Une tache personnelle n'a
+    personne a prevenir : aucun evenement. Un module qui termine lui-meme sa tache
+    (`ModuleTasks.complete`) n'en recoit pas non plus : il le sait deja.
+    """
     task = await session.get(Task, task_id, with_for_update=True)
     if task is None:
         raise TaskNotFoundError(task_id)
@@ -301,6 +311,17 @@ async def complete_task(
         .returning(Task.id)
     )
     closed = len(result.all())
+    if task.owner_module is not None:
+        await publish(
+            session,
+            TASK_COMPLETED,
+            {
+                "task_id": str(task_id),
+                "owner_module": task.owner_module,
+                "owner_ref": task.owner_ref,
+            },
+            user_id=user_id,
+        )
     await audit(
         session, user_id, "planning.task_complete", "success", ip, {"task_id": str(task_id)}
     )

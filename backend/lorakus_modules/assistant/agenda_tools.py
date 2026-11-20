@@ -13,10 +13,10 @@ from typing import Any, Final
 from pydantic import BaseModel, ConfigDict, Field
 
 from lorakus.core.account.clock import local_today
+from lorakus.core.account.dates import french_date, relative_day
 from lorakus.core.account.service import timezone_name, user_timezone
 from lorakus.core.planning.service import AgendaView, agenda_for_days
 from lorakus.core.tools.spec import ToolCall, ToolError, ToolSpec
-from lorakus_modules.assistant.dates import french_date, relative_day
 from lorakus_modules.assistant.prompts import inert
 
 MAX_DAYS: Final = 14

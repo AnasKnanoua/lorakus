@@ -45,3 +45,11 @@ Constaté en production le jour même : une carte confirmée était reproposée 
 3. **Issue écrite pour être comprise** : la note rappelle une carte « faite, après confirmation de l'utilisateur » (et non plus « confirmée »), « toujours affichée », « refusée » ou « expirée sans réponse » ; le prompt (`assistant-system-2026-11-18.3`) ajoute qu'une action déjà proposée ne se propose jamais une seconde fois.
 
 Tests : `test_the_same_action_never_waits_twice` (dont un outil sans argument, dont les arguments effacés après décision ressemblent à une nouvelle demande), cartes de mémoire et de tâches avec un faux modèle qui redemande l'outil à chaque message, 19 mutations détectées ; 2 cas au banc (`confirmed_card_not_again`, `waiting_card_not_again`).
+
+## Amendement du 2026-11-20 (PR 46) : premier outil d'un autre module
+
+`academic.add_assessment` (write) est ajouté à `CHAT_TOOLS` après revue : c'est le premier outil du chat qui n'appartient pas au module `assistant`. La liste reste dans `assistant` (le profil du Majordome) ; l'outil, son schéma et le texte de sa carte restent dans son module, et il n'est proposé au modèle que si l'utilisateur a activé ce module (`ToolRuntime.available`).
+
+Revue : la carte est écrite par le code (devoir ou examen, cours tel qu'il est enregistré, ou « nouveau cours » si le nom ne correspond à aucun, date absolue dans le fuseau du compte, durée, coefficient) ; nom du cours et titre ramenés à une ligne, donc incapables d'imiter une ligne de la carte ; échéance obligatoire dans le schéma (le modèle doit la demander plutôt que l'inventer) ; date passée ou à plus de 5 ans, évaluation ouverte identique et cours de trop refusés avant toute carte ; le clic crée le cours s'il manque, l'évaluation et sa tâche dans la transaction de la confirmation. Aucune consigne ajoutée au prompt système : c'est la description de l'outil qui dit de le préférer à une tâche simple pour un travail lié à un cours (version du prompt inchangée, `assistant-system-2026-11-20.1`).
+
+Corpus : position 6 (chaque attaque dans un nom de cours et un titre d'évaluation ; le modèle qui obéit tente d'ajouter des évaluations en masse, de terminer et de supprimer la tâche du devoir). Banc : 3 cas (25 au total, non encore mesurés avec le vrai modèle) : `assessment_by_course_card`, `assessment_needs_a_date`, `errand_stays_a_task`.

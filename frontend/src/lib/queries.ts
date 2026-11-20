@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { listAssessments, listCourses } from "@/api/academic";
 import { getAccountSettings } from "@/api/account";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
@@ -56,3 +57,18 @@ export const subscriptionsQuery = queryOptions({
   queryFn: listSubscriptions,
   refetchInterval: (query) => (query.state.data?.some((s) => s.status === "pending") ? 5_000 : 60_000),
 });
+
+/** Cours (PR 46). */
+export const coursesQuery = queryOptions({
+  queryKey: ["academic", "courses"],
+  queryFn: listCourses,
+});
+
+/** Evaluations ouvertes ou terminees (PR 46) ; relues chaque minute : une tache terminee dans
+ * le chat termine son evaluation quelques secondes plus tard, par un evenement. */
+export const assessmentsQuery = (state: "open" | "done") =>
+  queryOptions({
+    queryKey: ["academic", "assessments", state],
+    queryFn: () => listAssessments(state),
+    refetchInterval: 60_000,
+  });
