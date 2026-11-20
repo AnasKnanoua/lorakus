@@ -22,7 +22,7 @@ docker system df -v | sed -n '/VOLUME NAME/,$p' && sudo journalctl --disk-usage
 
 | Constat | Cause |
 | --- | --- |
-| Beaucoup d'images « reclaimable » | Chaque déploiement télécharge de nouvelles images ; `deploy.sh` ne supprime pas les anciennes |
+| Beaucoup d'images « reclaimable » | Images d'avant le nettoyage automatique (2026-11-20), ou d'un autre projet. Depuis cette date, chaque déploiement réussi supprime les images Lorakus qui ne sont ni la version en service ni la précédente (`prune_images` dans `deploy.sh`) |
 | Volume `lorakus_postgres-data` en forte hausse | Croissance des données, ou table qui enfle |
 | Volume `lorakus_prometheus-data` au-dessus de 1 Go | Anormal : la rétention est bornée à 15 jours et 1 Go |
 | `/var/log` ou journal systemd volumineux | Journaux du système (ceux des conteneurs sont bornés à 30 Mo chacun) |
@@ -32,10 +32,10 @@ docker system df -v | sed -n '/VOLUME NAME/,$p' && sudo journalctl --disk-usage
 
 Dans l'ordre, en s'arrêtant dès que l'espace libre repasse au-dessus de 20 % :
 
-1. **Images inutilisées de plus de 7 jours** (sans risque : seules les images qu'aucun conteneur n'utilise sont supprimées) :
+1. **Images inutilisées** (sans risque : seules les images qu'aucun conteneur n'utilise sont supprimées ; aucun volume n'est touché). La version précédente part aussi : un retour arrière la retéléchargera.
 
    ```bash
-   docker image prune -a --filter "until=168h" && docker builder prune -f && df -h /
+   docker image prune -a -f && docker builder prune -f && df -h /
    ```
 
 2. **Journal systemd** : `sudo journalctl --vacuum-size=200M`.
@@ -58,4 +58,4 @@ Dans l'ordre, en s'arrêtant dès que l'espace libre repasse au-dessus de 20 % :
 
 ## Après l'incident
 
-Si la cause est l'accumulation d'images, ouvrir une PR pour que `deploy.sh` nettoie les images qui ne sont ni la version en service ni la précédente.
+L'accumulation d'images est traitée depuis le 2026-11-20 (alertes « avertissement » puis « critique » reçues ce jour-là, après une série de déploiements). Si le disque se remplit encore, la cause est ailleurs : reprendre les vérifications ci-dessus. Rappel : ces alertes mesurent le disque `/` du serveur, pas celui d'un poste de travail.
