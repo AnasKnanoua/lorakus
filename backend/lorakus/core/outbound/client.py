@@ -214,6 +214,53 @@ def _header(headers: Sequence[tuple[bytes, bytes]], name: bytes) -> str | None:
     return None
 
 
+def _translate(error: Exception) -> OutboundError:
+    """Erreur de httpcore ou de TLS traduite en raison stable (ou relancee telle quelle)."""
+    if isinstance(error, OutboundError):
+        return error
+    if isinstance(error, httpcore2.TimeoutException):
+        return OutboundError("timeout")
+    if isinstance(error, (httpcore2.ConnectError, httpcore2.ReadError, httpcore2.WriteError)):
+        if isinstance(error.__cause__ or error.__context__, ssl.SSLError):
+            return OutboundError("tls")
+        return OutboundError("connect")
+    if isinstance(error, ssl.SSLError):
+        return OutboundError("tls")
+    if isinstance(error, (httpcore2.ProtocolError, httpcore2.UnsupportedProtocol)):
+        return OutboundError("protocol")
+    raise error
+
+
+def _timeouts(bounds: FetchLimits) -> dict[str, float]:
+    return {
+        "connect": bounds.connect_timeout_s,
+        "read": bounds.read_timeout_s,
+        "write": bounds.read_timeout_s,
+        "pool": bounds.connect_timeout_s,
+    }
+
+
+def _target(url: SafeUrl) -> httpcore2.URL:
+    return httpcore2.URL(
+        scheme=b"https", host=url.host.encode("ascii"), port=url.port, target=url.target
+    )
+
+
+@dataclass(frozen=True)
+class PostResult:
+    """Issue d'un POST : le statut tel que le serveur l'a donne (jamais suivi)."""
+
+    status: int
+    host: str
+    retry_after: str | None = None
+
+
+# Un POST ne lit de la reponse que de quoi la consommer : c'est le statut qui compte.
+POST_LIMITS: Final = FetchLimits(
+    max_bytes=64 * 1024, connect_timeout_s=5.0, read_timeout_s=10.0, total_timeout_s=15.0
+)
+
+
 class OutboundHttp:
     """Client sortant. Une instance par processus ; sans etat entre deux appels."""
 
@@ -256,6 +303,68 @@ class OutboundHttp:
             checked.append(str(address))
         return checked
 
+    def _pool(self, url: SafeUrl, addresses: Sequence[str]) -> httpcore2.AsyncConnectionPool:
+        return httpcore2.AsyncConnectionPool(
+            ssl_context=self._ssl,
+            network_backend=_PinnedBackend(url.host, addresses),
+            max_connections=1,
+            max_keepalive_connections=0,
+            http1=True,
+            http2=False,
+            retries=0,
+        )
+
+    async def post(
+        self,
+        url: str,
+        body: bytes,
+        headers: Sequence[tuple[str, str]],
+        *,
+        limits: FetchLimits = POST_LIMITS,
+    ) -> PostResult:
+        """POST unique (Web Push, ADR 0042) : memes controles qu'un GET pour l'adresse, aucune
+        redirection suivie (une redirection est rendue comme un statut), aucune reprise.
+
+        Le statut est rendu quel qu'il soit : c'est a l'appelant de savoir ce que 404 ou 429
+        veulent dire pour lui. Seules les pannes de transport levent OutboundError.
+        """
+        try:
+            safe = parse_public_url(url)
+        except InvalidUrlError as error:
+            raise OutboundError("invalid_url", str(error)) from None
+        sent = [
+            (b"User-Agent", self._user_agent.encode("ascii")),
+            (b"Content-Length", str(len(body)).encode("ascii")),
+            (b"Connection", b"close"),
+            *((key.encode("ascii"), value.encode("ascii")) for key, value in headers),
+        ]
+        try:
+            with anyio.fail_after(limits.total_timeout_s):
+                addresses = await self._addresses(safe)
+                pool = self._pool(safe, addresses)
+                async with (
+                    pool,
+                    pool.stream(
+                        "POST",
+                        _target(safe),
+                        headers=sent,
+                        content=body,
+                        extensions={"timeout": _timeouts(limits)},
+                    ) as r,
+                ):
+                    read = 0
+                    async for chunk in r.aiter_stream():
+                        read += len(chunk)
+                        if read > limits.max_bytes:
+                            break  # reponse trop longue : on n'en a pas besoin
+                    retry_after = _header(r.headers, b"retry-after")
+                    log.info("outbound_post", host=safe.host, status=r.status)
+                    return PostResult(r.status, safe.host, retry_after)
+        except TimeoutError:
+            raise OutboundError("timeout") from None
+        except Exception as error:
+            raise _translate(error) from None
+
     async def get(
         self, url: str, *, limits: FetchLimits | None = None, accept: str = "*/*"
     ) -> FetchResult:
@@ -288,34 +397,19 @@ class OutboundHttp:
         self, url: SafeUrl, addresses: Sequence[str], bounds: FetchLimits, accept: str
     ) -> FetchResult | str:
         """Un saut : la reponse finale, ou l'adresse de redirection (non suivie ici)."""
-        timeouts = {
-            "connect": bounds.connect_timeout_s,
-            "read": bounds.read_timeout_s,
-            "write": bounds.read_timeout_s,
-            "pool": bounds.connect_timeout_s,
-        }
-        target = httpcore2.URL(
-            scheme=b"https", host=url.host.encode("ascii"), port=url.port, target=url.target
-        )
         headers = [
             (b"User-Agent", self._user_agent.encode("ascii")),
             (b"Accept", accept.encode("ascii")),
             (b"Accept-Encoding", b"gzip, identity"),
             (b"Connection", b"close"),
         ]
-        pool = httpcore2.AsyncConnectionPool(
-            ssl_context=self._ssl,
-            network_backend=_PinnedBackend(url.host, addresses),
-            max_connections=1,
-            max_keepalive_connections=0,
-            http1=True,
-            http2=False,
-            retries=0,
-        )
+        pool = self._pool(url, addresses)
         try:
             async with (
                 pool,
-                pool.stream("GET", target, headers=headers, extensions={"timeout": timeouts}) as r,
+                pool.stream(
+                    "GET", _target(url), headers=headers, extensions={"timeout": _timeouts(bounds)}
+                ) as r,
             ):
                 if r.status in _REDIRECTS:
                     location = _header(r.headers, b"location")
@@ -333,19 +427,5 @@ class OutboundHttp:
                     decoder.feed(chunk)
                 body = decoder.finish()
                 return FetchResult(body, r.status, _header(r.headers, b"content-type"), "", 0)
-        except OutboundError:
-            raise
-        except httpcore2.TimeoutException:
-            raise OutboundError("timeout") from None
-        except httpcore2.ConnectError as error:
-            if isinstance(error.__cause__ or error.__context__, ssl.SSLError):
-                raise OutboundError("tls") from None
-            raise OutboundError("connect") from None
-        except (httpcore2.ReadError, httpcore2.WriteError) as error:
-            if isinstance(error.__cause__ or error.__context__, ssl.SSLError):
-                raise OutboundError("tls") from None
-            raise OutboundError("connect") from None
-        except ssl.SSLError:
-            raise OutboundError("tls") from None
-        except (httpcore2.ProtocolError, httpcore2.UnsupportedProtocol):
-            raise OutboundError("protocol") from None
+        except Exception as error:
+            raise _translate(error) from None

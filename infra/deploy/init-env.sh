@@ -116,6 +116,27 @@ generated LORAKUS_FIELD_ENCRYPTION_KEY "$(random_key)"
 # Chiffrement des adresses ICS secretes (ADR 0041) : API et worker. Hors sauvegardes ; la
 # perdre oblige seulement a recopier les adresses des calendriers.
 generated LORAKUS_CONNECTOR_ENCRYPTION_KEY "$(random_key)"
+# Paire VAPID des notifications Web Push (ADR 0042), courbe P-256, en hexadecimal : la cle
+# privee (64 caracteres) au seul worker, la publique (130) a l'API et au worker. Hors
+# sauvegardes ; la perdre oblige seulement a reactiver les notifications sur chaque appareil.
+vapid_pair() {
+  if has LORAKUS_VAPID_PRIVATE_KEY; then
+    has LORAKUS_VAPID_PUBLIC_KEY || { echo "LORAKUS_VAPID_PUBLIC_KEY manquante" >&2; exit 1; }
+    [ "$GENERATED_ONLY" = 1 ] || echo "  conserve   LORAKUS_VAPID_PRIVATE_KEY"
+    return 0
+  fi
+  local der
+  # Cle EC au format SEC1 (DER) : 30 77 02 01 01 04 20 <32 octets prives> ... 03 42 00 <65>.
+  der=$(openssl ecparam -name prime256v1 -genkey -noout -outform DER | od -An -tx1 | tr -d ' \n')
+  if [ "${#der}" -ne 242 ] || [ "${der:0:14}" != "30770201010420" ] || [ "${der:112:2}" != "04" ]; then
+    echo "cle VAPID : format OpenSSL inattendu" >&2
+    exit 1
+  fi
+  put LORAKUS_VAPID_PRIVATE_KEY "${der:14:64}"
+  put LORAKUS_VAPID_PUBLIC_KEY "${der:112:130}"
+  echo "  genere     LORAKUS_VAPID_PRIVATE_KEY et LORAKUS_VAPID_PUBLIC_KEY"
+}
+vapid_pair
 
 if [ "$GENERATED_ONLY" = 1 ]; then
   chmod 600 "$ENV_FILE"

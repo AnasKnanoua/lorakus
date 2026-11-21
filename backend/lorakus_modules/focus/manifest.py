@@ -1,10 +1,13 @@
 """Manifeste du module Focus : le Sergent (MODULE_SYSTEM.md §2, PR 50)."""
 
-from lorakus.core.modules.manifest import ModuleManifest
+from lorakus.core.modules.manifest import ModuleManifest, Signal
 from lorakus_modules.focus.specialist import PROFILE
 from lorakus_modules.focus.tools import TOOLS
 
-__all__ = ["manifest"]
+# Importer le job l'enregistre (@periodic) dans l'API et dans le worker.
+from lorakus_modules.focus.watch import SIGNAL, deadline_watch
+
+__all__ = ["deadline_watch", "manifest"]
 
 
 async def check_health() -> bool:
@@ -24,6 +27,15 @@ manifest = ModuleManifest(
     permissions=["focus:read", "focus:write"],
     # Aucune table : il lit le planning du Core (ADR 0018), sous la RLS de l'utilisateur.
     specialist=PROFILE,
+    # Prendre les devants (P5, ADR 0042) : un seul rappel avant une echeance, decide par la
+    # politique d'intervention du Core (jamais une notification directe).
+    signals_produced=[
+        Signal(
+            name=SIGNAL,
+            kind="scheduled",
+            description="Tâche à rendre dans 3 jours ou moins, sans étape terminée.",
+        )
+    ],
     tools=TOOLS,
     health=check_health,
 )

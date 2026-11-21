@@ -22,3 +22,7 @@ OAuth Google Calendar (jetons limités tant que l'app n'est pas vérifiée) ; nt
 
 
 Amendement du 2026-11-09 : les alertes d'exploitation passent par Discord (ADR 0035) ; Telegram est réservé aux notifications du produit.
+
+## Amendement du 2026-11-22 (P5, ADR 0042)
+
+Web Push devient le canal principal des notifications du produit (contenu chiffré de bout en bout) ; Telegram sert à la capture d'idées et de second canal, sans contenu personnel.

@@ -24,6 +24,7 @@ from lorakus.core.identity.crypto import FieldCipher
 from lorakus.core.jobs.port import registry as job_registry
 from lorakus.core.jobs.procrastinate_queue import ProcrastinateQueue
 from lorakus.core.modules.registry import ModuleRegistry
+from lorakus.core.signals import jobs as signal_jobs
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -64,6 +65,9 @@ async def run() -> None:
     # Cle des secrets des connecteurs (ADR 0041) : absente en staging ou en production, le
     # worker refuse de demarrer (ValueError) plutot que d'echouer a chaque synchronisation.
     FieldCipher.for_connectors(settings)
+    # Cles VAPID (ADR 0042) : une paire incoherente empeche de demarrer, plutot que d'echouer
+    # a chaque notification. Absentes : cartes seulement, sans notification.
+    signal_jobs.pusher()
     # Importer les manifestes enregistre les handlers (@on) et les jobs (@job) des modules.
     modules = ModuleRegistry.from_entry_points()
     database = Database.connect(settings)

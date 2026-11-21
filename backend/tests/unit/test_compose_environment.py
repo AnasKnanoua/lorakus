@@ -19,6 +19,9 @@ ALLOWED = {
     "LORAKUS_ANTHROPIC_API_KEY": {"api"},
     "LORAKUS_APP_DB_PASSWORD": {"postgres", "api", "worker"},
     "BACKUP_AGE_RECIPIENT": {"backup"},
+    # Notifications (ADR 0042) : le worker envoie ; l'API ne voit que la cle publique.
+    "LORAKUS_VAPID_PRIVATE_KEY": {"worker"},
+    "LORAKUS_VAPID_PUBLIC_KEY": {"api", "worker"},
 }
 
 

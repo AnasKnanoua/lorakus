@@ -5,6 +5,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect,
   useParams,
 } from "@tanstack/react-router";
@@ -83,6 +84,14 @@ const dataRoute = createRoute({
   component: DataScreen,
 });
 
+// Notifications (P5) : appareils abonnés et règles, depuis l'icône du pied de la barre latérale.
+// Chargée à la demande : une page de réglages rarement ouverte n'alourdit pas le premier chargement.
+const notificationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/notifications",
+  component: lazyRouteComponent(() => import("@/features/notifications/NotificationsScreen"), "NotificationsScreen"),
+});
+
 // Calendriers (PR 45) : abonnements ICS, dans la barre laterale, apres les destinations de l'assistant.
 const calendarsRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -113,7 +122,7 @@ const todayRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute, projectsRoute, todayRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, notificationsRoute, calendarsRoute, academicRoute, projectsRoute, todayRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

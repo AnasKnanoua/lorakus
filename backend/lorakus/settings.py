@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     # Reponses IA simultanees par utilisateur (dans ce processus).
     ai_concurrent_calls: int = Field(default=2, ge=1)
 
+    # --- Notifications Web Push (P5, ADR 0042) ---
+    # Paire VAPID creee par init-env.sh (P-256, en hexadecimal). Le worker, qui envoie, recoit
+    # les deux ; l'API ne recoit que la publique (donnee aux navigateurs a l'abonnement).
+    # Vides : notifications indisponibles (les cartes de l'application restent).
+    vapid_public_key: str = Field(default="", pattern=r"^(04[0-9a-f]{128})?$")
+    vapid_private_key: SecretStr = SecretStr("")
+
     # --- Memoire (PR 36) ---
     # Delai entre le dernier message d'une conversation et l'analyse qui propose des faits :
     # plusieurs messages proches ne coutent qu'une analyse.

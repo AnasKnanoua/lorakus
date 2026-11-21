@@ -219,6 +219,7 @@ class Handler(BaseHTTPRequestHandler):
     """Reponses scriptees par chemin ; chaque requete est notee (hote demande)."""
 
     seen: ClassVar[list[tuple[str, str]]] = []
+    posted: ClassVar[list[tuple[str, dict[str, str], bytes]]] = []
     ICS: ClassVar[bytes] = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n"
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -282,6 +283,24 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404)
 
+    def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length)
+        Handler.posted.append((self.path, dict(self.headers.items()), body))
+        if self.path == "/push/ok":
+            self._send(201)
+        elif self.path == "/push/gone":
+            self._send(410, b"expired")
+        elif self.path == "/push/busy":
+            self._send(429, headers={"Retry-After": "60"})
+        elif self.path == "/push/hop":
+            self._send(307, headers={"Location": "https://prive.example.com/push/ok"})
+        elif self.path == "/push/slow":
+            time.sleep(3)
+            self._send(201)
+        else:
+            self._send(404)
+
 
 @pytest.fixture(scope="module")
 def server(tls_files: dict[str, Path]) -> Iterator[int]:
@@ -336,6 +355,7 @@ def standard_dns() -> FakeDns:
 @pytest.fixture(autouse=True)
 def clear_seen() -> None:
     Handler.seen.clear()
+    Handler.posted.clear()
 
 
 # ------------------------------------------------------------ client complet
@@ -502,3 +522,72 @@ async def test_unknown_names_and_closed_ports(
     with pytest.raises(OutboundError) as error:
         await http.get("https://agenda.example.com:9/ok.ics")
     assert error.value.reason == "connect"
+
+
+# ------------------------------------------------------------------ POST (Web Push)
+async def test_post_sends_the_body_and_headers_once(
+    server: int, tls_files: dict[str, Path]
+) -> None:
+    result = await client(tls_files, standard_dns()).post(
+        f"https://agenda.example.com:{server}/push/ok",
+        b"\x00chiffre\xff",
+        [("Content-Encoding", "aes128gcm"), ("TTL", "60")],
+    )
+    assert (result.status, result.host) == (201, "agenda.example.com")
+    [(path, headers, body)] = Handler.posted
+    assert path == "/push/ok" and body == b"\x00chiffre\xff"
+    assert headers["Content-Encoding"] == "aes128gcm" and headers["TTL"] == "60"
+    assert headers["Content-Length"] == "9"
+
+
+@pytest.mark.parametrize(("path", "status"), [("gone", 410), ("busy", 429), ("absent", 404)])
+async def test_post_returns_any_status_as_is(
+    server: int, tls_files: dict[str, Path], path: str, status: int
+) -> None:
+    result = await client(tls_files, standard_dns()).post(
+        f"https://agenda.example.com:{server}/push/{path}", b"x", []
+    )
+    assert result.status == status
+    assert result.retry_after == ("60" if path == "busy" else None)
+
+
+async def test_post_never_follows_a_redirect(server: int, tls_files: dict[str, Path]) -> None:
+    result = await client(tls_files, standard_dns()).post(
+        f"https://agenda.example.com:{server}/push/hop", b"x", []
+    )
+    assert result.status == 307
+    assert len(Handler.posted) == 1
+
+
+async def test_post_to_a_private_address_is_never_sent(
+    server: int, tls_files: dict[str, Path]
+) -> None:
+    with pytest.raises(OutboundError) as error:
+        await client(tls_files, standard_dns()).post(
+            f"https://prive.example.com:{server}/push/ok", b"x", []
+        )
+    assert error.value.reason == "forbidden_address"
+    with pytest.raises(OutboundError) as error:
+        await client(tls_files, standard_dns()).post("http://agenda.example.com/push/ok", b"x", [])
+    assert error.value.reason == "invalid_url"
+    assert Handler.posted == []
+
+
+async def test_post_time_is_bounded(server: int, tls_files: dict[str, Path]) -> None:
+    started = time.monotonic()
+    with pytest.raises(OutboundError) as error:
+        await client(tls_files, standard_dns()).post(
+            f"https://agenda.example.com:{server}/push/slow",
+            b"x",
+            [],
+            limits=FetchLimits(total_timeout_s=1.0),
+        )
+    assert error.value.reason == "timeout"
+    assert time.monotonic() - started < 2.5
+
+
+async def test_post_with_an_untrusted_certificate_is_refused(server: int) -> None:
+    production = OutboundHttp(resolver=standard_dns(), address_policy=only_loopback_or_public)
+    with pytest.raises(OutboundError) as error:
+        await production.post(f"https://agenda.example.com:{server}/push/ok", b"x", [])
+    assert error.value.reason == "tls"

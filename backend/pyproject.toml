@@ -161,6 +161,15 @@ source_modules = ["lorakus.ai.port", "lorakus.ai.router", "lorakus.ai.catalog", 
 forbidden_modules = ["anthropic", "onnxruntime", "tokenizers"]
 allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas appeler le SDK
 
+# Les rappels ne dependent d'aucun modele de langage (P5, ADR 0042, scenario 8) : la politique
+# d'intervention, l'envoi des notifications et la regle des echeances du Sergent continuent
+# quand le fournisseur d'IA est coupe. Imports indirects compris.
+[[tool.importlinter.contracts]]
+name = "Les rappels n'utilisent aucun modele de langage"
+type = "forbidden"
+source_modules = ["lorakus.core.signals", "lorakus_modules.focus.watch"]
+forbidden_modules = ["lorakus.ai"]
+
 # Modules decouverts par le Core.
 [project.entry-points."lorakus.modules"]
 academic = "lorakus_modules.academic.manifest:manifest"

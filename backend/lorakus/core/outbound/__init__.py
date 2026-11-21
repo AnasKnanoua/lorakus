@@ -5,6 +5,7 @@ from lorakus.core.outbound.client import (
     FetchResult,
     OutboundError,
     OutboundHttp,
+    PostResult,
     system_resolver,
 )
 from lorakus.core.outbound.policy import (
@@ -21,6 +22,7 @@ __all__ = [
     "InvalidUrlError",
     "OutboundError",
     "OutboundHttp",
+    "PostResult",
     "SafeUrl",
     "display_hint",
     "is_public_address",

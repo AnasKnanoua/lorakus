@@ -25,9 +25,11 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: false,
-    // Environ 190 Ko compresses (React et le rendu Markdown), mis en cache par le service
-    // worker apres la premiere visite : acceptable, on ne decoupe pas avant d'en avoir besoin.
-    chunkSizeWarningLimit: 700,
+    // Environ 214 Ko compresses (React et le rendu Markdown) apres la P5 (701 Ko minifies), mis
+    // en cache par le service worker apres la premiere visite : acceptable, on ne decoupe pas
+    // avant d'en avoir besoin. Les pages de reglages rarement ouvertes (Notifications) sont
+    // chargees a la demande.
+    chunkSizeWarningLimit: 750,
   },
   test: {
     environment: "jsdom",

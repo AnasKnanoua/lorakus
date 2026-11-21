@@ -96,6 +96,8 @@ Sans elle, une base restaurée sur un serveur neuf garde ses comptes mais perd l
 
 `LORAKUS_CONNECTOR_ENCRYPTION_KEY` (PR 45, ADR 0041) chiffre les adresses secrètes des calendriers ICS. Créée de la même façon, au premier déploiement de la PR 45 ; donnée à l'API **et au worker** (qui synchronise), jamais la clé précédente. L'API et le worker refusent de démarrer sans elle en staging et en production. Hors sauvegardes elle aussi ; la perdre oblige seulement à supprimer les abonnements et à recopier leurs adresses : la copier dans le gestionnaire de mots de passe est conseillé, pas indispensable.
 
+`LORAKUS_VAPID_PRIVATE_KEY` et `LORAKUS_VAPID_PUBLIC_KEY` (P5, ADR 0042) : la paire des notifications Web Push (courbe P-256, en hexadécimal), créée par `init-env.sh` avec OpenSSL au premier déploiement de la PR 52, sans rien demander. La privée va au seul **worker** (qui envoie), la publique à l'API (donnée aux navigateurs) et au worker ; une paire incohérente empêche le worker de démarrer. Absentes : pas de notification, les cartes « À noter » restent. Hors sauvegardes ; la perdre oblige seulement à réactiver les notifications sur chaque appareil (page « Notifications »). Ne jamais la régénérer sans raison : chaque appareil devrait se réabonner.
+
 ### 4.4 Staging éphémère
 
 Avant chaque `deploy`, le job `staging` (runner ARM, même architecture que la production) installe la version en production, y écrit une donnée témoin, déploie la nouvelle version par-dessus avec le vrai `deploy.sh`, essaie le retour arrière, redéploie, lance une sauvegarde et une alerte de test, puis restaure la dernière sauvegarde en suivant le [runbook](docs/runbooks/restore.md) et vérifie la donnée témoin. S'il échoue, la production n'est pas touchée.

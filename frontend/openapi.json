@@ -1760,6 +1760,136 @@
         "title": "ProjectTaskOut",
         "type": "object"
       },
+      "PushDeviceIn": {
+        "description": "L'abonnement tel que le rend le navigateur (PushSubscription.toJSON) et un nom.",
+        "properties": {
+          "endpoint": {
+            "maxLength": 1024,
+            "minLength": 10,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushDeviceKeys"
+          },
+          "label": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys",
+          "label"
+        ],
+        "title": "PushDeviceIn",
+        "type": "object"
+      },
+      "PushDeviceKeys": {
+        "properties": {
+          "auth": {
+            "maxLength": 30,
+            "minLength": 16,
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "maxLength": 100,
+            "minLength": 80,
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushDeviceKeys",
+        "type": "object"
+      },
+      "PushDeviceOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "service",
+          "created_at",
+          "last_success_at"
+        ],
+        "title": "PushDeviceOut",
+        "type": "object"
+      },
+      "PushInfoOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/PushDeviceOut"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "max_devices": {
+            "title": "Max Devices",
+            "type": "integer"
+          },
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key"
+          }
+        },
+        "required": [
+          "available",
+          "public_key",
+          "devices",
+          "max_devices"
+        ],
+        "title": "PushInfoOut",
+        "type": "object"
+      },
       "ReadinessResponse": {
         "description": "Reponse de la route de disponibilite.",
         "properties": {
@@ -1806,6 +1936,174 @@
           "password"
         ],
         "title": "ReauthRequest",
+        "type": "object"
+      },
+      "ReminderDecisionOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "app",
+              "push"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "delivered": {
+            "title": "Delivered",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "channel",
+          "reason",
+          "at",
+          "delivered",
+          "failed"
+        ],
+        "title": "ReminderDecisionOut",
+        "type": "object"
+      },
+      "ReminderFactOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "source",
+          "measured"
+        ],
+        "title": "ReminderFactOut",
+        "type": "object"
+      },
+      "ReminderOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "module",
+          "title",
+          "body",
+          "url",
+          "created_at"
+        ],
+        "title": "ReminderOut",
+        "type": "object"
+      },
+      "ReminderWhyOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ReminderFactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "interventions": {
+            "items": {
+              "$ref": "#/components/schemas/ReminderDecisionOut"
+            },
+            "title": "Interventions",
+            "type": "array"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "rule",
+          "facts",
+          "status",
+          "outcome",
+          "created_at",
+          "interventions"
+        ],
+        "title": "ReminderWhyOut",
         "type": "object"
       },
       "SettingsIn": {
@@ -4669,6 +4967,242 @@
         "summary": "Update Module",
         "tags": [
           "modules"
+        ]
+      }
+    },
+    "/api/v1/notifications/cards": {
+      "get": {
+        "operationId": "cards_api_v1_notifications_cards_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReminderOut"
+                  },
+                  "title": "Response Cards Api V1 Notifications Cards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cards",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/cards/{card_id}/why": {
+      "get": {
+        "operationId": "why_api_v1_notifications_cards__card_id__why_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderWhyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Why",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/cards/{card_id}/{action}": {
+      "post": {
+        "operationId": "act_api_v1_notifications_cards__card_id___action__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "seen",
+                "close",
+                "later"
+              ],
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Act",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push": {
+      "get": {
+        "operationId": "push_api_v1_notifications_push_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Push",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/devices": {
+      "post": {
+        "operationId": "subscribe_api_v1_notifications_push_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Subscribe",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/devices/{device_id}": {
+      "delete": {
+        "operationId": "unsubscribe_api_v1_notifications_push_devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unsubscribe",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/test": {
+      "post": {
+        "description": "Notification de test vers tous les appareils, envoyee par le worker (une minute au\nplus) : le meme chemin que les vraies notifications.",
+        "operationId": "test_api_v1_notifications_push_test_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Test",
+        "tags": [
+          "notifications"
         ]
       }
     },
