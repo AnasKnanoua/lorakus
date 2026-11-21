@@ -188,3 +188,9 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** (2026-11-18, PR 45) : le job CodeQL échoue sur `ssl.create_default_context()` dans `tests/unit/test_outbound.py`, alors que le contexte par défaut de Python 3.13 refuse déjà TLS 1.0 et 1.1.
 - **Cause** : CodeQL ne déduit pas la version minimale par défaut ; il exige qu'elle soit écrite.
 - **Correction** : `context.minimum_version = ssl.TLSVersion.TLSv1_2` juste après chaque `create_default_context()`, tests compris (le client de production le fait déjà dans `OutboundHttp`). Ne pas ignorer l'alerte.
+
+## Une recherche dans Loki ne trouve rien alors que l'événement est bien journalisé
+
+- **Symptôme** (2026-11-21) : `{service_name="lorakus-api"}` filtré sur `ai_call` ou `assistant_reply_failed` ne renvoie aucune ligne sur 24 h, alors que `deploy.sh compose logs --since 24h api | grep -c ai_call` en compte 10.
+- **Cause** : le nom de l'événement (`event`) est **dans le texte JSON** de la ligne, pas une étiquette de Loki. Seuls `service_name` et quelques attributs de la ressource OpenTelemetry sont des étiquettes ; un sélecteur `{…, event="ai_call"}` ne correspond donc à rien.
+- **Correction** : filtrer le texte, `{service_name="lorakus-api"} |= "ai_call"`, ou lire le JSON, `{service_name="lorakus-api"} | json | event="ai_call"`. Vérifier que les flux existent : `deploy.sh compose exec -T grafana wget -qO- http://loki:3100/loki/api/v1/label/service_name/values` doit lister `lorakus-api` et `lorakus-worker`.

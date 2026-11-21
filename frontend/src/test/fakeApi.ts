@@ -95,7 +95,18 @@ export interface FakeState {
   projectsEnabled: boolean;
   ideas: FakeIdea[];
   projects: FakeProject[];
+  /** Rappels « À noter » (P5) : ce que rend GET /notifications/cards ; une réponse les retire
+   * (close) ou les cache (later). Explications par identifiant ; absente : 404. */
+  reminders: FakeReminder[];
+  reminderWhy: Map<string, FakeReminderWhy>;
+  /** Notifications (P5) : clé publique (null : indisponible) et appareils abonnés. */
+  pushKey: string | null;
+  devices: FakeDevice[];
 }
+
+export type FakeReminder = Schemas["ReminderOut"];
+export type FakeReminderWhy = Schemas["ReminderWhyOut"];
+export type FakeDevice = Schemas["PushDeviceOut"];
 
 export type FakeIdea = Schemas["IdeaOut"];
 export type FakeProject = Schemas["ProjectOut"];
@@ -217,6 +228,10 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     projectsEnabled: true,
     ideas: [],
     projects: [],
+    reminders: [],
+    reminderWhy: new Map(),
+    pushKey: null,
+    devices: [],
     ...overrides,
   };
   let counter = 0;
@@ -530,6 +545,58 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     }
     if (path.startsWith("/api/v1/academic/")) {
       return academic(request.method, path, url.searchParams, body);
+    }
+    if (path === "/api/v1/notifications/cards" && request.method === "GET") {
+      return json(200, state.reminders);
+    }
+    const reminder = /^\/api\/v1\/notifications\/cards\/([^/]+)\/(seen|close|later|why)$/.exec(path);
+    if (reminder) {
+      const [, id = "", action = ""] = reminder;
+      if (action === "why") {
+        const why = state.reminderWhy.get(id);
+        return why ? json(200, why) : json(404, { detail: "Carte inconnue." });
+      }
+      if (!state.reminders.some((r) => r.id === id)) {
+        return json(404, { detail: "Carte inconnue." });
+      }
+      if (action !== "seen") {
+        state.reminders = state.reminders.filter((r) => r.id !== id);
+      }
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/notifications/push" && request.method === "GET") {
+      return json(200, {
+        available: state.pushKey !== null,
+        public_key: state.pushKey,
+        devices: state.devices,
+        max_devices: 10,
+      });
+    }
+    if (path === "/api/v1/notifications/push/devices" && request.method === "POST") {
+      const b = body as { endpoint: string; label: string };
+      if (!b.endpoint.startsWith("https://fcm.googleapis.com/")) {
+        return json(422, { detail: "Service de notification inconnu." });
+      }
+      const device: FakeDevice = {
+        id: nextId(),
+        label: b.label,
+        service: "fcm.googleapis.com",
+        created_at: "2026-11-23T08:00:00Z",
+        last_success_at: null,
+      };
+      state.devices.push(device);
+      return json(201, device);
+    }
+    const device = /^\/api\/v1\/notifications\/push\/devices\/([^/]+)$/.exec(path);
+    if (device && request.method === "DELETE") {
+      const before = state.devices.length;
+      state.devices = state.devices.filter((d) => d.id !== device[1]);
+      return new Response(null, { status: state.devices.length < before ? 204 : 404 });
+    }
+    if (path === "/api/v1/notifications/push/test" && request.method === "POST") {
+      return state.devices.length > 0
+        ? new Response(null, { status: 202 })
+        : json(409, { detail: "Aucun appareil abonné." });
     }
     if (path === "/api/v1/auth/reauth") {
       const ok = (body as { password: string }).password === state.password;

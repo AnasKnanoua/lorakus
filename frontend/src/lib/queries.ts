@@ -4,6 +4,7 @@ import { listAssessments, listCourses } from "@/api/academic";
 import { listIdeas, listProjects } from "@/api/projects";
 import { getAccountSettings } from "@/api/account";
 import { getToday } from "@/api/planning";
+import { getPushInfo, listReminders } from "@/api/notifications";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
@@ -97,3 +98,16 @@ export const ideasQuery = (state: "inbox" | "archived") =>
     queryKey: ["projects", "ideas", state],
     queryFn: () => listIdeas(state),
   });
+
+/** Rappels « À noter » de Ma journée (P5) ; relus chaque minute : le serveur en décide. */
+export const remindersQuery = queryOptions({
+  queryKey: ["notifications", "cards"],
+  queryFn: listReminders,
+  refetchInterval: 60_000,
+});
+
+/** Notifications : clé publique du serveur et appareils abonnés (P5). */
+export const pushQuery = queryOptions({
+  queryKey: ["notifications", "push"],
+  queryFn: getPushInfo,
+});

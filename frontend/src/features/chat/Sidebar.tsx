@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, PanelLeftClose, ShieldCheck, SquarePen } from "lucide-react";
+import { Bell, LogOut, PanelLeftClose, ShieldCheck, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { logout } from "@/api/auth";
@@ -125,6 +125,17 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
             {email.split("@")[0]}
           </span>
         </div>
+        {/* Notifications (P5) : appareils abonnes et regles, a cote du compte. */}
+        <Link
+          to="/notifications"
+          onClick={onNavigate}
+          aria-label="Notifications"
+          title="Notifications"
+          className={buttonVariants({ variant: "quiet", size: "icon-sm" })}
+          activeProps={{ "aria-current": "page", className: "bg-hover !text-ink" }}
+        >
+          <Bell aria-hidden="true" />
+        </Link>
         {/* Mes donnees (PR 41) : export et suppression, a cote du compte. */}
         <Link
           to="/donnees"

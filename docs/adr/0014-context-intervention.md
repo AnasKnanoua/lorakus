@@ -19,3 +19,7 @@ Notifications par module ; moteur de règles générique.
 ## Conséquences
 
 Version minimale en phase 5, complétée en phase 7.
+
+## Amendement du 2026-11-22 (P5, ADR 0042) : version minimale
+
+L'`InterventionPolicy` est livrée dans le Core (`lorakus/core/signals/policy.py`), seule à décider d'interrompre, avec niveaux, budget, heures calmes et dédoublonnage. Le Context Engine (`PersonalContext`) n'est **pas** construit en P5 : son seul consommateur serait la politique, qui lit directement le cadre du jour et le planning. Il viendra avec un second consommateur (situations, P10). Heures calmes : la plage de travail donnée pour le jour en cours, rien n'est supposé.

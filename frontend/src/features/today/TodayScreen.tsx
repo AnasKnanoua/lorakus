@@ -20,6 +20,8 @@ import { clockTime, duration, longDate, relativeDay } from "@/lib/format";
 import { todayQuery } from "@/lib/queries";
 import { NAV_ITEMS } from "@/navigation";
 
+import { Reminders } from "./Reminders";
+
 /** Premier message envoyé par « Organiser ma journée avec Lorakus ». */
 export const ORGANISE_MESSAGE = "Organise ma journée.";
 
@@ -83,6 +85,7 @@ function Day({ data }: { data: Today }) {
   const over = frame?.ends_at != null && new Date(frame.ends_at).getTime() <= new Date(data.generated_at).getTime();
   return (
     <div className="flex flex-col gap-7">
+      <Reminders timeZone={data.timezone} />
       <FrameBar data={data} />
       <Section title="Déroulé">
         {allDay.length > 0 && (

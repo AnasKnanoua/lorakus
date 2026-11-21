@@ -11,7 +11,15 @@ Il n'a aucune table : il lit le planning du Core (tâches, agenda, journée donn
 - **Une seule question, et seulement si elle change le résultat** : sans journée dite et avec du travail ouvert, « Quand comptes-tu travailler aujourd'hui ? » ; avec une journée encore ouverte, la durée de la tâche la plus urgente qui n'en a pas. Le Majordome la pose telle quelle. Pas de réponse par défaut : le planificateur ne suppose ni heure ni durée (PR 49), le Sergent non plus. La roadmap prévoyait une réponse par défaut tirée de l'historique ; elle est écartée tant que l'historique ne dit rien de fiable (les horaires du propriétaire changent tous les jours).
 - **Découper une tâche** (`focus.split_task`) : 2 à 8 étapes ordonnées, avec une durée par étape si elle est connue. Les étapes sont des sous-tâches du Core (`step_number` garde l'ordre) ; le planificateur les place à la place de la tâche, dans leur ordre, avec l'échéance et la priorité de la tâche.
 
-Non couvert pour l'instant : prendre les devants (présenter la journée le matin, rappeler une échéance), qui demande les notifications de la P5 ; le palier 3 du routage (petit appel au modèle quand c'est ambigu) ; le cache des rapports (inutile : un rapport se calcule en quelques millisecondes).
+Non couvert pour l'instant : présenter la journée le matin (briefing, PR 53) ; le palier 3 du routage (petit appel au modèle quand c'est ambigu) ; le cache des rapports (inutile : un rapport se calcule en quelques millisecondes).
+
+## Prendre les devants (P5, ADR 0042)
+
+- **Règle** (`watch.py`, job `focus.deadline_watch` toutes les 10 minutes, un seul pour tous les utilisateurs qui ont le Sergent activé) : une tâche ouverte à rendre dans 3 jours ou moins (jour local du compte), sans étape terminée, donne **un** signal `focus.deadline_soon`. Clé : la tâche et son échéance (une échéance déplacée est une nouvelle cause). Une étape d'une tâche ne donne pas de signal : sa tâche suffit.
+- **Retrait** : tâche commencée (une étape terminée), repoussée au-delà de 3 jours, terminée ou supprimée ; module désactivé. La carte disparaît.
+- **Textes**, écrits par le code : « À rendre dans 3 jours » ; « CSEC507 : rapport · jeudi 26 novembre 2026. Pas encore commencé. » ; pour la notification : « Toujours pas commencé : « … » est à rendre dans 3 jours (jeudi 26 novembre 2026). Il te faut environ 3 h. Ouvre Ma journée pour lui trouver un créneau. » Faits pour « Pourquoi ? » : tâche, échéance (source : Cours, Projets ou Tâches), avancement, durée estimée (« estimé » si c'est Lorakus qui l'a proposée).
+- **Ce que le Sergent ne fait pas** : il ne notifie jamais lui-même. La politique du Core montre une carte, puis une notification seulement si la carte n'a pas été vue en 24 h, pendant la plage de travail du jour (scénario 4).
+- **Limite assumée** : sans découpage, Lorakus ne voit pas qu'une tâche est commencée. « OK » sur la carte suffit : rien d'autre ne suivra.
 
 ## Approche (programmation classique, ML ou LLM)
 
@@ -22,6 +30,7 @@ Non couvert pour l'instant : prendre les devants (présenter la journée le mati
 | Reconnaître une question pour le Sergent | Mots-clés (palier 1), puis similarité avec des exemples par le modèle d'embeddings local (palier 2) | Aucun appel au modèle ; rien ne sort du serveur ; mesuré sur un jeu distinct |
 | Proposer un découpage | LLM, dans l'appel déjà fait pour la réponse | Langage naturel ; le code vérifie tout et la carte attend le clic |
 | Formuler la réponse | LLM | Le rapport est une donnée ; le modèle l'explique et cite ses sources |
+| Rappeler une échéance proche | Règle (3 jours, aucune étape terminée), puis politique d'intervention du Core | Un seul rappel, explicable, sans appel au modèle : il part même si le fournisseur d'IA est coupé |
 | Durée d'un devoir sans estimation | Rien : on la demande | Pas assez de temps réels enregistrés (PR 49) pour estimer ; ML en P16 |
 
 ## Rapports

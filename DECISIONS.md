@@ -19,12 +19,12 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0011](docs/adr/0011-migrations.md) | Migrations expand/contract, backup obligatoire | Validé (exigence) / Accepté (méthode) | — |
 | [0012](docs/adr/0012-untrusted-content.md) | Contenu externe non fiable, outils à permissions | Accepté | Après chaque campagne red team |
 | [0013](docs/adr/0013-lorakus-sensors.md) | App Android compagnon séparée (PWA + capteurs, lots HTTPS) | Validé (2026-11-08) | Phase 7 (deux apps ou une seule) |
-| [0014](docs/adr/0014-context-intervention.md) | Context Engine et InterventionPolicy dans le Core | Accepté | Phase 11 |
+| [0014](docs/adr/0014-context-intervention.md) | Context Engine et InterventionPolicy dans le Core | Accepté (amendé 2026-11-22 : politique sans Context Engine) | Phase 11 |
 | [0015](docs/adr/0015-data-provenance.md) | Provenance et contraintes de licence des données | Accepté | À chaque nouveau connecteur |
 | [0016](docs/adr/0016-minimal-usage-collection.md) | Collecte d'usage numérique minimale | Accepté | Phase 11 |
 | [0017](docs/adr/0017-motivation-curation.md) | Motivation = curation, pas un flux | Accepté | 2 mois après la phase 10 |
 | [0018](docs/adr/0018-planning-in-core.md) | Tâches et agenda dans le Core (`planning`) | Validé (2026-11-18, D-F, amendé : temps en UTC, fuseau de l'utilisateur, agenda sans récurrence) | Fin de la phase 5 |
-| [0019](docs/adr/0019-unified-signals.md) | Signaux unifiés, aucune notification directe | Accepté | — |
+| [0019](docs/adr/0019-unified-signals.md) | Signaux unifiés, aucune notification directe | Accepté (mis en œuvre 2026-11-22, ADR 0042) | — |
 | [0020](docs/adr/0020-mvp-integrations.md) | Intégrations du MVP : ICS en lecture, Telegram, Web Push | Accepté | Phase 8 |
 | [0021](docs/adr/0021-baseline-versions.md) | Socle de versions (Python 3.13, PostgreSQL 18) | Accepté | Tous les 12 mois |
 | [0022](docs/adr/0022-public-repo-no-secrets.md) | Dépôt public, aucun secret dans le dépôt | Validé (D-B, 2026-11-08) | Avant toute ouverture commerciale |
@@ -40,13 +40,14 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0032](docs/adr/0032-chess-stockfish.md) | Analyste : Stockfish | Accepté | Avant toute distribution |
 | [0033](docs/adr/0033-knowledge-graph-fsrs.md) | Archiviste : graphe PostgreSQL et FSRS | Accepté | Phase 16 |
 | [0034](docs/adr/0034-python-only-backend.md) | Python seul côté serveur, Rust seulement sur mesure | Accepté | Si un profilage montre un goulot CPU |
-| [0035](docs/adr/0035-notification-channels.md) | Canaux de notification : exploitation sur Discord, produit sur Telegram | Accepté | Ouverture à d'autres utilisateurs |
+| [0035](docs/adr/0035-notification-channels.md) | Canaux de notification : exploitation sur Discord, produit sur Telegram | Accepté (amendé 2026-11-22 : Web Push en principal, secrets au worker) | Ouverture à d'autres utilisateurs |
 | [0036](docs/adr/0036-environments.md) | Environnements : production sur Oracle (amende 0009) ; staging et sentinelle remplacés par 0037 | Validé (2026-11-09), amendé par 0037 | Changement d'hébergeur |
 | [0037](docs/adr/0037-ci-staging-external-sentinel.md) | Staging éphémère dans la CI, sentinelle externe par signal de vie (healthchecks.io) | Validé (2026-11-11) | Phase 17 ou disparition d'un service gratuit |
 | [0038](docs/adr/0038-public-exposure-caddy.md) | Exposition publique par Caddy, limites par utilisateur dans l'application | Validé (2026-11-12) | Avant toute ouverture commerciale, ou API à plusieurs processus |
 | [0039](docs/adr/0039-memory-v1.md) | Mémoire v1 : rien n'est retenu sans confirmation ; recherche hybride des souvenirs | Validé (2026-11-12, amendé 2026-11-13) | Avant toute ouverture commerciale |
 | [0040](docs/adr/0040-chat-tools-confirmation-cards.md) | Outils dans le chat : le modèle demande, l'utilisateur confirme par une carte | Accepté (2026-11-14, amendé 2026-11-18 : jamais deux fois la même carte) | À chaque nouvel outil du chat ; avant toute ouverture commerciale |
-| [0041](docs/adr/0041-outbound-http-and-calendars.md) | Client HTTP sortant du Core (SSRF), abonnements ICS chiffrés, `icalendar` + `recurring-ical-events` | Accepté (2026-11-18) | À chaque nouveau connecteur ; avant toute ouverture commerciale |
+| [0041](docs/adr/0041-outbound-http-and-calendars.md) | Client HTTP sortant du Core (SSRF), abonnements ICS chiffrés, `icalendar` + `recurring-ical-events` | Accepté (2026-11-18, amendé 2026-11-22 : POST borné pour Web Push) | À chaque nouveau connecteur ; avant toute ouverture commerciale |
+| [0042](docs/adr/0042-signals-intervention-policy-web-push.md) | Signaux, politique d'intervention (niveaux 1 et 2, heures calmes tirées du cadre du jour, budget, jamais deux fois) et notifications Web Push | Validé (2026-11-21, D1 à D11) | Fin de la phase 5 ; avant toute ouverture commerciale |
 
 ## Décisions en attente d'avis
 
@@ -73,6 +74,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | — | Pas de VM Azure : staging éphémère dans la CI, sentinelle healthchecks.io ; crédit Azure gardé (ADR 0037) | 2026-11-11 |
 | — | Loki reporté en P3, avec les traces (amendement de l'ADR 0010) | 2026-11-11 |
 | D-F | `planning` dans le Core (ADR 0018 validé) : tâches génériques avec module propriétaire, agenda sans récurrence (dépliée par `calendars`), fuseau de l'utilisateur en réglage du compte, planificateur déterministe qui propose ; découpage de la P4 en PR 44 à 50 | 2026-11-18 |
+| — | P5 découpée en PR 52 à 55 (2026-11-21) ; D1 à D11 acceptées : heures calmes = plage de travail du jour donnée par l'utilisateur (scénario 3 : briefing présenté au début de la journée déclarée ou à la première ouverture) ; Web Push en principal, Telegram en second canal sans contenu ; chiffrement Web Push maison sur `cryptography` ; Telegram par relevé depuis le worker ; secrets d'envoi au worker ; idée venue de Telegram créée sans carte ; briefing sans LLM ; niveau 1 dans l'application, niveau 2 en notification, 3 par jour ; escalade unique après 24 h ; pas de Context Engine ; pas de version à la fin de la P5 (ADR 0042) | 2026-11-21 |
 | D-D | Budget IA : 10 $ prépayés sans rechargement automatique ; plafond applicatif de 3 $ par utilisateur et par mois ; Claude Haiku 5.5 seul fournisseur des conversations en phase 3 (amendement de l'ADR 0007) | 2026-11-12 |
 | — | Exposition publique de `app.lorakus.app` à la PR 35 ; en production, la connexion du propriétaire exige la double authentification | 2026-11-12 |
 | — | Exposition par Caddy (image `lorakus-web`), contrôle d'origine, limites par utilisateur dans PostgreSQL (API et appels IA), double authentification activée sur le serveur (ADR 0038) | 2026-11-12 |

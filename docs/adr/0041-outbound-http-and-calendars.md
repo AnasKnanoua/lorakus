@@ -70,3 +70,7 @@ Taille bornée par le client ; 5 000 événements au plus ; une récurrence plus
 - Un abonnement nouveau apparaît dans l'agenda une à deux minutes après son ajout.
 - Tout futur connecteur qui va chercher une adresse fournie par l'utilisateur passe par `OutboundHttp` (contrat import-linter).
 - Hypothèse ajoutée : licence LGPL de `recurring-ical-events` et `x-wr-timezone`, à revoir avant toute distribution.
+
+## Amendement du 2026-11-22 (P5, ADR 0042) : POST borné
+
+`OutboundHttp.post` envoie un corps une seule fois (notifications Web Push) : mêmes contrôles d'adresse qu'un GET (HTTPS, nom résolu une fois, adresses publiques seulement, connexion à l'adresse vérifiée), aucune redirection suivie (rendue comme un statut), délai total de 15 s, réponse lue jusqu'à 64 Kio puis ignorée. Le statut est rendu tel quel ; seules les pannes de transport lèvent `OutboundError`.

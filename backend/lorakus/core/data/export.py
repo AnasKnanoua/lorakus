@@ -35,6 +35,8 @@ from lorakus.core.memory.models import MemoryRejection
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
 from lorakus.core.planning.models import AgendaEntry, PlanningDay, Task
+from lorakus.core.signals.models import InterventionRow, PushSubscriptionRow, SignalRow
+from lorakus.core.signals.webpush import push_host
 from lorakus.db.database import Database
 
 log = structlog.get_logger("lorakus.data")
@@ -89,6 +91,7 @@ class DataExportService:
             "modules": await self._module_states(user.id),
             "memory": await self._memory_data(user.id),
             "planning": await self._planning_data(user.id),
+            "notifications": await self._notifications_data(user.id),
             **await self._identity_data(user.id),
             "modules_data": await self._modules_data(user.id),
         }
@@ -234,6 +237,80 @@ class DataExportService:
             "agenda": [dict(row) for row in agenda],
             # Cadres des jours donnes par l'utilisateur (PR 49).
             "days": [{**row, "source_ref": _source(row["source_ref"])} for row in days],
+        }
+
+    async def _notifications_data(self, user_id: uuid.UUID) -> dict[str, Any]:
+        """Signaux, decisions et appareils (P5, ADR 0042). Jamais l'adresse d'abonnement ni
+        les cles d'un appareil : seulement son nom et le domaine de son service."""
+        async with self._db.transaction(user_id) as session:
+            signals = (
+                (
+                    await session.execute(
+                        select(
+                            SignalRow.id,
+                            SignalRow.name,
+                            SignalRow.title,
+                            SignalRow.body,
+                            SignalRow.firm_body,
+                            SignalRow.rule,
+                            SignalRow.facts,
+                            SignalRow.status,
+                            SignalRow.outcome,
+                            SignalRow.not_before,
+                            SignalRow.expires_at,
+                            SignalRow.seen_at,
+                            SignalRow.closed_at,
+                            SignalRow.snoozed_until,
+                            SignalRow.created_at,
+                        ).order_by(SignalRow.created_at, SignalRow.id)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            interventions = (
+                (
+                    await session.execute(
+                        select(
+                            InterventionRow.signal_id,
+                            InterventionRow.level,
+                            InterventionRow.channel,
+                            InterventionRow.reason,
+                            InterventionRow.delivered,
+                            InterventionRow.failed,
+                            InterventionRow.created_at,
+                        ).order_by(InterventionRow.created_at, InterventionRow.level)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            devices = (
+                (
+                    await session.execute(
+                        select(
+                            PushSubscriptionRow.label,
+                            PushSubscriptionRow.endpoint,
+                            PushSubscriptionRow.created_at,
+                            PushSubscriptionRow.last_success_at,
+                        ).order_by(PushSubscriptionRow.created_at)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return {
+            "signals": [dict(row) for row in signals],
+            "interventions": [dict(row) for row in interventions],
+            "devices": [
+                {
+                    "label": row["label"],
+                    "service": push_host(row["endpoint"]),
+                    "created_at": row["created_at"],
+                    "last_success_at": row["last_success_at"],
+                }
+                for row in devices
+            ],
         }
 
     async def _identity_data(self, user_id: uuid.UUID) -> dict[str, Any]:

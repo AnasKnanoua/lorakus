@@ -19,6 +19,7 @@ from lorakus.core.modules import models as _module_models  # noqa: F401
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.planning import models as _planning_models  # noqa: F401
 from lorakus.core.ratelimit import models as _rate_limit_models  # noqa: F401
+from lorakus.core.signals import models as _signal_models  # noqa: F401
 from lorakus.core.tools import models as _tool_models  # noqa: F401
 from lorakus.db.base import SCHEMA, Base
 from lorakus.settings import get_settings

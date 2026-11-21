@@ -84,6 +84,8 @@ services:
       LORAKUS_ANTHROPIC_API_KEY: ${LORAKUS_ANTHROPIC_API_KEY:-}
       LORAKUS_AI_KILL_SWITCH: ${LORAKUS_AI_KILL_SWITCH:-false}
       LORAKUS_AI_MONTHLY_BUDGET_USD: ${LORAKUS_AI_MONTHLY_BUDGET_USD:-3.00}
+      # Notifications (ADR 0042) : l'API ne recoit que la cle VAPID PUBLIQUE (abonnements).
+      LORAKUS_VAPID_PUBLIC_KEY: ${LORAKUS_VAPID_PUBLIC_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,6 +112,9 @@ services:
       # Synchronisation des calendriers (ADR 0041) : dechiffre les adresses ICS. Jamais la
       # cle des secrets TOTP (LORAKUS_FIELD_ENCRYPTION_KEY), qui reste au seul service api.
       LORAKUS_CONNECTOR_ENCRYPTION_KEY: ${LORAKUS_CONNECTOR_ENCRYPTION_KEY:-}
+      # Notifications (ADR 0042) : le worker envoie ; lui seul recoit la cle VAPID privee.
+      LORAKUS_VAPID_PUBLIC_KEY: ${LORAKUS_VAPID_PUBLIC_KEY:-}
+      LORAKUS_VAPID_PRIVATE_KEY: ${LORAKUS_VAPID_PRIVATE_KEY:-}
     healthcheck:
       # Battement de coeur ecrit a chaque tour de boucle : un worker bloque est detecte.
       test: ["CMD", "python", "-m", "lorakus.worker", "healthcheck"]

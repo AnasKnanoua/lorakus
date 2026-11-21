@@ -19,3 +19,7 @@ Blocage d'applications Android (exigerait le service d'accessibilité, rejeté p
 ## Conséquences
 
 L'ADR 0016 reste valable pour la collecte ; seule la phrase « aucun blocage » est remplacée par « aucun blocage hors pactes volontaires (ADR 0029) ». Livré en phase 12.
+
+## Amendement du 2026-11-22 (P5, ADR 0042) : niveaux 1 et 2
+
+Niveau 1 : une carte « À noter » dans Ma journée, sans notification (rien ne sonne). Niveau 2 : une notification Web Push, seulement si la carte n'a été ni vue, ni fermée, ni repoussée pendant 24 h, une fois par cause, pendant la plage de travail du jour, 3 par jour au plus. Le niveau 3 (pactes) reste en P12.

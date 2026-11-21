@@ -21,3 +21,8 @@ Un seul canal Telegram pour tout (mélange des natures, pas de couleurs) ; deux 
 ## Conséquences
 
 Amende l'ADR 0020 sur un point : les alertes d'exploitation ne passent plus par Telegram.
+
+## Amendement du 2026-11-22 (P5, ADR 0042)
+
+- **Produit** : Web Push en principal (contenu chiffré de bout en bout, lisible seulement par l'appareil), Telegram en second canal sans contenu personnel et pour la capture d'idées.
+- **Secrets** : c'est le **worker** qui envoie. Il reçoit la clé VAPID privée (et, à la PR du bot, le jeton Telegram) ; l'API ne reçoit que la clé VAPID publique. Les alertes d'exploitation restent sur Discord.

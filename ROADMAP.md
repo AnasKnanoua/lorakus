@@ -39,7 +39,7 @@ Scénarios d'acceptation :
 
 1. « Qu'est-ce que je dois faire aujourd'hui ? » → réponse juste (tâches, cours ICS, deadlines), passée par le Sergent, sources citées, en moins de 5 s.
 2. « Ajoute le devoir de Machine Learning pour vendredi, environ 3 h » → confirmation → tâche visible dans `/academic` et Today.
-3. Briefing du lendemain préparé la nuit et présenté à 7 h 30 ; aucune notification pendant les quiet hours.
+3. Briefing du lendemain préparé la nuit et présenté au début de la journée déclarée (ou à la première ouverture) ; aucune notification pendant les quiet hours. *(Reformulé le 2026-11-21, décision D1 : « 7 h 30 » supposait des horaires fixes ; les heures calmes sont tout ce qui est hors de la plage de travail donnée pour le jour.)*
 4. Un seul rappel J-3 pour un devoir non commencé ; escalade au niveau 2 seulement si le niveau 1 est ignoré.
 5. Idée envoyée au bot Telegram → boîte d'idées de `projects`.
 6. Préférence exprimée en conversation → fait proposé → confirmé → utilisé par la planification.
@@ -98,7 +98,7 @@ Scénarios d'acceptation :
   - **PR 42 — Documentation** (2026-11-18) : mesures de clôture, mémoire des conteneurs lue dans `memory.stat` (`DEPLOYMENT.md`).
   - **Clôture** : usage quotidien confirmé le 2026-11-18 ; v0.3.0 par `make release-pr VERSION=0.3.0`.
 
-### P4 — Planning, academic, projects, Sergent v0 (4 semaines)
+### P4 — Planning, academic, projects, Sergent v0 (4 semaines) — terminée le 2026-11-21 (v0.4.0)
 
 - **Composants** : `planning` (tâches, agenda, planificateur), `calendars` (ICS), `academic`, `projects`, Today, **module `focus` avec le profil Sergent (échéances, retards, découpage de tâches proposé)**.
 - **Questions de clarification** : un spécialiste signale une information manquante dans son `SpecialistReport` ; le Majordome ne pose la question que si la réponse change le résultat, une seule à la fois, en proposant une réponse par défaut tirée de l'historique ; la réponse est mémorisée comme un fait confirmé. Exemple : la durée estimée d'un devoir annoncé sans durée.
@@ -124,6 +124,11 @@ Scénarios d'acceptation :
 - **Tests** : scénarios simulés (budget, quiet hours, dédoublonnage, escalade) ; préparation expirée ; un seul job périodique traite toutes les échéances dues (pas de minuteur par utilisateur).
 - **Terminée quand** : scénarios 3, 4, 5, 7 et 8 ; zéro doublon sur 2 semaines.
 - **Risque** : agacement → seuils prudents, budget de 3 interventions par jour.
+- **Découpage et critères de fin (validés le 2026-11-21, décisions D1 à D11, ADR 0042)**. Chaque PR demande un déploiement. Aucun mécanisme sans consommateur ; aucun appel à un modèle de langage dans les rappels.
+  - **PR 52 — Signaux, politique d'intervention et Web Push** (livrée le 2026-11-22 ; regroupe les PR 52 et 53 proposées : escalade et heures calmes n'ont de sens qu'avec la notification) : `signals` dans le Core (une cause unique par `dedup_key`, retrait, cartes « À noter » dans Ma journée), politique pure (niveau 1 : carte, sans heures calmes ni budget ; niveau 2 : notification si la carte n'est ni vue ni repoussée en 24 h, une fois par cause, pendant la plage de travail du jour hors pauses, 3 par jour), un seul job `signals.dispatch`, Web Push (RFC 8291 et 8292 sur `cryptography`, services autorisés, `OutboundHttp.post`), clés VAPID générées par `init-env.sh` (privée au worker), page « Notifications », « Pourquoi ? » de chaque rappel, règle J-3 du Sergent (`focus.deadline_watch`). *Critères* : scénario 4 de bout en bout avec le fournisseur d'IA coupé ; budget, heures calmes, jour sans travail, nuit de travail, cause sensible, appareil désabonné testés ; 40 semaines simulées sans règle enfreinte ; deux processus simultanés n'envoient qu'une fois ; vecteur officiel de la RFC 8291 ; mutations détectées.
+  - **PR 53 — Préparations et briefing du lendemain** (ADR 0028) : table `core_preparations`, job de nuit, briefing par des règles (rapports du Sergent), expiré à la fin de son jour, présenté au début de la journée déclarée (notification si le cadre est connu) ou à la première ouverture. *Critères* : scénario 3 ; une préparation expirée n'est jamais présentée ; jamais deux briefings pour un jour.
+  - **PR 54 — Bot Telegram et capture d'idées** : liaison par code à usage unique haché (10 minutes), relevé depuis le worker (aucune route publique), discussions privées seulement, texte reçu → idée de `projects` par un port fourni au Core (provenance `telegram`, `inert()`), second canal générique sans contenu. *Critères* : scénario 5 ; les 31 attaques rejouées dans un message ; compte non lié ignoré ; jeton absent des journaux (canari).
+  - **PR 55 — Exploitation et clôture** : alertes (envois en échec, dispatch en retard, doublon refusé, relevé Telegram arrêté) et runbooks, panneau Grafana des interventions, scénarios 3, 4, 5, 7 et 8 en production, **deux semaines sans doublon** après le déploiement de la PR 52 (`lorakus_interventions_duplicate_total` à 0). Pas de version à la fin de la P5 : la v0.5 est celle de la P6 (D11).
 
 ### P6 — Stabilisation et v0.5 (1,5 semaine)
 
@@ -156,7 +161,7 @@ Usage réel, ZAP baseline, exercice d'incident, relecture des runbooks (créés 
 
 ## Idées (étudiées après la v0.5)
 
-- **Notifications du produit : Web Push en principal** (proposé le 2026-11-14, à trancher en P5, révision de l'ADR 0035) : le contenu d'un Web Push est chiffré de bout en bout (le service de Google ne fait que transporter un message illisible), alors que les serveurs de Telegram lisent les messages du bot ; boutons d'action dans la notification, rien à installer en plus de la PWA. Telegram reste pour la capture d'idées (scénario 5) et comme second canal.
+- **Notifications du produit : Web Push en principal** (proposé le 2026-11-14, **tranché le 2026-11-21 : ADR 0042**, PR 52) : le contenu d'un Web Push est chiffré de bout en bout (le service de Google ne fait que transporter un message illisible), alors que les serveurs de Telegram lisent les messages du bot ; boutons d'action dans la notification, rien à installer en plus de la PWA. Telegram reste pour la capture d'idées (scénario 5) et comme second canal.
 - **Widgets et raccourcis sur le téléphone** (proposé le 2026-11-14) : une PWA ne peut pas avoir de widget d'écran d'accueil sur Android (il faudrait une petite application native, par exemple en Flutter) ; en attendant, des raccourcis dans le manifeste de la PWA (appui long sur l'icône : « Nouvelle idée », « Nouvelle conversation »), sans application native.
 - **Routage vers les spécialistes (P4)** : le palier 2 (similarité par embeddings, PR 39) confond des intentions voisines (0,833 mesuré, objectif 0,90). Avec les vraies phrases du Sergent : mots-clés d'abord, puis un petit classifieur entraîné sur les embeddings des exemples (régression logistique, évalué sur un jeu séparé) ou le palier 3 (appel LLM léger si ambigu).
 - **Offre commerciale modulaire** : formules regroupant des modules au choix (par exemple Strava sans les échecs), définies à partir de sondages auprès d'utilisateurs potentiels. Déjà compatible avec l'activation des modules par utilisateur (phase 2) ; ajouter des « droits » par formule le moment venu.
