@@ -309,6 +309,18 @@ groups:
           description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror
 
+      # Le modele finit parfois sans rien ecrire : une fois, ce n'est rien (l'utilisateur
+      # reformule) ; plusieurs fois dans l'heure, le prompt ou un outil le pousse a se taire.
+      - alert: LorakusAssistantEmptyReplies
+        expr: sum(increase(lorakus_assistant_replies_total{reason=~"empty|model_refused"}[1h])) > 2
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: Reponses vides de l'assistant
+          description: Plusieurs reponses de l'heure ecoulee sont vides ou refusees par le modele. Leur raison de fin est dans les journaux de l'API (assistant_reply_empty).
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantemptyreplies
+
   # Exposition publique (PR 35) : Caddy, limites par utilisateur, controle d'origine.
   # La cible lorakus-web n'existe qu'en production (prometheus/production/web.yml).
   - name: lorakus-web

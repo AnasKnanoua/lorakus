@@ -20,12 +20,14 @@ from conftest import (
 )
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from prometheus_client import REGISTRY
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+from structlog.testing import capture_logs
 
 from lorakus.ai.catalog import Catalog
 from lorakus.ai.port import ProviderError
 from lorakus.ai.router import ModelRouter
-from lorakus.ai.testing import DEV_PREFIX, FakeProvider
+from lorakus.ai.testing import DEV_PREFIX, FakeProvider, FakeReply
 from lorakus.ai.usage import UsageStore
 from lorakus.api.app import create_app
 from lorakus.core.identity.passwords import HASHER
@@ -366,3 +368,64 @@ async def test_client_leaving_mid_answer_keeps_the_partial_reply() -> None:
         ("user", "Compte", "ok"),
         ("assistant", "un deux", "interrupted"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("reply", "stop_reason", "template", "reason"),
+    [
+        ("", "end_turn", "empty", "empty"),
+        ("  ", "end_turn", "empty", "empty"),  # des blancs seulement : rien a lire
+        ("", "refusal", "model_refused", "model_refused"),
+    ],
+)
+def test_an_empty_answer_is_not_called_an_internal_error(
+    owner: TestClient, reply: str, stop_reason: str, template: str, reason: str
+) -> None:
+    # Production, 21/11 : le modele a fini sans rien ecrire, et Lorakus affichait « erreur
+    # interne, signalee » alors que rien n'etait journalise ni compte.
+    enable(owner)
+    use_provider(owner, FakeProvider(replies=[FakeReply(text=reply, stop_reason=stop_reason)]))
+    conversation_id = new_conversation(owner)
+    before = REGISTRY.get_sample_value(
+        "lorakus_assistant_replies_total", {"status": "fallback", "reason": reason}
+    )
+
+    with capture_logs() as logs:
+        text, done = send(owner, conversation_id, "Bonjour")
+
+    assert text.strip() == FALLBACKS[template]  # des blancs deja envoyes ne se reprennent pas
+    assert done["status"] == "fallback"
+    saved = owner.get(f"{BASE}/conversations/{conversation_id}").json()["messages"][1]
+    assert (saved["content"], saved["status"]) == (FALLBACKS[template], "fallback")
+    after = REGISTRY.get_sample_value(
+        "lorakus_assistant_replies_total", {"status": "fallback", "reason": reason}
+    )
+    assert (after or 0) - (before or 0) == 1
+    [line] = [entry for entry in logs if entry["event"] == "assistant_reply_empty"]
+    assert (line["stop_reason"], line["model_calls"], line["log_level"]) == (
+        stop_reason,
+        1,
+        "warning",
+    )
+    assert "Bonjour" not in json.dumps(line)  # jamais de contenu dans le journal
+
+
+def test_an_empty_answer_after_a_card_keeps_the_card(owner: TestClient) -> None:
+    enable(owner)
+    use_provider(
+        owner,
+        FakeProvider(
+            replies=[
+                FakeReply(tool_calls=(("assistant__remember", {"content": "Je bois du thé"}),)),
+                FakeReply(text=""),
+            ]
+        ),
+    )
+    conversation_id = new_conversation(owner)
+
+    text, done = send(owner, conversation_id, "Retiens que je bois du thé")
+
+    assert text == ""  # la carte suffit : pas de gabarit par-dessus
+    assert done["status"] == "ok"
+    saved = owner.get(f"{BASE}/conversations/{conversation_id}").json()["messages"][1]
+    assert saved["content"] == "Voici ce que je te propose."
