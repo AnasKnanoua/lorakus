@@ -22,6 +22,7 @@ Le Majordome de l'ADR 0025 : une conversation avec l'assistant, réponse affich�
 | `assistant.set_day` | `write` | Carte « Ta journée du mercredi 18 novembre 2026 / Travail : de 15 h à 3 h (le lendemain) (12 h) / Repas : de 22 h à 22 h 45 » ; aujourd'hui ou demain ; bornes du Core (ADR 0018) |
 | `assistant.set_estimate` | `write` | Carte « Durée de « … » : 2 h 30 (estimation de Lorakus) / Actuellement : aucune » ; l'origine de la durée est gardée |
 | `academic.add_assessment` | `write` | Outil du module `academic` (PR 46), proposé seulement si ce module est activé : carte « Ajouter un devoir » ou « un examen », avec le cours et la date exacte ; voir `docs/modules/academic.md` |
+| `projects.list`, `projects.add_idea`, `projects.add_project`, `projects.add_task` | `read`, `write` | Outils du module `projects` (PR 51), proposés seulement si ce module est activé : liste neutralisée, cartes « Noter une idée », « Commencer le projet », « Ajouter au projet » ; voir `docs/modules/projects.md` |
 
 ## Approche (programmation classique, ML ou LLM)
 

@@ -95,6 +95,12 @@ CHAT_TOOLS: Final = (
     "academic.add_assessment",
     # Sergent (PR 50), revu : decoupage valide par le code, une carte, rien sans clic.
     "focus.split_task",
+    # Module projects (PR 51), revus : lecture en donnees inertes ; idee, projet et tache par
+    # carte, rien sans clic.
+    "projects.list",
+    "projects.add_idea",
+    "projects.add_project",
+    "projects.add_task",
 )
 MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
 MAX_TOOL_CALLS: Final = 6  # par message

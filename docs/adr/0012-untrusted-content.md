@@ -19,3 +19,7 @@ Filtrage par expressions régulières seul.
 ## Conséquences
 
 Quelques confirmations supplémentaires pour l'utilisateur.
+
+## Amendement du 2026-11-21 (PR 51) : `inert()` dans le Core
+
+La neutralisation des textes venus de l'utilisateur ou de l'extérieur avant qu'ils n'atteignent le modèle (`inert()`, avec ses délimiteurs `SAFE_LT` et `SAFE_GT`) vit désormais dans `lorakus/core/tools/inert.py`. Un module qui expose un outil de lecture au chat (le module `projects` le premier) l'utilise sans importer le module `assistant`, ce que l'architecture interdit (import-linter). `lorakus_modules/assistant/prompts.py` la réexporte : rien ne change pour ses appelants.

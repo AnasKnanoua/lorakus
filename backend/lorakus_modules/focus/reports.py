@@ -50,8 +50,8 @@ def _hour(moment: datetime, tz: ZoneInfo, day: date) -> str:
 
 
 def task_source(task: TaskView) -> str:
-    """D'ou vient une tache : le module qui l'a creee, ou la liste des taches."""
-    kind = "Cours" if task.owner_module == "academic" else "Tâche"
+    """D'ou vient une tache : le module qui l'a creee (cours, projet), ou la liste des taches."""
+    kind = {"academic": "Cours", "projects": "Projet"}.get(task.owner_module or "", "Tâche")
     return f"{kind} « {_short(task.title, 90)} »"
 
 

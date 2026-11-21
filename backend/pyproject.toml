@@ -165,5 +165,6 @@ allow_indirect_imports = true  # l'API importe la fabrique ; elle ne doit pas ap
 [project.entry-points."lorakus.modules"]
 academic = "lorakus_modules.academic.manifest:manifest"
 focus = "lorakus_modules.focus.manifest:manifest"
+projects = "lorakus_modules.projects.manifest:manifest"
 assistant = "lorakus_modules.assistant.manifest:manifest"
 calendars = "lorakus_modules.calendars.manifest:manifest"

@@ -445,6 +445,16 @@ class ModuleTasks:
         task = await session.scalar(select(Task).where(*self._mine(ref)))
         return _view(task) if task is not None else None
 
+    async def many(self, session: AsyncSession, refs: Sequence[str]) -> dict[str, TaskView]:
+        """Les taches du module pour ces references, en une requete (PR 51) ; une reference
+        sans tache est absente du resultat."""
+        if not refs:
+            return {}
+        rows = await session.scalars(
+            select(Task).where(Task.owner_module == self.module_id, Task.owner_ref.in_(refs))
+        )
+        return {task.owner_ref: _view(task) for task in rows if task.owner_ref is not None}
+
     async def upsert(
         self,
         session: AsyncSession,

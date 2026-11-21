@@ -727,27 +727,6 @@
         "title": "BreakOut",
         "type": "object"
       },
-      "CompleteIn": {
-        "additionalProperties": false,
-        "description": "Fin d'une evaluation : le temps reellement passe, si l'utilisateur le donne (PR 49).",
-        "properties": {
-          "actual_minutes": {
-            "anyOf": [
-              {
-                "maximum": 10080.0,
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actual Minutes"
-          }
-        },
-        "title": "CompleteIn",
-        "type": "object"
-      },
       "Confidence": {
         "properties": {
           "level": {
@@ -1203,6 +1182,56 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "IdeaIn": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "IdeaIn",
+        "type": "object"
+      },
+      "IdeaOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "inbox",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "status",
+          "created_at"
+        ],
+        "title": "IdeaOut",
+        "type": "object"
+      },
       "LeftoverOut": {
         "description": "Ce qui n'a pas trouve de place aujourd'hui.",
         "properties": {
@@ -1528,6 +1557,207 @@
           "minutes"
         ],
         "title": "PlanBlockOut",
+        "type": "object"
+      },
+      "ProjectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "idea_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idea Id"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProjectIn",
+        "type": "object"
+      },
+      "ProjectOut": {
+        "description": "Un projet. `idle_days` : jours sans activite d'un projet actif qui dort (14 ou plus).",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "done_tasks": {
+            "title": "Done Tasks",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idle_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Days"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open_tasks": {
+            "title": "Open Tasks",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTaskOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "status",
+          "open_tasks",
+          "done_tasks",
+          "idle_days",
+          "last_activity_at",
+          "finished_at",
+          "tasks"
+        ],
+        "title": "ProjectOut",
+        "type": "object"
+      },
+      "ProjectTaskOut": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "due_on",
+          "overdue",
+          "estimate_minutes",
+          "completed_at"
+        ],
+        "title": "ProjectTaskOut",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -1865,6 +2095,47 @@
           "why"
         ],
         "title": "SuggestedAction",
+        "type": "object"
+      },
+      "TaskIn": {
+        "additionalProperties": false,
+        "properties": {
+          "due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "maximum": 10080.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "title": {
+            "maxLength": 110,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TaskIn",
         "type": "object"
       },
       "TaskOut": {
@@ -2513,6 +2784,47 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "lorakus_modules__academic__router__CompleteIn": {
+        "additionalProperties": false,
+        "description": "Fin d'une evaluation : le temps reellement passe, si l'utilisateur le donne (PR 49).",
+        "properties": {
+          "actual_minutes": {
+            "anyOf": [
+              {
+                "maximum": 10080.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Minutes"
+          }
+        },
+        "title": "CompleteIn",
+        "type": "object"
+      },
+      "lorakus_modules__projects__router__CompleteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_minutes": {
+            "anyOf": [
+              {
+                "maximum": 10080.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Minutes"
+          }
+        },
+        "title": "CompleteIn",
+        "type": "object"
       }
     }
   },
@@ -2774,7 +3086,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/CompleteIn"
+                    "$ref": "#/components/schemas/lorakus_modules__academic__router__CompleteIn"
                   },
                   {
                     "type": "null"
@@ -4415,6 +4727,493 @@
         "summary": "Today",
         "tags": [
           "planning"
+        ]
+      }
+    },
+    "/api/v1/projects/ideas": {
+      "get": {
+        "operationId": "get_ideas_api_v1_projects_ideas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "inbox",
+              "enum": [
+                "inbox",
+                "archived"
+              ],
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IdeaOut"
+                  },
+                  "title": "Response Get Ideas Api V1 Projects Ideas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ideas",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "post": {
+        "operationId": "create_idea_api_v1_projects_ideas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdeaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdeaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Idea",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/ideas/{idea_id}": {
+      "delete": {
+        "operationId": "remove_idea_api_v1_projects_ideas__idea_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idea_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idea Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Idea",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/ideas/{idea_id}/archive": {
+      "post": {
+        "operationId": "archive_api_v1_projects_ideas__idea_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idea_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idea Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdeaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/projects": {
+      "get": {
+        "operationId": "get_projects_api_v1_projects_projects_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "active",
+              "enum": [
+                "active",
+                "done"
+              ],
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectOut"
+                  },
+                  "title": "Response Get Projects Api V1 Projects Projects Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Projects",
+        "tags": [
+          "Projets"
+        ]
+      },
+      "post": {
+        "operationId": "create_project_api_v1_projects_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/projects/{project_id}": {
+      "delete": {
+        "operationId": "remove_project_api_v1_projects_projects__project_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Project",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/projects/{project_id}/finish": {
+      "post": {
+        "operationId": "finish_api_v1_projects_projects__project_id__finish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/projects/{project_id}/tasks": {
+      "post": {
+        "operationId": "create_task_api_v1_projects_projects__project_id__tasks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Task",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/tasks/{task_id}": {
+      "delete": {
+        "operationId": "remove_task_api_v1_projects_tasks__task_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Task",
+        "tags": [
+          "Projets"
+        ]
+      }
+    },
+    "/api/v1/projects/tasks/{task_id}/complete": {
+      "post": {
+        "operationId": "finish_task_api_v1_projects_tasks__task_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/lorakus_modules__projects__router__CompleteIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish Task",
+        "tags": [
+          "Projets"
         ]
       }
     },

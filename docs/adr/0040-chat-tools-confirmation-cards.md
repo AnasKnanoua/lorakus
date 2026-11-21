@@ -76,3 +76,14 @@ Prompt `assistant-system-2026-11-21.1` : ne jamais supposer d'heure ; lire la jo
 Ajouté à `CHAT_TOOLS` après revue : `focus.split_task` (`write`, module Sergent, proposé seulement s'il est activé). Le découpage est proposé par le modèle dans l'appel déjà fait pour la réponse ; le code vérifie la tâche (existe, ouverte, ni déjà découpée ni elle-même une étape), les étapes (2 à 8, titres lisibles et distincts, durées bornées), écrit la carte (étapes numérotées, total, durée prévue, échéance) et ne crée rien avant le clic. La carte dit si les durées sont celles de l'utilisateur ou une estimation de Lorakus.
 
 Prompt `assistant-system-2026-11-21.2` : quand un rapport de spécialiste suffit, répondre avec lui sans relire les mêmes données par un outil ; poser la question d'un rapport, une seule, plutôt que deviner. La consigne de proposer un découpage est dans la description de l'outil (absente si le module est désactivé). Corpus : position 8. Banc : 4 cas (33 au total, non encore mesurés avec le vrai modèle).
+
+## Amendement du 2026-11-21 (PR 51) : projets et boîte d'idées
+
+Ajoutés à `CHAT_TOOLS` après revue, proposés seulement si le module `projects` est activé :
+
+- `projects.list` (`read`) : projets actifs, leurs tâches ouvertes, les jours sans activité de ceux qui dorment, les dernières idées. Tous les textes passés par `inert()`.
+- `projects.add_idea` (`write`) : noter une idée, sans échéance ni durée. La description de l'outil la préfère à un projet tant que l'utilisateur ne dit pas vouloir s'y mettre.
+- `projects.add_project` (`write`) : nom, but, 8 premières tâches au plus. La carte rappelle les projets qui dorment (noms écrits par l'utilisateur, ramenés à une ligne) : finir avant de commencer.
+- `projects.add_task` (`write`) : une tâche dans un projet existant, retrouvé par son nom sans casse ni accents ; projet inconnu ou terminé, doublon, échéance passée : refusés avant toute carte.
+
+Pas de changement de prompt système : les consignes sont dans les descriptions des outils. Corpus : position 9 (idée, nom de projet et titre de tâche piégés). Banc : 3 cas (36 au total : 13 de sécurité, 23 de qualité, non encore mesurés avec le vrai modèle).

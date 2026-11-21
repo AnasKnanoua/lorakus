@@ -3,7 +3,7 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : v0.3.0 (2026-11-18)
-- **Phase** : P4 — Planning, academic, projects, Sergent v0, commencée le 2026-11-18 (D-F tranchée, découpage en PR 44 à 50 validé). P3 close le 2026-11-18 (v0.3.0).
+- **Phase** : P4 — Planning, academic, projects, Sergent v0, commencée le 2026-11-18 (D-F tranchée, découpage en PR 44 à 51 validé). P3 close le 2026-11-18 (v0.3.0).
 - **Dernière mise à jour** : 2026-11-20
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
@@ -79,7 +79,7 @@
   - **Supprimé** : préférences fixes (table, outils, routes, section de la page), plafond de 6 h, 30 minutes supposées.
   - Prompt `assistant-system-2026-11-21.1`. Corpus : position 7 réécrite (31 attaques). Banc : 4 cas à la place des 3 des préférences (29, non mesurés avec le vrai modèle).
   - Vérifié localement : voir le message de livraison.
-- PR 50 — Sergent v0 (module `focus`, ADR 0018, 0025, 0026 et 0040 amendés), **livrée le 2026-11-21, à déployer** (migration `0016_core_task_steps`, aucun secret ; activer « Sergent » dans la page des modules) :
+- PR 50 — Sergent v0 (module `focus`, ADR 0018, 0025, 0026 et 0040 amendés), **fusionnée le 2026-11-21** (#77 ; migration `0016_core_task_steps`, aucun secret ; activer « Sergent » dans la page des modules) :
   - **Premier spécialiste réel** : rapports par des règles, sans LLM ni table, à partir de la vue du jour du Core (le même plan que « Ma journée ») ; chaque fait avec sa source et « mesuré » ou « estimé » ; tenus dans le contrat (3 phrases, 10 faits, 1 500 caractères), « partiel » quand il en manque. Intentions `day_plan` et `deadlines`.
   - **Scénario 1** : « Qu'est-ce que je dois faire aujourd'hui ? » → mots-clés → rapport dans le prompt → un seul appel au modèle, sans relire la journée par un outil. Rapport en quelques millisecondes ; temps total à mesurer en production.
   - **Une seule question** (`SpecialistReport.clarification`, ADR 0026) : la journée manquante, sinon la durée de la tâche la plus urgente ; pas de réponse par défaut (rien n'est supposé).
@@ -88,6 +88,14 @@
   - Horloge des spécialistes donnée par le Core (`SpecialistContext.now`). Prompt `assistant-system-2026-11-21.2`. Corpus : position 8 (31 attaques). Banc : 4 cas (33, non mesurés avec le vrai modèle).
   - Non fait, et pourquoi : prendre les devants (message du matin, rappels) attend les notifications de la P5 ; palier 3 du routage et cache des rapports, sans besoin mesuré.
   - Vérifié localement : voir le message de livraison.
+- PR 51 — Module `projects` (ADR 0012, 0018 et 0040 amendés), **livrée le 2026-11-21, à déployer** (migration `projects_0001`, aucun secret ; activer « Projets » dans la page des modules) :
+  - **Boîte d'idées** (`proj_ideas`) : une ligne, sans échéance ni durée ; archiver, supprimer après confirmation, ou en faire un projet (l'idée devient sa description).
+  - **Projets et tâches** (`proj_projects`, `proj_tasks`, RLS forcée) : chaque tâche crée sa tâche du planning par `ModuleTasks("projects")` ; échéance et durée restent sur la tâche du planning, lues en une requête (`ModuleTasks.many`). Terminer depuis la page (temps passé facultatif) ou depuis le chat (`planning.task_completed`) ; terminer un projet ferme ses tâches ouvertes.
+  - **Projets qui dorment** : 14 jours sans activité, signalés sur la page, au modèle (`projects.list`) et sur la carte d'un nouveau projet.
+  - Outils `projects.list`, `projects.add_idea`, `projects.add_project`, `projects.add_task` (cartes). `inert()` déplacé dans le Core (`lorakus/core/tools/inert.py`) : un module ne peut pas importer l'assistant. Le Sergent nomme la source « Projet » d'une tâche de projet.
+  - Corpus : position 9 (31 attaques). Banc : 3 cas (36, non mesurés avec le vrai modèle). Page `/projets` (entrée « Projets »).
+  - Vérifié localement : voir le message de livraison.
+- **Clôture de la P4** après le déploiement de la PR 51 : scénarios 1, 2 et 6 rejoués en production par le propriétaire, puis v0.4.0.
 - Emploi du temps : pas d'ICS fourni par METU (capture d'écran reçue, créneaux de 50 minutes à HH:40) ; en attendant celui de TSP (2027), saisie des cours dans Google Agenda en événements récurrents, lus par l'adresse ICS secrète (PR 45).
 - Reporté de la P3 : palier 3 du routage, invalidation du cache des spécialistes par événements, suppression des conversations par période ; amélioration du routage par le sens et de la recherche dans la mémoire (`ROADMAP.md`, « Idées »).
 
