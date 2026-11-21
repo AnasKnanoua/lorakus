@@ -122,6 +122,7 @@ class NewTask:
     notes: str | None = None
     parent_id: uuid.UUID | None = None
     estimate_source: EstimateSource = "user"  # ignore sans duree
+    step_number: int | None = None  # rang parmi les etapes de sa tache (decoupage, PR 50)
 
 
 @dataclass(frozen=True)
@@ -142,13 +143,18 @@ class TaskView:
     open_subtasks: int = 0
     estimate_source: str | None = None  # « user » ou « assistant », present avec la duree
     actual_minutes: int | None = None  # temps reellement passe, donne a la fin
+    # Toutes ses sous-taches, terminees comprises (PR 50) : une tache decoupee n'est plus
+    # placee elle-meme, meme quand ses etapes sont faites.
+    subtasks: int = 0
+    step_number: int | None = None  # rang parmi les etapes de sa tache
 
     def overdue(self, today: date) -> bool:
         """En retard : ouverte, et son jour d'echeance est passe (pas « aujourd'hui »)."""
         return self.status == "open" and self.due_on is not None and self.due_on < today
 
 
-def _view(task: Task, open_subtasks: int = 0) -> TaskView:
+def _view(task: Task, counts: tuple[int, int] = (0, 0)) -> TaskView:
+    open_subtasks, subtasks = counts
     return TaskView(
         id=task.id,
         title=task.title,
@@ -166,21 +172,30 @@ def _view(task: Task, open_subtasks: int = 0) -> TaskView:
         open_subtasks=open_subtasks,
         estimate_source=task.estimate_source,
         actual_minutes=task.actual_minutes,
+        subtasks=subtasks,
+        step_number=task.step_number,
     )
 
 
-async def _open_subtasks(session: AsyncSession, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, int]:
+async def _subtasks(
+    session: AsyncSession, ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """Par tache : (sous-taches ouvertes, toutes ses sous-taches)."""
     if not ids:
         return {}
     rows = await session.execute(
-        select(Task.parent_id, func.count())
-        .where(Task.parent_id.in_(ids), Task.status == "open")
+        select(
+            Task.parent_id,
+            func.count().filter(Task.status == "open"),
+            func.count(),
+        )
+        .where(Task.parent_id.in_(ids))
         .group_by(Task.parent_id)
     )
-    counts: dict[uuid.UUID, int] = {}
-    for parent, count in rows:
+    counts: dict[uuid.UUID, tuple[int, int]] = {}
+    for parent, opened, total in rows:
         if parent is not None:
-            counts[parent] = count
+            counts[parent] = (opened, total)
     return counts
 
 
@@ -198,16 +213,16 @@ async def list_tasks(
     else:
         query = query.order_by(Task.completed_at.desc(), Task.id)
     tasks = list(await session.scalars(query.limit(max(1, min(limit, MAX_LIST)))))
-    counts = await _open_subtasks(session, [t.id for t in tasks])
-    return [_view(t, counts.get(t.id, 0)) for t in tasks]
+    counts = await _subtasks(session, [t.id for t in tasks])
+    return [_view(t, counts.get(t.id, (0, 0))) for t in tasks]
 
 
 async def get_task(session: AsyncSession, task_id: uuid.UUID) -> TaskView:
     task = await session.get(Task, task_id)
     if task is None:
         raise TaskNotFoundError(task_id)
-    counts = await _open_subtasks(session, [task.id])
-    return _view(task, counts.get(task.id, 0))
+    counts = await _subtasks(session, [task.id])
+    return _view(task, counts.get(task.id, (0, 0)))
 
 
 async def find_open_duplicate(
@@ -286,6 +301,7 @@ async def add_task(
         due_on=new.due_on,
         estimate_minutes=new.estimate_minutes,
         estimate_source=None if new.estimate_minutes is None else new.estimate_source,
+        step_number=new.step_number if new.parent_id is not None else None,
         source_kind=source_kind,
         source_ref=source_ref,
     )
@@ -486,8 +502,8 @@ class ModuleTasks:
         *,
         actual_minutes: int | None = None,
     ) -> bool:
-        """Termine la tache de `ref` (avec le temps passe, s'il est donne) ; False si elle
-        n'existe pas ou l'est deja."""
+        """Termine la tache de `ref` (avec le temps passe, s'il est donne) et ses sous-taches
+        encore ouvertes, comme complete_task ; False si elle n'existe pas ou l'est deja."""
         _check_actual(actual_minutes)
         result = await session.execute(
             update(Task)
@@ -500,7 +516,16 @@ class ModuleTasks:
             )
             .returning(Task.id)
         )
-        return result.first() is not None
+        done = result.scalar_one_or_none()
+        if done is None:
+            return False
+        # Ses etapes (decoupage par l'utilisateur, PR 50) n'ont plus lieu d'etre proposees.
+        await session.execute(
+            update(Task)
+            .where(Task.parent_id == done, Task.status == "open")
+            .values(status="done", completed_at=now, updated_at=func.now())
+        )
+        return True
 
     async def delete(self, session: AsyncSession, ref: str) -> bool:
         result = await session.execute(delete(Task).where(*self._mine(ref)).returning(Task.id))

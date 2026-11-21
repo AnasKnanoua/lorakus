@@ -1599,6 +1599,8 @@ export interface components {
         };
         /** SpecialistReport */
         SpecialistReport: {
+            /** Clarification */
+            clarification?: string | null;
             confidence?: components["schemas"]["Confidence"] | null;
             /**
              * Cost Eur

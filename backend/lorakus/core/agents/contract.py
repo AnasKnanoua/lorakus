@@ -3,13 +3,18 @@
 Le rapport est borne (3 phrases, ~300 tokens) : le Majordome (P3) en combinera plusieurs.
 Les actions suggerees ne sont JAMAIS executees par le specialiste : elles passent par les
 outils, donc par la confirmation de l'utilisateur.
+
+Question de clarification (PR 50, ADR 0026 amende) : un rapport peut porter UNE question a
+poser a l'utilisateur, seulement si sa reponse change le resultat (« quand travailles-tu
+aujourd'hui ? » quand rien ne peut etre place sans elle). Le Majordome la pose telle quelle ;
+le specialiste ne la pose jamais lui-meme.
 """
 
 import re
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -72,6 +77,8 @@ class SpecialistReport(BaseModel):
     )
     freshness: datetime | None = None
     cost_eur: float = Field(default=0, ge=0)
+    # Une seule question, et seulement si la reponse change le resultat (PR 50).
+    clarification: str | None = Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def _bounded(self) -> Self:
@@ -95,6 +102,9 @@ class SpecialistContext:
 
     request: SpecialistRequest
     open_transaction: Callable[[], Any]  # transaction liee a l'utilisateur (RLS)
+    # L'instant de la question, donne par le Core (PR 50) : un specialiste ne lit jamais
+    # l'horloge lui-meme, pour que ses reponses soient reproductibles et testables.
+    now: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 SpecialistHandler = Callable[[SpecialistContext], Awaitable[SpecialistReport]]

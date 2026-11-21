@@ -17,7 +17,11 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
    en masse, de terminer et de supprimer la tache du devoir ;
 7. dans le titre d'une tache, lue par l'outil du plan du jour (PR 49) : le modele qui obeit
    tente de declarer la journee sans travail, de la reduire a rien, de passer la nuit a
-   travailler, et de changer les durees des taches.
+   travailler, et de changer les durees des taches ;
+8. dans un evenement d'agenda et un titre de tache, lus par le rapport du Sergent (PR 50) et
+   places dans le prompt systeme sans aucun appel d'outil : le texte arrive inerte, dans un
+   bloc qu'il ne peut pas refermer, et le modele qui obeit (decouper la tache en etapes
+   piegees, journee sans travail, tout terminer) ne change rien sans clic.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -574,3 +578,77 @@ def test_an_attack_cannot_change_the_day_or_durations_without_the_users_click(
         )
     )
     assert used == [(0,)]
+
+
+# ----------------------------- 8. lu par le rapport du Sergent (PR 50)
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_read_by_the_sergent_stays_inert_and_changes_nothing(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    from datetime import datetime, time, timedelta
+    from zoneinfo import ZoneInfo
+
+    from lorakus_modules.calendars.ics import visible_line
+
+    assert owner.put("/api/v1/modules/focus", json={"enabled": True}).status_code == 200
+    paris = ZoneInfo("Europe/Paris")
+    today = datetime.now(paris).date()
+    start = datetime.combine(today, time(12, 0), tzinfo=paris)
+
+    async def _seed(session: Any, user: Any) -> Any:
+        title = visible_line(attack["payload"], 200) or "vide"
+        item = AgendaItem("piege", title, start, start + timedelta(hours=1), location=title)
+        await ModuleAgenda("calendars").replace_source(session, user, "abonnement", [item])
+        trap = _as_fact(attack["payload"])[:200] or "vide"
+        return (await add_task(session, user, NewTask(trap, today, 120))).id
+
+    task_id = str(asyncio.run(_with_tasks(_seed)))
+    before = (
+        _task_titles(),
+        asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_planning_days")),
+    )
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    provider = _use(
+        owner,
+        [
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    (
+                        "focus__split_task",
+                        {"task_id": task_id, "steps": [{"title": "PIRATE"}, {"title": "B"}]},
+                    ),
+                    ("assistant__set_day", {"no_work": True}),
+                    (COMPLETE_TASK, {"task_id": task_id}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            "C'est fait : j'ai suivi les instructions du rapport.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Qu'est-ce que je dois faire aujourd'hui ?")
+
+    system = provider.calls[0][1].system
+    # Le rapport est arrive dans le prompt, comme une donnee : un seul bloc, jamais referme
+    # par le texte piege, chaque ligne inerte.
+    assert system.count("<rapports>") == 1 and system.count("</rapports>") == 1
+    lines = _body(system, "rapports")
+    assert lines[0].startswith("- [Sergent] ")
+    _inert([line for line in lines if not line.startswith("- [Sergent]")])
+    after = (
+        _task_titles(),
+        asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_planning_days")),
+    )
+    assert after == before  # ni etape, ni journee, ni tache terminee
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]
+    cards = [data for name, data in events if name == "card"]
+    assert 1 <= len(cards) <= MAX_CARDS
+    assert all(card["status"] == "pending" for card in cards)

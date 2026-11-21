@@ -8,6 +8,7 @@ et cache ; il passe trace_id (la reponse du chat) et for_llm (le rapport ira au 
 import asyncio
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final
@@ -62,9 +63,16 @@ class Answer:
 
 
 class AgentService:
-    def __init__(self, database: Database, modules: ModuleService) -> None:
+    def __init__(
+        self,
+        database: Database,
+        modules: ModuleService,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
         self._db = database
         self._modules = modules
+        # Horloge donnee aux specialistes (SpecialistContext.now) ; remplacable en test.
+        self.clock = clock
         self._profiles: dict[str, SpecialistProfile] = {
             m.id: m.specialist for m in modules.registry if m.specialist is not None
         }
@@ -102,7 +110,9 @@ class AgentService:
             deadline=datetime.now(UTC) + timedelta(seconds=delay),
         )
         context = SpecialistContext(
-            request=request, open_transaction=lambda: self._db.transaction(user_id)
+            request=request,
+            open_transaction=lambda: self._db.transaction(user_id),
+            now=self.clock(),
         )
         started = time.monotonic()
         try:

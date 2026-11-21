@@ -5,6 +5,7 @@ des tests sont des heures locales, converties par `at`. Le cadre du jour (days.p
 plage de travail : sans cadre, rien n'est propose.
 """
 
+import dataclasses
 import itertools
 import random
 import uuid
@@ -75,6 +76,7 @@ def task(
     priority: int = 2,
     parent: uuid.UUID | None = None,
     open_subtasks: int = 0,
+    subtasks: int | None = None,
     status: str = "open",
     created: datetime = CREATED,
     number: int | None = None,
@@ -94,6 +96,7 @@ def task(
         created_at=created,
         completed_at=None,
         open_subtasks=open_subtasks,
+        subtasks=open_subtasks if subtasks is None else subtasks,
     )
 
 
@@ -260,6 +263,41 @@ def test_steps_are_planned_instead_of_their_parent() -> None:
         ("Etape 1", date(2026, 11, 20), 45),  # l'echeance de sa tache
         ("Etape d'une tache absente de la liste", None, 20),
     ]
+
+
+def test_steps_stay_together_in_their_order_with_their_tasks_priority() -> None:
+    parent = task("Projet", due=date(2026, 11, 20), minutes=300, open_subtasks=3, priority=1)
+    # Identifiants dans l'ordre inverse des etapes, meme date de creation : seul le rang
+    # peut donner l'ordre.
+    steps = [
+        dataclasses.replace(task(title, parent=parent.id, minutes=m, number=10 - n), step_number=n)
+        for n, (title, m) in enumerate([("Lire", 120), ("Coder", 30), ("Rédiger", 60)], 1)
+    ]
+    other = task("Autre urgent", due=date(2026, 11, 20), minutes=10, priority=2)
+    chosen = candidates([other, steps[2], parent, steps[0], steps[1]])
+    # La priorite haute du projet passe a ses etapes ; ensuite, leur rang, pas leur duree.
+    assert [c.task.title for c in chosen] == ["Lire", "Coder", "Rédiger", "Autre urgent"]
+
+
+def test_the_steps_of_two_tasks_never_interleave() -> None:
+    first = task("A", due=DAY, minutes=60, open_subtasks=2, number=1)
+    second = task("B", due=DAY, minutes=60, open_subtasks=2, number=2)
+    steps = [
+        dataclasses.replace(
+            task(f"{p.title}{n}", parent=p.id, minutes=30, number=n * 10 + i), step_number=n
+        )
+        for i, p in enumerate([first, second], 1)
+        for n in (1, 2)
+    ]
+    chosen = [c.task.title for c in candidates([*steps, first, second])]
+    assert chosen == ["A1", "A2", "B1", "B2"]
+
+
+def test_a_task_whose_steps_are_all_done_is_not_proposed_again() -> None:
+    # Ses etapes sont faites : il reste a la marquer terminee, pas a refaire 10 h de travail.
+    finished = task("Projet", minutes=600, open_subtasks=0, subtasks=3)
+    whole = task("Rapport", minutes=60)
+    assert [c.task.title for c in candidates([finished, whole])] == ["Rapport"]
 
 
 # ---------------------------------------------------------- placement

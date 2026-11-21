@@ -14,14 +14,16 @@ Regles, dans l'ordre ou elles s'appliquent :
    cadre (repas, sport...), fusionnes s'ils se touchent. Une journee entiere (ferie,
    anniversaire) n'occupe pas d'heures. Un trou de moins d'un quart d'heure n'est pas un
    creneau.
-3. **Quelles taches** : les taches ouvertes sans sous-tache ouverte (on travaille sur les
-   etapes, pas sur leur titre). Une sous-tache sans echeance prend celle de sa tache.
+3. **Quelles taches** : les taches ouvertes qui n'ont pas ete decoupees (on travaille sur
+   les etapes, pas sur leur titre ; une tache dont toutes les etapes sont faites n'est pas
+   reproposee, il reste a la marquer terminee). Une sous-tache sans echeance prend celle de
+   sa tache.
 4. **Duree** : la duree estimee. Une tache SANS duree n'est pas placee : elle est rendue a
    part (« a estimer »), pour que Lorakus demande combien de temps elle prendra au lieu de
    supposer.
 5. **Ordre** : echeance la plus proche d'abord (donc les retards en tete), les taches sans
    echeance a la fin ; a echeance egale, priorite haute d'abord ; puis la plus courte ; puis
-   la plus ancienne.
+   la plus ancienne. Les etapes d'une tache decoupee restent ensemble, dans leur ordre.
 6. **Placement** : dans l'ordre, chaque tache prend le premier temps libre. Un bloc dure
    2 h au plus et 30 minutes au moins (ou ce qui reste de la tache) ; un quart d'heure de
    pause suit chaque bloc ; une tache trop longue pour un creneau continue dans le suivant.
@@ -161,21 +163,30 @@ def candidates(tasks: Sequence[TaskView]) -> list[Candidate]:
     by_id = {task.id: task for task in tasks}
     chosen: list[Candidate] = []
     for task in tasks:
-        if task.status != "open" or task.open_subtasks > 0:
+        if task.status != "open" or task.subtasks > 0:
             continue
         parent = by_id.get(task.parent_id) if task.parent_id is not None else None
         due_on = task.due_on if task.due_on is not None else (parent.due_on if parent else None)
         chosen.append(Candidate(task, due_on, task.estimate_minutes))
-    return sorted(
-        chosen,
-        key=lambda c: (
+
+    def key(c: Candidate) -> tuple[date, int, int, datetime, str, int, datetime, str]:
+        # Les etapes d'une meme tache restent ensemble et dans leur ordre (decoupage, PR 50) :
+        # entre elles, ni la plus courte ni la plus ancienne d'abord, mais leur rang.
+        parent = by_id.get(c.task.parent_id) if c.task.parent_id is not None else None
+        group = parent if parent is not None else c.task
+        size = (parent.estimate_minutes or 0) if parent is not None else (c.minutes or 0)
+        return (
             c.due_on or date.max,  # sans echeance : a la fin
-            c.task.priority,
-            c.minutes or 0,
+            group.priority,  # une etape a la priorite de sa tache
+            size,
+            group.created_at,
+            str(group.id),
+            c.task.step_number or 0,
             c.task.created_at,
             str(c.task.id),
-        ),
-    )
+        )
+
+    return sorted(chosen, key=key)
 
 
 def place(

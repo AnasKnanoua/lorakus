@@ -93,6 +93,8 @@ CHAT_TOOLS: Final = (
     "assistant.set_estimate",
     # Module academic (PR 46), revu : une carte, rien sans clic.
     "academic.add_assessment",
+    # Sergent (PR 50), revu : decoupage valide par le code, une carte, rien sans clic.
+    "focus.split_task",
 )
 MAX_MODEL_CALLS: Final = 4  # par message ; le dernier appel est sans outil
 MAX_TOOL_CALLS: Final = 6  # par message

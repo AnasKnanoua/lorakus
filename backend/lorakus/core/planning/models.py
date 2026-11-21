@@ -1,4 +1,4 @@
-"""Tables du planning (migrations 0013 et 0015). RLS forcee : chacun ne voit que ses lignes.
+"""Tables du planning (migrations 0013, 0015 et 0016). RLS forcee : chacun ne voit que ses lignes.
 
 Generiques (ADR 0018) : une tache ne connait ni devoir ni projet. `owner_module` et
 `owner_ref` disent quel module l'a creee et a quel objet elle correspond ; nuls pour une
@@ -73,6 +73,8 @@ class Task(Base):
     estimate_source: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Temps reellement passe, donne a la fin (PR 49) : l'ecart avec l'estimation.
     actual_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Rang d'une etape parmi celles de sa tache (PR 50, decoupage) : l'ordre de travail.
+    step_number: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     owner_module: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_kind: Mapped[str] = mapped_column(Text)
