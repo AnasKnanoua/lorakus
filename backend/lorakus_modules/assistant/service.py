@@ -152,6 +152,15 @@ FALLBACKS: Final[dict[str, str]] = {
         "ou le découper ?"
     ),
     "refused": "Je ne peux pas envoyer ces données à un modèle externe.",
+    # Le modele a fini sans rien ecrire ni proposer : ce n'est pas un bogue de Lorakus.
+    "empty": (
+        "Je n'ai rien su répondre à ce message. Reformule-le ou réessaie ; il est bien enregistré."
+    ),
+    # Le fournisseur a refuse de repondre (stop_reason « refusal »).
+    "model_refused": (
+        "Mon modèle de langage a refusé de répondre à ce message. Reformule-le si c'est un "
+        "malentendu ; il est bien enregistré."
+    ),
     "error": "Une erreur interne m'empêche de répondre. Elle a été signalée ; réessaie plus tard.",
 }
 
@@ -726,6 +735,19 @@ class AssistantService:
                             ToolResult(tool_use_id=use.id, content=content, is_error=is_error)
                         )
                     messages.append(ChatMessage(role="user", tool_results=tuple(results)))
+                if not "".join(parts).strip() and not actions:
+                    # Le modele a fini sans rien ecrire ni proposer. Ce n'est pas un bogue :
+                    # gabarit honnete, raison comptee et journalisee (sans contenu).
+                    stop = result.stop_reason if result else None
+                    reason = "model_refused" if stop == "refusal" else "empty"
+                    log.warning(
+                        "assistant_reply_empty",
+                        stop_reason=stop,
+                        model_calls=calls,
+                        output_tokens=result.usage.output_tokens if result else None,
+                    )
+                    parts.clear()  # des blancs seulement : rien n'a ete montre
+                    yield fallback(reason)
             except AIUnavailableError as error:
                 reason = error.reason
                 key = error.reason if error.reason in ("budget", "rate_limited") else "unavailable"

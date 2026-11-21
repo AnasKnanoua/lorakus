@@ -36,6 +36,8 @@ class FakeReply:
 
     text: str = ""
     tool_calls: tuple[tuple[str, dict[str, Any]], ...] = ()
+    # Raison de fin imposee (ex. "refusal") ; par defaut, celle d'une reponse normale.
+    stop_reason: str | None = None
 
 
 @dataclass
@@ -91,5 +93,5 @@ class FakeProvider:
             usage=Usage(
                 input_tokens=request_tokens(request), output_tokens=estimate_tokens(reply.text)
             ),
-            stop_reason="tool_use" if calls else "end_turn",
+            stop_reason=(reply.stop_reason or ("tool_use" if calls else "end_turn")),
         )

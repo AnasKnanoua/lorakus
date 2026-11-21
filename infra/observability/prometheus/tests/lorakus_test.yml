@@ -538,6 +538,31 @@ tests:
               description: Une reponse s'est terminee par le message d'erreur interne. Une exception est dans les journaux de l'API.
               runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantinternalerror
 
+  - name: Reponses vides de l'assistant
+    interval: 1m
+    input_series:
+      # Une heure de zeros d'abord : l'augmentation sur 1 h est alors exacte (sans extrapolation).
+      - series: 'lorakus_assistant_replies_total{status="fallback", reason="empty"}'
+        values: '0x60 1 2 2'
+      - series: 'lorakus_assistant_replies_total{status="fallback", reason="model_refused"}'
+        values: '0x62 1'
+      - series: 'lorakus_assistant_replies_total{status="fallback", reason="error"}'
+        values: '0x60 5 10 15'
+    alert_rule_test:
+      - eval_time: 62m
+        alertname: LorakusAssistantEmptyReplies
+        exp_alerts: []
+      - eval_time: 63m
+        alertname: LorakusAssistantEmptyReplies
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: ai
+            exp_annotations:
+              summary: Reponses vides de l'assistant
+              description: Plusieurs reponses de l'heure ecoulee sont vides ou refusees par le modele. Leur raison de fin est dans les journaux de l'API (assistant_reply_empty).
+              runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/ai.md#lorakusassistantemptyreplies
+
   # ------------------------------------------------------------------ exposition (PR 35)
   - name: Caddy injoignable
     interval: 1m

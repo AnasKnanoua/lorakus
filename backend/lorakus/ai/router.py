@@ -97,6 +97,8 @@ class ChatResult:
     usage: Usage
     cost_usd: Decimal
     budget_warning: bool  # 80 % du plafond mensuel atteint avec cet appel
+    # Raison de fin donnee par le fournisseur (end_turn, tool_use, max_tokens, refusal...).
+    stop_reason: str = "end_turn"
 
 
 RouterEvent = TextDelta | ToolUseEvent | ChatResult
@@ -330,6 +332,7 @@ class ModelRouter:
                 usage=completion.usage,
                 cost_usd=cost,
                 budget_warning=spent + cost >= self._budget * BUDGET_WARNING_RATIO,
+                stop_reason=completion.stop_reason,
             )
             return
 

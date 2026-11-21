@@ -10,7 +10,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Mémoire basse, métriques du serveur absentes](host.md) | `LorakusHostMemoryLow`, `LorakusNodeExporterDown` |
 | [Production disparue](production-down.md) | Message healthchecks.io « DOWN », `LorakusHeartbeatFailing` |
 | [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
-| [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError` |
+| [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError`, `LorakusAssistantEmptyReplies` |
 | [Accès public : Caddy, limites, origine](web.md) | `LorakusWebDown`, `LorakusRateLimited`, `LorakusOriginRefused` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |

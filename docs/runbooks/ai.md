@@ -59,3 +59,9 @@ L'API redémarre en quelques secondes ; tout message reçoit le message de secou
 - **Symptôme** : une réponse s'est terminée par le message d'erreur interne : c'est un bogue, pas une panne du fournisseur.
 - **Vérifier** : `dc logs --since 1h api </dev/null | grep -A 30 assistant_reply_failed` (trace de l'exception).
 - **Action** : ouvrir une issue avec la trace (sans contenu de conversation), corriger par une PR. Si l'erreur se répète à chaque message, `make rollback` depuis le Dell.
+
+## LorakusAssistantEmptyReplies
+
+- **Symptôme** : plus de deux réponses dans l'heure se sont terminées sans texte ni carte. L'utilisateur a vu « Je n'ai rien su répondre à ce message » (`empty`) ou « Mon modèle de langage a refusé de répondre » (`model_refused`, raison de fin `refusal`). Ce n'est pas une exception : rien dans `assistant_reply_failed`.
+- **Vérifier** : dans Grafana, `{service_name="lorakus-api"} |= "assistant_reply_empty"` donne la raison de fin (`stop_reason`), le nombre d'appels au modèle et les jetons produits ; le panneau « Pourquoi ? » du message donne la trace (outils proposés, souvenirs fournis, version du prompt).
+- **Action** : `end_turn` répété, le prompt ou une description d'outil pousse le modèle à se taire (souvent après un résultat d'outil) : reproduire avec le banc (`model-eval.yml`), corriger le prompt et changer sa version. `refusal`, regarder ce qui a été envoyé (souvenirs, contenu d'outil) : un contenu piégé peut provoquer un refus. `max_tokens`, la limite de sortie est trop basse pour la tâche.
