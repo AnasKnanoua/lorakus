@@ -25,7 +25,7 @@ import { TopBar } from "@/features/chat/layout";
 import { cn } from "@/lib/cn";
 import { assessmentsQuery, coursesQuery } from "@/lib/queries";
 
-import { duration, hoursToMinutes, longDate, minutesToHours, relativeDay, weight } from "@/lib/format";
+import { duration, hoursToMinutes, localDay, longDate, minutesToHours, relativeDay, weight } from "@/lib/format";
 
 const KIND_LABEL: Record<AssessmentKind, string> = { assignment: "Devoir", exam: "Examen" };
 const SELECT =
@@ -410,13 +410,6 @@ function DoneAssessments() {
       )}
     </Collapsible>
   );
-}
-
-/** Jour local (AAAA-MM-JJ) d'un instant ISO, sur cet appareil. */
-function localDay(iso: string): string {
-  const at = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
 function AddAssessment({ courses }: { courses: Course[] }) {

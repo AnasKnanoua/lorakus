@@ -141,7 +141,13 @@ def test_the_export_holds_everything_and_no_real_secret(owner: TestClient) -> No
     assert data["account"]["second_factor_enabled"] is True
     assert data["account"]["backup_codes_remaining"] == 10
     # Tous les modules connus, actives ou non (calendars : PR 45 ; academic : PR 46).
-    assert [m["id"] for m in data["modules"]] == ["academic", "assistant", "calendars", "focus"]
+    assert [m["id"] for m in data["modules"]] == [
+        "academic",
+        "assistant",
+        "calendars",
+        "focus",
+        "projects",
+    ]
     assert [f["content"] for f in data["memory"]["facts"]] == ["Révise le matin"]
     assert data["memory"]["settings"] == {"propose_after_conversations": True}
     assert data["ai_usage"][0]["task"] == "chat" and data["ai_usage"][0]["calls"] == 2
@@ -167,7 +173,7 @@ def test_the_export_holds_everything_and_no_real_secret(owner: TestClient) -> No
     [(details,)] = _sql(
         "SELECT details FROM lorakus.core_audit_events WHERE action = 'data.export'"
     )
-    assert details == {"modules": ["academic", "assistant", "calendars"]}
+    assert details == {"modules": ["academic", "assistant", "calendars", "projects"]}
 
 
 def test_the_export_needs_a_recent_proof_of_identity(owner: TestClient) -> None:

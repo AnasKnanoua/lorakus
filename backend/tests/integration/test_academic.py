@@ -63,7 +63,8 @@ ModuleRegistry.from_entry_points()
 
 
 def test_discovering_the_modules_subscribes_the_handler() -> None:
-    assert list(bus.handlers_for(TASK_COMPLETED)) == ["academic.task_completed"]
+    # D'autres modules ecoutent aussi la fin d'une tache (projects) : chacun filtre la sienne.
+    assert "academic.task_completed" in bus.handlers_for(TASK_COMPLETED)
     assert list(bus.handlers_for(TASK_ESTIMATED)) == ["academic.task_estimated"]
 
 
@@ -388,7 +389,7 @@ async def test_completing_the_task_completes_the_assessment_through_the_event(
         assert (done.id, done.status, done.completed_at) == (created.id, "done", NOW)
     assert await _events() == [(TASK_COMPLETED, payload, True)]
     handlers = await migrator_sql("SELECT handler FROM lorakus.core_outbox_deliveries")
-    assert handlers == [("academic.task_completed",)]
+    assert ("academic.task_completed",) in handlers
 
 
 async def test_a_personal_task_publishes_no_event(

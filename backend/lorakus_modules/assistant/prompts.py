@@ -4,13 +4,18 @@ Toute modification du texte change PROMPT_VERSION : chaque reponse enregistre la
 qui l'a produite, pour comparer ou expliquer un comportement apres coup.
 """
 
-import unicodedata
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Final
 
 from lorakus.core.account.dates import french_date
 from lorakus.core.agents.orchestrator import Consultation
+
+# Texte inerte (PR 41) : dans le Core depuis la PR 51, pour que tout module puisse rendre ses
+# donnees inertes ; reexporte ici pour les appelants existants.
+from lorakus.core.tools.inert import SAFE_GT as SAFE_GT
+from lorakus.core.tools.inert import SAFE_LT as SAFE_LT
+from lorakus.core.tools.inert import inert as inert
 
 PROMPT_VERSION: Final = "assistant-system-2026-11-21.2"
 
@@ -92,38 +97,6 @@ _CATEGORY_LABELS: Final = {
 }
 
 _NO_FACTS: Final = "\n\nFaits confirmés par l'utilisateur : aucun pour l'instant."
-
-# Chevrons de remplacement dans les blocs de donnees (PR 41) : U+2039 et U+203A, lisibles mais
-# incapables d'ouvrir ou de fermer une balise. Ecrits en echappements (ruff RUF001).
-SAFE_LT: Final = "\u2039"
-SAFE_GT: Final = "\u203a"
-
-
-def _chevron(char: str) -> str:
-    """Remplacant d'un caractere qui se lit comme un chevron (« < », pleine chasse...)."""
-    folded = unicodedata.normalize("NFKC", char)
-    if "<" in folded:
-        return SAFE_LT
-    if ">" in folded:
-        return SAFE_GT
-    return char
-
-
-def inert(text: str) -> str:
-    """Texte rendu inerte pour un bloc de donnees du prompt (PR 41).
-
-    Une seule ligne ; caracteres invisibles retires (largeur nulle, inversions de sens,
-    controles) ; tout ce qui se lit comme « < » ou « > » (pleine chasse comprise) remplace par
-    SAFE_LT et SAFE_GT. Aucune balise, connue ou non, imbriquee ou en majuscules, ne peut donc
-    fermer le bloc ni en ouvrir un autre. Retirer seulement les balises connues etait
-    contournable (« </fa</faits>its> », « </FAITS> », « </system> »).
-    """
-    visible = "".join(
-        " " if unicodedata.category(c) in ("Cc", "Zl", "Zp") else c
-        for c in text
-        if unicodedata.category(c) != "Cf"
-    )
-    return "".join(_chevron(c) for c in " ".join(visible.split()))
 
 
 def memory_block(facts: Sequence[tuple[str, str]]) -> str:

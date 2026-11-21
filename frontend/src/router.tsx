@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 
 import { AcademicScreen } from "@/features/academic/AcademicScreen";
+import { ProjectsScreen } from "@/features/projects/ProjectsScreen";
 import { TodayScreen } from "@/features/today/TodayScreen";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { ChatLayout } from "@/features/chat/ChatLayout";
@@ -89,6 +90,13 @@ const calendarsRoute = createRoute({
   component: CalendarsScreen,
 });
 
+// Projets (PR 51) : boite d'idees, projets et leurs taches, du module projects.
+const projectsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/projets",
+  component: ProjectsScreen,
+});
+
 // Cours (PR 46) : devoirs et examens du module academic.
 const academicRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -105,7 +113,7 @@ const todayRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute, todayRoute]),
+  appRoute.addChildren([homeRoute, conversationRoute, memoryRoute, dataRoute, calendarsRoute, academicRoute, projectsRoute, todayRoute]),
 ]);
 
 /** history : barre d'adresse du navigateur par defaut ; historique en memoire dans les tests. */

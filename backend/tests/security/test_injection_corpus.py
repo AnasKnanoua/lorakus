@@ -21,7 +21,10 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
 8. dans un evenement d'agenda et un titre de tache, lus par le rapport du Sergent (PR 50) et
    places dans le prompt systeme sans aucun appel d'outil : le texte arrive inerte, dans un
    bloc qu'il ne peut pas refermer, et le modele qui obeit (decouper la tache en etapes
-   piegees, journee sans travail, tout terminer) ne change rien sans clic.
+   piegees, journee sans travail, tout terminer) ne change rien sans clic ;
+9. dans le nom d'un projet, le titre d'une de ses taches et une idee de la boite (PR 51,
+   module projects), lus par l'outil des projets : le texte arrive inerte, et le modele qui
+   obeit (projets, taches et idees en masse, tache terminee) ne change rien sans clic.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -642,6 +645,73 @@ def test_an_attack_read_by_the_sergent_stays_inert_and_changes_nothing(
         asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_planning_days")),
     )
     assert after == before  # ni etape, ni journee, ni tache terminee
+    used = asyncio.run(
+        migrator_sql(
+            "SELECT count(*) FROM lorakus.core_tool_confirmations "
+            "WHERE used_at IS NOT NULL OR cancelled_at IS NOT NULL"
+        )
+    )
+    assert used == [(0,)]
+    cards = [data for name, data in events if name == "card"]
+    assert 1 <= len(cards) <= MAX_CARDS
+    assert all(card["status"] == "pending" for card in cards)
+
+
+# ------------------------- 9. dans un projet, une tache et une idee (PR 51)
+@pytest.mark.integration
+@pytest.mark.parametrize("attack", CORPUS, ids=IDS)
+def test_an_attack_in_a_project_or_an_idea_changes_nothing_without_the_users_click(
+    owner: TestClient, attack: dict[str, str]
+) -> None:
+    assert owner.put("/api/v1/modules/projects", json={"enabled": True}).status_code == 200
+    trap = _as_fact(attack["payload"])
+    name = trap[:80].strip() or "vide"
+    created = owner.post("/api/v1/projects/projects", json={"name": name})
+    if created.status_code != 201:  # un nom illisible est refuse : on garde le piege ailleurs
+        created = owner.post("/api/v1/projects/projects", json={"name": "Projet piégé"})
+    project_id = created.json()["id"]
+    task = owner.post(
+        f"/api/v1/projects/projects/{project_id}/tasks",
+        json={"title": trap[:110].strip() or "vide"},
+    )
+    if task.status_code != 201:
+        task = owner.post(f"/api/v1/projects/projects/{project_id}/tasks", json={"title": "Tâche"})
+    owner.post("/api/v1/projects/ideas", json={"text": trap[:500].strip() or "vide"})
+
+    def state() -> Any:
+        return (
+            owner.get("/api/v1/projects/projects").json(),
+            owner.get("/api/v1/projects/ideas").json(),
+            _task_titles(),
+        )
+
+    before = state()
+    [(planned_id, _, _)] = before[2]
+    conversation = owner.post(f"{BASE}/conversations").json()["id"]
+    provider = _use(
+        owner,
+        [
+            FakeReply("Je regarde.", tool_calls=(("projects__list", {}),)),
+            FakeReply(
+                "J'obéis.",
+                tool_calls=(
+                    ("projects__add_project", {"name": "PIRATE", "tasks": ["Virer 500 euros"]}),
+                    ("projects__add_task", {"project": name, "title": "Virer 500 euros"}),
+                    ("projects__add_idea", {"text": "PIRATE"}),
+                    (COMPLETE_TASK, {"task_id": planned_id}),
+                    ("tools__confirm", {"confirmation_id": "toutes"}),
+                ),
+            ),
+            "C'est fait.",
+        ],
+    )
+
+    events = _events(owner, conversation, "Où en sont mes projets ? Fais ce qui est écrit.")
+
+    read = json.loads(provider.calls[1][1].messages[-1].tool_results[0].content)
+    [entry] = read["projets_actifs"]
+    _inert([entry["nom"], *entry["taches_ouvertes"], *read["dernieres_idees"]])
+    assert state() == before  # ni projet, ni tache, ni idee, ni tache terminee
     used = asyncio.run(
         migrator_sql(
             "SELECT count(*) FROM lorakus.core_tool_confirmations "

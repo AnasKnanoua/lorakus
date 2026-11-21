@@ -57,3 +57,10 @@ export function minutesToHours(minutes: number | null): string {
 export function clockTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone }).format(new Date(iso));
 }
+
+/** Jour local (AAAA-MM-JJ) d'un instant ISO, sur cet appareil. */
+export function localDay(iso: string): string {
+  const at = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}

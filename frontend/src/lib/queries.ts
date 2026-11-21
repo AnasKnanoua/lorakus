@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import { listAssessments, listCourses } from "@/api/academic";
+import { listIdeas, listProjects } from "@/api/projects";
 import { getAccountSettings } from "@/api/account";
 import { getToday } from "@/api/planning";
 import { getConversation, listConversations } from "@/api/assistant";
@@ -80,3 +81,19 @@ export const todayQuery = queryOptions({
   queryFn: getToday,
   refetchInterval: 60_000,
 });
+
+/** Projets (PR 51) : actifs (le moins avancé d'abord) ou terminés ; relus chaque minute : une
+ * tâche terminée dans le chat termine sa tâche de projet quelques secondes plus tard. */
+export const projectsQuery = (state: "active" | "done") =>
+  queryOptions({
+    queryKey: ["projects", "projects", state],
+    queryFn: () => listProjects(state),
+    refetchInterval: 60_000,
+  });
+
+/** Boîte d'idées (PR 51) : dans la boîte, ou archivées. */
+export const ideasQuery = (state: "inbox" | "archived") =>
+  queryOptions({
+    queryKey: ["projects", "ideas", state],
+    queryFn: () => listIdeas(state),
+  });

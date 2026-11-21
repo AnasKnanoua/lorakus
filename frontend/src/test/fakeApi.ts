@@ -91,7 +91,14 @@ export interface FakeState {
   today: FakeToday | null;
   /** Jours dont le cadre a ete efface par DELETE /planning/days/{day} (PR 49). */
   clearedDays: string[];
+  /** Module projects (PR 51) : idees et projets (taches comprises), tels que l'API les rend. */
+  projectsEnabled: boolean;
+  ideas: FakeIdea[];
+  projects: FakeProject[];
 }
+
+export type FakeIdea = Schemas["IdeaOut"];
+export type FakeProject = Schemas["ProjectOut"];
 
 export type FakeToday = Schemas["TodayOut"];
 
@@ -207,6 +214,9 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     academicToday: "2026-11-18",
     today: emptyToday(),
     clearedDays: [],
+    projectsEnabled: true,
+    ideas: [],
+    projects: [],
     ...overrides,
   };
   let counter = 0;
@@ -511,6 +521,13 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     if (path === "/api/v1/planning/today" && request.method === "GET") {
       return state.today ? json(200, state.today) : json(403, { detail: "Refusé." });
     }
+    if (path === "/api/v1/modules/projects" && request.method === "PUT") {
+      state.projectsEnabled = true;
+      return json(200, { id: "projects", enabled: true, config: {} });
+    }
+    if (path.startsWith("/api/v1/projects/")) {
+      return projects(request.method, path, url.searchParams, body);
+    }
     if (path.startsWith("/api/v1/academic/")) {
       return academic(request.method, path, url.searchParams, body);
     }
@@ -615,6 +632,123 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
         state.assessments = state.assessments.filter((a) => a !== found);
         return new Response(null, { status: 204 });
       }
+    }
+    return json(404, { detail: `route inconnue du faux backend : ${method} ${path}` });
+  }
+
+  // Module projects (PR 51) : memes regles que le serveur pour ce que la page affiche.
+  const NOW_ISO = "2026-11-18T12:00:00Z";
+  function counted(project: FakeProject): FakeProject {
+    return {
+      ...project,
+      open_tasks: project.tasks.filter((t) => t.status === "open").length,
+      done_tasks: project.tasks.filter((t) => t.status === "done").length,
+    };
+  }
+  function projects(method: string, path: string, query: URLSearchParams, body: unknown): Response {
+    if (!state.projectsEnabled) return json(404, { detail: "Module indisponible." });
+    if (path === "/api/v1/projects/ideas" && method === "GET") {
+      return json(200, state.ideas.filter((i) => i.status === (query.get("state") ?? "inbox")));
+    }
+    if (path === "/api/v1/projects/ideas" && method === "POST") {
+      const text = (body as { text: string }).text.trim();
+      if (state.ideas.some((i) => i.status === "inbox" && i.text.toLowerCase() === text.toLowerCase())) {
+        return json(422, { detail: "Cette idée est déjà dans ta boîte." });
+      }
+      const created: FakeIdea = { id: nextId(), text, status: "inbox", created_at: NOW_ISO };
+      state.ideas.unshift(created);
+      return json(201, created);
+    }
+    const idea = /^\/api\/v1\/projects\/ideas\/([^/]+)\/archive$/.exec(path);
+    if (idea && method === "POST") {
+      const found = state.ideas.find((i) => i.id === idea[1]);
+      if (!found) return json(404, { detail: "Idée introuvable." });
+      found.status = "archived";
+      return json(200, found);
+    }
+    const oneIdea = /^\/api\/v1\/projects\/ideas\/([^/]+)$/.exec(path);
+    if (oneIdea && method === "DELETE") {
+      if (!state.ideas.some((i) => i.id === oneIdea[1])) return json(404, { detail: "Idée introuvable." });
+      state.ideas = state.ideas.filter((i) => i.id !== oneIdea[1]);
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/v1/projects/projects" && method === "GET") {
+      return json(200, state.projects.filter((p) => p.status === (query.get("state") ?? "active")).map(counted));
+    }
+    if (path === "/api/v1/projects/projects" && method === "POST") {
+      const b = body as { name: string; description?: string | null; idea_id?: string | null };
+      const name = b.name.trim();
+      if (state.projects.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+        return json(422, { detail: "Tu as déjà un projet de ce nom." });
+      }
+      const fromIdea = b.idea_id ? state.ideas.find((i) => i.id === b.idea_id) : undefined;
+      if (b.idea_id && !fromIdea) return json(404, { detail: "Idée introuvable." });
+      state.ideas = state.ideas.filter((i) => i !== fromIdea);
+      const created: FakeProject = {
+        id: nextId(),
+        name,
+        description: b.description ?? fromIdea?.text ?? null,
+        status: "active",
+        open_tasks: 0,
+        done_tasks: 0,
+        idle_days: null,
+        last_activity_at: NOW_ISO,
+        finished_at: null,
+        tasks: [],
+      };
+      state.projects.push(created);
+      return json(201, created);
+    }
+    const one = /^\/api\/v1\/projects\/projects\/([^/]+)(\/finish|\/tasks)?$/.exec(path);
+    const project = one ? state.projects.find((p) => p.id === one[1]) : undefined;
+    if (one && !project) return json(404, { detail: "Projet introuvable." });
+    if (one && project) {
+      if (one[2] === "/finish" && method === "POST") {
+        project.status = "done";
+        project.finished_at = NOW_ISO;
+        project.idle_days = null;
+        for (const t of project.tasks) t.status = "done";
+        return json(200, counted(project));
+      }
+      if (one[2] === "/tasks" && method === "POST") {
+        const b = body as { title: string; due_on: string | null; estimate_minutes: number | null };
+        const title = b.title.trim();
+        if (project.tasks.some((t) => t.status === "open" && t.title.toLowerCase() === title.toLowerCase())) {
+          return json(422, { detail: "Cette tâche est déjà ouverte dans ce projet." });
+        }
+        project.tasks.push({
+          id: nextId(),
+          title,
+          status: "open",
+          due_on: b.due_on,
+          overdue: b.due_on !== null && b.due_on < "2026-11-18",
+          estimate_minutes: b.estimate_minutes,
+          completed_at: null,
+        });
+        project.idle_days = null;
+        return json(201, counted(project));
+      }
+      if (!one[2] && method === "DELETE") {
+        state.projects = state.projects.filter((p) => p !== project);
+        return new Response(null, { status: 204 });
+      }
+    }
+    const task = /^\/api\/v1\/projects\/tasks\/([^/]+)\/complete$/.exec(path);
+    if (task && method === "POST") {
+      const owner = state.projects.find((p) => p.tasks.some((t) => t.id === task[1]));
+      const found = owner?.tasks.find((t) => t.id === task[1]);
+      if (!owner || !found) return json(404, { detail: "Tâche introuvable." });
+      found.status = "done";
+      found.completed_at = NOW_ISO;
+      owner.idle_days = null;
+      return json(200, counted(owner));
+    }
+    const oneTask = /^\/api\/v1\/projects\/tasks\/([^/]+)$/.exec(path);
+    if (oneTask && method === "DELETE") {
+      const owner = state.projects.find((p) => p.tasks.some((t) => t.id === oneTask[1]));
+      if (!owner) return json(404, { detail: "Tâche introuvable." });
+      owner.tasks = owner.tasks.filter((t) => t.id !== oneTask[1]);
+      return new Response(null, { status: 204 });
     }
     return json(404, { detail: `route inconnue du faux backend : ${method} ${path}` });
   }

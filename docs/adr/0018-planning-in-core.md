@@ -99,3 +99,7 @@ La table `core_planning_preferences` est supprimée par la migration 0015, avec 
 - **Planificateur** : une tâche qui a été découpée n'est plus placée elle-même, même quand toutes ses étapes sont faites (il reste à la marquer terminée, pas à refaire tout le travail) ; les étapes d'une tâche restent ensemble, dans leur ordre, avec l'échéance et la priorité de la tâche quand elles n'en ont pas.
 - **Fin d'une tâche de module** : `ModuleTasks.complete` termine aussi ses étapes encore ouvertes, comme `complete_task` le fait déjà quand l'utilisateur termine une tâche. Sans cela, finir un devoir découpé depuis la page Cours aurait laissé ses étapes au planning.
 - `TaskView.subtasks` : toutes les sous-tâches, terminées comprises, à côté de `open_subtasks`.
+
+## Amendement du 2026-11-21 (PR 51) : lecture groupée
+
+`ModuleTasks.many(session, refs)` : les tâches d'un module pour une liste de références, en une requête (dictionnaire référence → `TaskView`, références inconnues absentes). La page Projets lit l'échéance et la durée de toutes les tâches de tous les projets sans une requête par tâche ; ces deux informations restent sur la tâche du planning, jamais recopiées dans le module.

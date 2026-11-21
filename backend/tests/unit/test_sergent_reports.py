@@ -199,6 +199,8 @@ def test_one_dropped_fact_is_singular() -> None:
 
 
 def test_long_titles_are_cut_and_module_tasks_say_where_they_come_from() -> None:
+    project_task = dataclasses.replace(task("Lorakus : README"), owner_module="projects")
+    assert task_source(project_task) == "Projet « Lorakus : README »"
     long = academic("Un intitulé de devoir vraiment très long " * 5, DAY + timedelta(days=1))
     assert task_source(long).startswith("Cours « Un intitulé")
     assert len(task_source(long)) <= 120
