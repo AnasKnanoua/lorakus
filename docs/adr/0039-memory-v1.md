@@ -53,3 +53,7 @@ L'analyse tourne dans le processus de l'API (`DebouncedTasks`), car seule l'API 
 ## Amendement du 2026-11-20 (PR 48) : préférences de planification hors de la mémoire
 
 Les préférences de planification (heures de travail, repas, jours sans travail, plafond du jour) ne passent pas par l'extraction de faits : ce sont des valeurs typées d'un catalogue fermé du Core, confirmées par une carte du chat (ADR 0018 et 0040). La règle de cet ADR reste entière : rien n'est retenu sans confirmation de la personne. La mémoire garde les faits en texte libre ; elle pourra plus tard proposer une préférence typée, qui passera alors par la même validation et la même confirmation.
+
+## Amendement du 2026-11-21 (PR 49)
+
+Les préférences fixes de la PR 48 sont remplacées par le cadre du jour (ADR 0018) : une information qui ne vaut que pour un jour, confirmée par une carte. La mémoire n'y intervient toujours pas : elle garde des faits durables, et des horaires qui changent chaque jour n'en sont pas.

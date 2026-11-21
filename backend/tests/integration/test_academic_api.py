@@ -528,6 +528,88 @@ def test_completing_the_task_from_the_chat_completes_the_assessment(
     assert deliver_events() == (0, 0)  # livre une seule fois
 
 
+# ------------------------------------------- duree et temps passe (PR 49)
+def test_lorakus_can_propose_its_own_estimate_and_says_so(
+    owner: TestClient, conversation: str
+) -> None:
+    fix_clock(owner, NOW)
+    set_timezone(owner, "Europe/Istanbul")
+    arguments = {
+        "course": "Algo",
+        "due_on": "2026-11-20",
+        "estimate_minutes": 150,
+        "estimate_by": "lorakus",
+    }
+    use_model(owner, FakeReply("", tool_calls=((ADD, arguments),)), "Confirme-la.")
+    [card] = of(send(owner, conversation, "Ajoute le DM d'algo, estime toi-même"), "card")
+    assert "Durée estimée : 2 h 30 (estimation de Lorakus)" in card["summary"].split("\n")
+    assert confirm(owner, card) == 200
+    [created] = opened(owner)
+    assert created["estimate_minutes"] == 150
+    source = asyncio.run(
+        migrator_sql(
+            "SELECT estimate_source FROM lorakus.core_tasks WHERE owner_ref = :ref",
+            {"ref": created["id"]},
+        )
+    )
+    assert source == [("assistant",)]
+
+
+def test_an_estimate_given_in_the_chat_reaches_the_assessment_page(
+    owner: TestClient, conversation: str
+) -> None:
+    fix_clock(owner, NOW)
+    homework = assessment(owner, course(owner))
+    assert homework["estimate_minutes"] is None
+    task_id = asyncio.run(
+        migrator_sql(
+            "SELECT id FROM lorakus.core_tasks WHERE owner_ref = :ref", {"ref": homework["id"]}
+        )
+    )[0][0]
+    arguments = {"task_id": str(task_id), "minutes": 180, "estimate_by": "utilisateur"}
+    use_model(owner, FakeReply("", tool_calls=(("assistant__set_estimate", arguments),)), "Ok.")
+    [card] = of(send(owner, conversation, "Le TP 2 me prendra 3 h"), "card")
+    assert card["summary"] == ("Durée de « Machine Learning : TP 2 » : 3 h\nActuellement : aucune")
+    assert confirm(owner, card) == 200
+    assert deliver_events() == (1, 0)
+    [updated] = opened(owner)
+    assert updated["estimate_minutes"] == 180
+    assert deliver_events() == (0, 0)
+
+
+def test_the_time_spent_is_given_when_finishing_from_the_page(owner: TestClient) -> None:
+    homework = assessment(owner, course(owner), estimate_minutes=120)
+    refused = owner.post(
+        f"{BASE}/assessments/{homework['id']}/complete", json={"actual_minutes": 0}
+    )
+    assert refused.status_code == 422
+    extra = owner.post(
+        f"{BASE}/assessments/{homework['id']}/complete", json={"actual_minutes": 90, "note": "x"}
+    )
+    assert extra.status_code == 422  # aucun champ inconnu
+    finished = owner.post(
+        f"{BASE}/assessments/{homework['id']}/complete", json={"actual_minutes": 150}
+    )
+    assert finished.status_code == 200, finished.text
+    stored = asyncio.run(
+        migrator_sql(
+            "SELECT status, actual_minutes FROM lorakus.core_tasks WHERE owner_ref = :ref",
+            {"ref": homework["id"]},
+        )
+    )
+    assert stored == [("done", 150)]
+    # Sans corps, comme avant : aucun temps note.
+    other = assessment(owner, course(owner, "Algo"))
+    assert owner.post(f"{BASE}/assessments/{other['id']}/complete").status_code == 200
+    none = asyncio.run(
+        migrator_sql(
+            "SELECT actual_minutes FROM lorakus.core_tasks WHERE owner_ref = :ref",
+            {"ref": other["id"]},
+        )
+    )
+    assert none == [(None,)]
+
+
 def test_the_handler_still_runs_when_the_module_is_disabled(owner: TestClient) -> None:
     """Desactiver ne supprime pas les donnees : elles restent justes au retour."""
     fix_clock(owner, NOW)

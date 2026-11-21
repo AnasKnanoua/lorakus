@@ -270,6 +270,9 @@ function AssessmentLine({ item }: { item: Assessment }) {
   const [removing, setRemoving] = useState(false);
   // Terminer ne se defait pas (ni ici, ni pour la tache) : jamais sur un simple toucher.
   const [completing, setCompleting] = useState(false);
+  // Temps reellement passe (PR 49), facultatif : l'ecart avec l'estimation, plus tard.
+  const [spent, setSpent] = useState("");
+  const spentId = useId();
 
   if (editing) {
     return (
@@ -353,10 +356,27 @@ function AssessmentLine({ item }: { item: Assessment }) {
         confirmLabel="Terminer"
         failure="Impossible de terminer cette évaluation. Réessaie."
         onConfirm={async () => {
-          await completeAssessment(item.id);
+          await completeAssessment(item.id, hoursToMinutes(spent));
+          setSpent("");
           await refresh();
         }}
-      />
+      >
+        <div className="mt-4 flex flex-col gap-1.5">
+          <label htmlFor={spentId} className="text-sm text-ink-muted">
+            Temps passé, en heures (facultatif)
+          </label>
+          <Input
+            id={spentId}
+            inputMode="decimal"
+            value={spent}
+            autoComplete="off"
+            placeholder={item.estimate_minutes ? minutesToHours(item.estimate_minutes) : "2"}
+            onChange={(e) => {
+              setSpent(e.target.value);
+            }}
+          />
+        </div>
+      </ConfirmDialog>
     </li>
   );
 }

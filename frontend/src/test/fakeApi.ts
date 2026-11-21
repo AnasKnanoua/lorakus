@@ -60,6 +60,8 @@ export interface FakeState {
   };
   /** Simule une coupure reseau a l'envoi du prochain message. */
   failNextSend: boolean;
+  /** La prochaine creation de conversation echoue comme une coupure reseau. */
+  failNextCreate: boolean;
   /** Si defini, le flux s'arrete apres les morceaux de texte jusqu'a ce que la promesse aboutisse. */
   holdReply: Promise<void> | null;
   requests: { method: string; path: string; body: unknown }[];
@@ -87,20 +89,9 @@ export interface FakeState {
   academicToday: string;
   /** Ma journee (PR 47) : ce que rend GET /planning/today, tel quel ; null : refus definitif (403, sans nouvel essai). */
   today: FakeToday | null;
-  /** Preferences de planification confirmees (PR 48) : cle → valeur ecrite. */
-  preferences: Partial<Record<FakePreference["key"], string>>;
+  /** Jours dont le cadre a ete efface par DELETE /planning/days/{day} (PR 49). */
+  clearedDays: string[];
 }
-
-export type FakePreference = Schemas["PreferenceOut"];
-
-const PREFERENCE_DEFAULTS: [FakePreference["key"], string, string][] = [
-  ["work_start", "Début de la journée de travail", "8 h"],
-  ["work_end", "Fin de la journée de travail", "22 h"],
-  ["lunch", "Déjeuner", "aucun"],
-  ["dinner", "Dîner", "aucun"],
-  ["rest_days", "Jours sans travail", "aucun"],
-  ["daily_cap", "Travail proposé par jour", "6 h au plus"],
-];
 
 export type FakeToday = Schemas["TodayOut"];
 
@@ -109,13 +100,12 @@ export function emptyToday(overrides: Partial<FakeToday> = {}): FakeToday {
     day: "2026-11-18",
     timezone: "Europe/Istanbul",
     generated_at: "2026-11-18T04:30:00Z",
-    work_ends_at: "2026-11-18T19:00:00Z",
-    rest_day: false,
-    meals: [],
+    frame: null,
     agenda: [],
     plan: [],
     planned_minutes: 0,
     unplanned: [],
+    unestimated: [],
     overdue: [],
     upcoming: [],
     ...overrides,
@@ -137,6 +127,8 @@ export interface FakeAssessment {
   estimate_minutes: number | null;
   status: "open" | "done";
   completed_at: string | null;
+  /** Temps passe envoye a la fin (PR 49) ; absent tant que l'evaluation est ouverte. */
+  actual_minutes?: number | null;
 }
 
 export interface FakeSubscription {
@@ -196,6 +188,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     conversations: new Map(),
     nextReply: { chunks: ["Bonjour", " Anas."], status: "ok" },
     failNextSend: false,
+    failNextCreate: false,
     holdReply: null,
     requests: [],
     facts: [],
@@ -213,7 +206,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     assessments: [],
     academicToday: "2026-11-18",
     today: emptyToday(),
-    preferences: {},
+    clearedDays: [],
     ...overrides,
   };
   let counter = 0;
@@ -277,6 +270,10 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       );
     }
     if (path === "/api/v1/assistant/conversations" && request.method === "POST") {
+      if (state.failNextCreate) {
+        state.failNextCreate = false;
+        throw new TypeError("Failed to fetch");
+      }
       const id = nextId();
       state.conversations.set(id, { id, title: "Nouvelle conversation", messages: [] });
       return json(201, { id, title: "Nouvelle conversation", created_at: NOW, updated_at: NOW });
@@ -500,22 +497,15 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
       state.academicEnabled = true;
       return json(200, { id: "academic", enabled: true, config: {} });
     }
-    if (path === "/api/v1/planning/preferences" && request.method === "GET") {
-      return json(
-        200,
-        PREFERENCE_DEFAULTS.map(([key, label, fallback]) => ({
-          key,
-          label,
-          value: state.preferences[key] ?? fallback,
-          is_default: state.preferences[key] === undefined,
-        })),
-      );
-    }
-    const preference = /^\/api\/v1\/planning\/preferences\/([a-z_]+)$/.exec(path);
-    if (preference && request.method === "DELETE") {
-      const key = preference[1] as FakePreference["key"];
-      if (state.preferences[key] === undefined) return json(404, { detail: "Aucune préférence enregistrée." });
-      state.preferences = Object.fromEntries(Object.entries(state.preferences).filter(([k]) => k !== key));
+    const day = /^\/api\/v1\/planning\/days\/([0-9-]+)$/.exec(path);
+    if (day && request.method === "DELETE") {
+      const [, wanted = ""] = day;
+      const today = state.today;
+      if (today === null || today.day !== wanted || today.frame === null) {
+        return json(404, { detail: "Aucun cadre pour ce jour." });
+      }
+      state.today = { ...today, frame: null, plan: [], planned_minutes: 0 };
+      state.clearedDays.push(wanted);
       return new Response(null, { status: 204 });
     }
     if (path === "/api/v1/planning/today" && request.method === "GET") {
@@ -609,8 +599,10 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     if (one && found) {
       if (one[2] && method === "POST") {
         if (found.status === "done") return json(422, { detail: "Cette évaluation est déjà terminée." });
+        const sent = body as { actual_minutes?: number } | null;
         found.status = "done";
         found.completed_at = `${state.academicToday}T12:00:00Z`;
+        found.actual_minutes = sent?.actual_minutes ?? null;
         return json(200, assessmentOut(found));
       }
       if (method === "PUT") {

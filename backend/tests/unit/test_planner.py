@@ -1,7 +1,8 @@
-"""Planificateur de journee (PR 47) : des regles pures, testees une a une puis ensemble.
+"""Planificateur de journee (PR 47 et 49) : des regles pures, testees une a une puis ensemble.
 
 Reperes : mercredi 18 novembre 2026 a Ankara (UTC+3, sans changement d'heure). Les heures
-des tests sont des heures locales, converties par `at`.
+des tests sont des heures locales, converties par `at`. Le cadre du jour (days.py) donne la
+plage de travail : sans cadre, rien n'est propose.
 """
 
 import itertools
@@ -13,6 +14,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from lorakus.core.planning import planner
+from lorakus.core.planning.days import DayFrame, build_frame, day_off
 from lorakus.core.planning.planner import (
     Block,
     Candidate,
@@ -26,7 +28,6 @@ from lorakus.core.planning.planner import (
     round_up,
     work_window,
 )
-from lorakus.core.planning.preferences import DEFAULTS, PlanningPrefs, TimeRange
 from lorakus.core.planning.service import AgendaView, TaskView
 
 ANKARA = ZoneInfo("Europe/Istanbul")
@@ -45,6 +46,25 @@ def at(hour: int, minute: int = 0, day: date = DAY, tz: ZoneInfo = ANKARA) -> da
 
 def span(start: tuple[int, int], end: tuple[int, int]) -> Interval:
     return Interval(at(*start), at(*end))
+
+
+def frame(
+    start: tuple[int, int] = (8, 0),
+    end: tuple[int, int] = (22, 0),
+    breaks: tuple[tuple[tuple[int, int], tuple[int, int]], ...] = (),
+    day: date = DAY,
+    tz: ZoneInfo = ANKARA,
+) -> DayFrame:
+    return build_frame(
+        day,
+        tz,
+        time(*start),
+        time(*end),
+        [("meal", time(*b[0]), time(*b[1])) for b in breaks],
+    )
+
+
+FULL = frame()  # de 8 h a 22 h
 
 
 def task(
@@ -86,7 +106,7 @@ def all_day(title: str = "Ferie") -> AgendaView:
 
 
 def one(minutes: int, title: str = "T") -> Candidate:
-    return Candidate(task(title, minutes=minutes), None, minutes, False)
+    return Candidate(task(title, minutes=minutes), None, minutes)
 
 
 def hours(blocks: list[Block]) -> list[tuple[str, str]]:
@@ -107,31 +127,36 @@ def test_round_up_goes_to_the_next_quarter_and_keeps_an_exact_one() -> None:
     assert round_up(at(23, 50)) == at(0, 0, DAY + timedelta(days=1))
 
 
-def test_the_window_runs_from_now_to_ten_pm_in_the_account_timezone() -> None:
-    assert work_window(at(6, 30), DAY, ANKARA) == span((8, 0), (22, 0))  # avant 8 h
-    assert work_window(at(8, 0), DAY, ANKARA) == span((8, 0), (22, 0))
-    assert work_window(at(13, 7), DAY, ANKARA) == span((13, 15), (22, 0))
-    assert work_window(at(21, 45), DAY, ANKARA) == span((21, 45), (22, 0))
-    # 8 h a Ankara n'est pas 8 h a Paris : le meme instant donne une autre fenetre.
-    paris = work_window(at(6, 30), DAY, PARIS)
+def test_the_window_runs_from_now_to_the_end_of_the_frame() -> None:
+    assert work_window(at(6, 30), FULL) == span((8, 0), (22, 0))  # avant le debut
+    assert work_window(at(8, 0), FULL) == span((8, 0), (22, 0))
+    assert work_window(at(13, 7), FULL) == span((13, 15), (22, 0))
+    assert work_window(at(21, 45), FULL) == span((21, 45), (22, 0))
+    # 8 h a Ankara n'est pas 8 h a Paris : le meme cadre dit dans un autre fuseau.
+    paris = work_window(at(6, 30), frame(tz=PARIS))
     assert paris == Interval(at(8, 0, tz=PARIS), at(22, 0, tz=PARIS))
-    assert paris != work_window(at(6, 30), DAY, ANKARA)
+    assert paris != work_window(at(6, 30), FULL)
 
 
 @pytest.mark.parametrize("now", [(21, 46), (22, 0), (23, 30)])
-def test_no_window_once_the_working_day_is_over(now: tuple[int, int]) -> None:
-    assert work_window(at(*now), DAY, ANKARA) is None
+def test_no_window_once_the_frame_is_over(now: tuple[int, int]) -> None:
+    assert work_window(at(*now), FULL) is None
 
 
-def test_the_window_follows_wall_clock_time_on_clock_change_days() -> None:
-    autumn, spring = date(2026, 10, 25), date(2027, 3, 28)  # Paris : 25 h, puis 23 h
-    for day in (autumn, spring):
-        midnight = datetime(day.year, day.month, day.day, 0, 30, tzinfo=PARIS)
-        window = work_window(midnight, day, PARIS)
-        assert window is not None
-        assert window.start.astimezone(PARIS).strftime("%H:%M") == "08:00"
-        assert window.end.astimezone(PARIS).strftime("%H:%M") == "22:00"
-        assert window.minutes == 14 * 60  # le changement a lieu la nuit, avant 8 h
+def test_no_window_without_a_frame_or_on_a_day_off() -> None:
+    # Aucune heure supposee : sans cadre, pas de fenetre, quelle que soit l'heure.
+    assert work_window(at(10, 0), None) is None
+    assert work_window(at(10, 0), day_off(DAY)) is None
+
+
+def test_a_night_frame_runs_past_midnight() -> None:
+    night = frame((22, 0), (4, 0))
+    tomorrow = DAY + timedelta(days=1)
+    assert work_window(at(21, 0), night) == Interval(at(22, 0), at(4, 0, tomorrow))
+    assert work_window(at(2, 10, tomorrow), night) == Interval(
+        at(2, 15, tomorrow), at(4, 0, tomorrow)
+    )
+    assert work_window(at(4, 0, tomorrow), night) is None
 
 
 # ------------------------------------------------------------- agenda
@@ -230,10 +255,10 @@ def test_steps_are_planned_instead_of_their_parent() -> None:
     orphan = task("Etape d'une tache absente de la liste", parent=uuid.uuid4(), minutes=20)
     done = task("Terminee", status="done")
     chosen = candidates([parent, step, dated, orphan, done])
-    assert [(c.task.title, c.due_on, c.minutes, c.assumed) for c in chosen] == [
-        ("Etape 2", DAY, 30, True),  # sa propre echeance ; 30 minutes supposees
-        ("Etape 1", date(2026, 11, 20), 45, False),  # l'echeance de sa tache
-        ("Etape d'une tache absente de la liste", None, 20, False),
+    assert [(c.task.title, c.due_on, c.minutes) for c in chosen] == [
+        ("Etape 2", DAY, None),  # sa propre echeance ; aucune duree
+        ("Etape 1", date(2026, 11, 20), 45),  # l'echeance de sa tache
+        ("Etape d'une tache absente de la liste", None, 20),
     ]
 
 
@@ -302,27 +327,12 @@ def test_a_slot_shrunk_under_a_quarter_disappears() -> None:
     assert hours(blocks) == [("09:00", "09:45"), ("10:00", "10:10")]
 
 
-def test_no_more_than_six_hours_are_proposed() -> None:
+def test_the_whole_window_can_be_used_when_the_user_says_so() -> None:
+    # Aucun plafond cache : la plage dite par l'utilisateur est la seule limite.
     work = [one(120, str(n)) for n in range(5)]
     blocks, left = place([span((8, 0), (22, 0))], work)
-    assert sum(b.minutes for b in blocks) == 360
-    assert [b.minutes for b in blocks] == [120, 120, 120]
-    assert left == [Leftover(work[3].task.id, 120), Leftover(work[4].task.id, 120)]
-    # Le plafond coupe une tache en cours ; le reste est rendu.
-    big, late = one(350, "grosse"), one(60, "apres")
-    blocks, left = place([span((8, 0), (22, 0))], [big, late])
-    assert [b.minutes for b in blocks] == [120, 120, 110]
-    # Il reste 10 minutes sous le plafond : trop peu pour avancer une tache d'une heure.
-    assert left == [Leftover(late.task.id, 60)]
-    # Plafond atteint pile : meme cinq minutes de plus ne sont pas proposees.
-    crumb = one(5, "miette")
-    blocks, left = place([span((8, 0), (22, 0))], [*work[:3], crumb])
-    assert sum(b.minutes for b in blocks) == 360
-    assert left == [Leftover(crumb.task.id, 5)]
-    tiny = one(10, "minuscule")
-    blocks, left = place([span((8, 0), (22, 0))], [big, late, tiny])
-    assert [b.minutes for b in blocks] == [120, 120, 110, 10]  # mais assez pour la finir, elle
-    assert left == [Leftover(late.task.id, 60)]
+    assert sum(b.minutes for b in blocks) == 600
+    assert left == []
 
 
 def test_blocks_come_back_in_chronological_order() -> None:
@@ -334,12 +344,13 @@ def test_blocks_come_back_in_chronological_order() -> None:
 # ----------------------------------------------------------- journee
 def test_a_day_is_planned_around_the_agenda() -> None:
     homework = task("ML : TP 2", due=date(2026, 11, 20), minutes=180)
-    errand = task("Courses", minutes=None)
+    errand = task("Courses", minutes=30)
     late = task("Rapport", due=date(2026, 11, 16), minutes=60, priority=3)
     agenda = [event((9, 0), (12, 0)), event((13, 30), (15, 0)), all_day()]
 
-    plan = plan_day(at(7, 40), DAY, ANKARA, agenda, [errand, homework, late])
+    plan = plan_day(at(7, 40), FULL, agenda, [errand, homework, late])
 
+    assert plan.frame == FULL
     assert plan.window == span((8, 0), (22, 0))
     assert list(plan.free) == [
         span((8, 0), (9, 0)),
@@ -351,27 +362,104 @@ def test_a_day_is_planned_around_the_agenda() -> None:
         (late.id, "08:00", "09:00"),  # le retard d'abord
         (homework.id, "12:00", "13:30"),
         (homework.id, "15:00", "16:30"),
-        (errand.id, "16:45", "17:15"),  # 30 minutes supposees
+        (errand.id, "16:45", "17:15"),
     ]
     assert plan.leftovers == ()
+    assert plan.unestimated == ()
     assert plan.planned_minutes == 60 + 180 + 30
+
+
+def test_a_task_without_duration_is_never_placed_but_listed_to_estimate() -> None:
+    known = task("TP", due=date(2026, 11, 20), minutes=60)
+    unknown = task("DM", due=DAY, minutes=None)
+    later = task("Lecture", minutes=None)
+    plan = plan_day(at(9, 0), FULL, [], [later, known, unknown])
+    assert [c.task.title for c in plan.candidates] == ["TP"]
+    assert [c.task.title for c in plan.unestimated] == ["DM", "Lecture"]  # meme ordre
+    assert {b.task_id for b in plan.blocks} == {known.id}
+    assert plan.leftovers == ()
+    # Sans cadre non plus, elles restent « a estimer », jamais « sans place ».
+    plan = plan_day(at(9, 0), None, [], [known, unknown])
+    assert [c.task.title for c in plan.unestimated] == ["DM"]
+    assert plan.leftovers == (Leftover(known.id, 60),)
+
+
+def test_without_a_frame_nothing_is_planned_and_everything_is_left() -> None:
+    homework = task("TP", minutes=120)
+    plan = plan_day(at(10, 0), None, [], [homework])
+    assert (plan.frame, plan.window, plan.free, plan.blocks) == (None, None, (), ())
+    assert plan.leftovers == (Leftover(homework.id, 120),)
+    assert plan.planned_minutes == 0
+
+
+def test_no_work_is_proposed_on_a_day_off() -> None:
+    homework = task("TP", minutes=60)
+    off = day_off(DAY)
+    plan = plan_day(at(9, 0), off, [], [homework])
+    assert (plan.frame, plan.window, plan.blocks) == (off, None, ())
+    assert plan.leftovers == (Leftover(homework.id, 60),)
 
 
 def test_the_plan_starts_now_and_skips_what_is_already_over() -> None:
     homework = task("TP", minutes=120)
     agenda = [event((9, 0), (10, 0)), event((14, 0), (16, 0))]
-    plan = plan_day(at(14, 20), DAY, ANKARA, agenda, [homework])  # pendant un cours
+    plan = plan_day(at(14, 20), FULL, agenda, [homework])  # pendant un cours
     assert hours(list(plan.blocks)) == [("16:00", "18:00")]
-    plan = plan_day(at(10, 7), DAY, ANKARA, agenda, [homework])
+    plan = plan_day(at(10, 7), FULL, agenda, [homework])
     assert hours(list(plan.blocks)) == [("10:15", "12:15")]
 
 
-def test_after_ten_pm_nothing_is_planned_and_everything_is_left() -> None:
+def test_once_the_frame_is_over_nothing_is_planned() -> None:
     homework = task("TP", minutes=120)
-    plan = plan_day(at(22, 10), DAY, ANKARA, [], [homework])
-    assert (plan.window, plan.rest_day, plan.free, plan.blocks) == (None, False, (), ())
+    plan = plan_day(at(22, 10), FULL, [], [homework])
+    assert (plan.window, plan.free, plan.blocks) == (None, (), ())
+    assert plan.frame == FULL
     assert plan.leftovers == (Leftover(homework.id, 120),)
-    assert plan.planned_minutes == 0
+
+
+def test_breaks_are_kept_free() -> None:
+    day = frame((10, 0), (22, 0), breaks=(((12, 30), (13, 30)), ((19, 0), (20, 0))))
+    homework = task("TP", minutes=360)
+    plan = plan_day(at(10, 0), day, [], [homework])
+    assert list(plan.free) == [
+        span((10, 0), (12, 30)),
+        span((13, 30), (19, 0)),
+        span((20, 0), (22, 0)),
+    ]
+    assert hours(list(plan.blocks)) == [
+        ("10:00", "12:00"),
+        ("13:30", "15:30"),
+        ("15:45", "17:45"),
+    ]
+    for block in plan.blocks:
+        for pause in day.breaks:
+            assert block.end <= pause.start or block.start >= pause.end
+    # Sans la pause, le meme travail passerait sur l'heure du repas.
+    assert hours(list(plan_day(at(10, 0), frame((10, 0), (22, 0)), [], [homework]).blocks))[1] == (
+        "12:15",
+        "14:15",
+    )
+
+
+def test_a_break_and_a_class_that_overlap_are_one_busy_time() -> None:
+    day = frame((10, 0), (22, 0), breaks=(((12, 30), (13, 30)),))
+    plan = plan_day(at(10, 0), day, [event((11, 0), (13, 0))], [])
+    assert list(plan.free) == [span((10, 0), (11, 0)), span((13, 30), (22, 0))]
+
+
+def test_a_night_is_planned_past_midnight_around_a_late_meal() -> None:
+    tomorrow = DAY + timedelta(days=1)
+    night = frame((21, 0), (3, 0), breaks=(((23, 30), (0, 15)),))
+    homework = task("Projet", minutes=240)
+    plan = plan_day(at(21, 0), night, [], [homework])
+    assert [(b.start, b.end) for b in plan.blocks] == [
+        (at(21, 0), at(23, 0)),
+        (at(0, 15, tomorrow), at(2, 15, tomorrow)),
+    ]
+    # Vu a 1 h du matin, la nuit continue : il reste la fin de la plage.
+    plan = plan_day(at(1, 0, tomorrow), night, [], [homework])
+    assert [(b.start, b.end) for b in plan.blocks] == [(at(1, 0, tomorrow), at(3, 0, tomorrow))]
+    assert plan.leftovers == (Leftover(homework.id, 120),)
 
 
 def test_the_same_inputs_always_give_the_same_plan() -> None:
@@ -380,12 +468,12 @@ def test_the_same_inputs_always_give_the_same_plan() -> None:
         for n in range(8)
     ]
     agenda = [event((9, 0), (10, 30)), event((13, 0), (14, 0))]
-    reference = plan_day(at(7, 0), DAY, ANKARA, agenda, tasks)
+    reference = plan_day(at(7, 0), FULL, agenda, tasks)
     for seed in range(10):
         shuffled_tasks, shuffled_agenda = tasks[:], agenda[:]
         dice(seed).shuffle(shuffled_tasks)
         dice(seed).shuffle(shuffled_agenda)
-        assert plan_day(at(7, 0), DAY, ANKARA, shuffled_agenda, shuffled_tasks) == reference
+        assert plan_day(at(7, 0), FULL, shuffled_agenda, shuffled_tasks) == reference
 
 
 @pytest.mark.parametrize("seed", range(60))
@@ -416,101 +504,38 @@ def test_every_plan_respects_the_rules(seed: int) -> None:
         )
         for n in range(rng.randint(0, 12))
     ]
-    now = at(5, 0) + timedelta(minutes=rng.randint(0, 18 * 60), seconds=rng.randint(0, 59))
+    first, length = rng.randint(0, 23), rng.randint(2, 19)  # heures ; parfois apres minuit
+    offset = rng.randint(0, length - 1)  # une pause de 45 minutes qui tient dans la plage
+    pauses = (((((first + offset) % 24), 0), (((first + offset) % 24), 45)),)
+    day = frame((first, 0), ((first + length) % 24, 0), breaks=pauses if rng.random() < 0.5 else ())
+    now = at(0, 0) + timedelta(minutes=rng.randint(0, 30 * 60), seconds=rng.randint(0, 59))
 
-    plan = plan_day(now, DAY, ANKARA, agenda, tasks)
+    plan = plan_day(now, day, agenda, tasks)
 
     wanted = {c.task.id: c.minutes for c in plan.candidates}
     left = {item.task_id: item.minutes for item in plan.leftovers}
     blocks = list(plan.blocks)
-    assert plan.planned_minutes <= DEFAULTS.daily_cap
+    assert day.start is not None and day.end is not None
     assert blocks == sorted(blocks, key=lambda b: b.start)
-    for first, second in itertools.pairwise(blocks):
+    for first_block, second in itertools.pairwise(blocks):
         # Jamais deux blocs en meme temps, et toujours la pause entre deux.
-        assert second.start - first.end >= timedelta(minutes=planner.BREAK_MINUTES)
+        assert second.start - first_block.end >= timedelta(minutes=planner.BREAK_MINUTES)
     for block in blocks:
         assert 0 < block.minutes <= planner.MAX_BLOCK_MINUTES
         assert block.start >= now
+        assert day.start <= block.start and block.end <= day.end  # dans la plage dite
         assert any(slot.start <= block.start and block.end <= slot.end for slot in plan.free)
         for entry in agenda:  # jamais pendant un creneau de l'agenda
             assert entry.starts_at is not None and entry.ends_at is not None
             assert block.end <= entry.starts_at or block.start >= entry.ends_at
+        for pause_time in day.breaks:  # ni pendant une pause
+            assert block.end <= pause_time.start or block.start >= pause_time.end
     for task_id, minutes in wanted.items():
+        assert minutes is not None
         done = sum(b.minutes for b in blocks if b.task_id == task_id)
         assert done + left.get(task_id, 0) == minutes  # rien de perdu, rien d'invente
     assert set(left) <= set(wanted) and all(m > 0 for m in left.values())
     assert {b.task_id for b in blocks} <= set(wanted)
-
-
-# -------------------------------------------------- preferences (PR 48)
-def test_the_window_follows_the_work_hours_preference() -> None:
-    prefs = PlanningPrefs(work_start=time(10, 30), work_end=time(19, 0))
-    assert work_window(at(6, 0), DAY, ANKARA, prefs) == span((10, 30), (19, 0))
-    assert work_window(at(12, 5), DAY, ANKARA, prefs) == span((12, 15), (19, 0))
-    assert work_window(at(19, 0), DAY, ANKARA, prefs) is None
-    assert work_window(at(20, 0), DAY, ANKARA) is not None  # sans preference : jusqu'a 22 h
-
-
-def test_no_work_is_proposed_on_a_rest_day() -> None:
-    homework = task("TP", minutes=60)
-    wednesday = PlanningPrefs(rest_days=frozenset({2}))  # le 18 novembre 2026 est un mercredi
-    plan = plan_day(at(9, 0), DAY, ANKARA, [], [homework], wednesday)
-    assert (plan.window, plan.rest_day, plan.blocks) == (None, True, ())
-    assert plan.leftovers == (Leftover(homework.id, 60),)
-    # Un autre jour de repos ne change rien a ce mercredi.
-    sunday = PlanningPrefs(rest_days=frozenset({6}))
-    plan = plan_day(at(9, 0), DAY, ANKARA, [], [homework], sunday)
-    assert (plan.rest_day, hours(list(plan.blocks))) == (False, [("09:00", "10:00")])
-    # Le jour local decide : a 23 h UTC mardi, il est deja mercredi a Ankara.
-    late = datetime(2026, 11, 17, 23, 0, tzinfo=UTC)
-    assert plan_day(late, DAY, ANKARA, [], [homework], wednesday).rest_day is True
-
-
-def test_meals_are_kept_free_and_listed_in_order() -> None:
-    prefs = PlanningPrefs(
-        lunch=TimeRange(time(12, 30), time(13, 30)), dinner=TimeRange(time(19, 0), time(20, 0))
-    )
-    homework = task("TP", minutes=360)
-    plan = plan_day(at(10, 0), DAY, ANKARA, [], [homework], prefs)
-    assert [(name, *hours([Block(homework.id, m.start, m.end)])[0]) for name, m in plan.meals] == [
-        ("lunch", "12:30", "13:30"),
-        ("dinner", "19:00", "20:00"),
-    ]
-    assert list(plan.free) == [
-        span((10, 0), (12, 30)),
-        span((13, 30), (19, 0)),
-        span((20, 0), (22, 0)),
-    ]
-    assert hours(list(plan.blocks)) == [
-        ("10:00", "12:00"),
-        ("13:30", "15:30"),
-        ("15:45", "17:45"),
-    ]
-    for block in plan.blocks:
-        for _, meal in plan.meals:
-            assert block.end <= meal.start or block.start >= meal.end
-    # Sans la preference, le meme travail passerait sur l'heure du dejeuner.
-    assert hours(list(plan_day(at(10, 0), DAY, ANKARA, [], [homework]).blocks))[1] == (
-        "12:15",
-        "14:15",
-    )
-
-
-def test_a_meal_and_a_class_that_overlap_are_one_busy_time() -> None:
-    prefs = PlanningPrefs(lunch=TimeRange(time(12, 30), time(13, 30)))
-    agenda = [event((11, 0), (13, 0))]
-    plan = plan_day(at(10, 0), DAY, ANKARA, agenda, [], prefs)
-    assert list(plan.free) == [span((10, 0), (11, 0)), span((13, 30), (22, 0))]
-    # Un repas hors de la fenetre de travail reste affiche, sans rien bloquer.
-    early = PlanningPrefs(lunch=TimeRange(time(6, 0), time(7, 0)))
-    plan = plan_day(at(5, 0), DAY, ANKARA, [], [], early)
-    assert (len(plan.meals), list(plan.free)) == (1, [span((8, 0), (22, 0))])
-
-
-def test_the_daily_cap_preference_replaces_six_hours() -> None:
-    work = [task(str(n), minutes=120, number=n + 1) for n in range(4)]
-    short = plan_day(at(8, 0), DAY, ANKARA, [], work, PlanningPrefs(daily_cap=150))
-    assert [b.minutes for b in short.blocks] == [120, 30]
-    assert short.planned_minutes == 150
-    long = plan_day(at(8, 0), DAY, ANKARA, [], work, PlanningPrefs(daily_cap=480))
-    assert long.planned_minutes == 480 and long.leftovers == ()
+    # Une tache sans duree n'est jamais placee.
+    assert {c.task.id for c in plan.unestimated}.isdisjoint({b.task_id for b in blocks})
+    assert all(c.minutes is None for c in plan.unestimated)

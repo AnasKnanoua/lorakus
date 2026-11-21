@@ -74,7 +74,13 @@ class AddAssessmentIn(BaseModel):
         default=None,
         ge=1,
         le=MAX_ESTIMATE_MINUTES,
-        description="Durée de travail estimée en minutes, seulement si l'utilisateur la donne.",
+        description="Durée de travail estimée en minutes : celle que l'utilisateur donne, ou "
+        "ton estimation s'il te la demande (alors estimate_by = lorakus).",
+    )
+    estimate_by: Literal["utilisateur", "lorakus"] = Field(
+        default="utilisateur",
+        description="Qui donne la durée : l'utilisateur, ou toi (lorakus) quand c'est ton "
+        "estimation. La carte l'affiche.",
     )
     weight: float | None = Field(
         default=None,
@@ -132,7 +138,8 @@ async def _add_summary(call: ToolCall, args: AddAssessmentIn) -> str:
         f"{when} : {french_date(new.due_on)} ({relative_day(new.due_on, today)})",
     ]
     if new.estimate_minutes is not None:
-        lines.append(f"Durée estimée : {duration(new.estimate_minutes)}")
+        by = " (estimation de Lorakus)" if args.estimate_by == "lorakus" else ""
+        lines.append(f"Durée estimée : {duration(new.estimate_minutes)}{by}")
     if weight is not None:
         lines.append(f"Coefficient : {format_weight(weight)}")
     return "\n".join(lines)
@@ -148,7 +155,12 @@ async def _add(call: ToolCall, args: AddAssessmentIn) -> dict[str, Any]:
             else (await add_course(call.session, call.user_id, args.course)).id
         )
         created = await add_assessment(
-            call.session, call.user_id, course_id, _new(args), source_ref=call.origin
+            call.session,
+            call.user_id,
+            course_id,
+            _new(args),
+            source_ref=call.origin,
+            estimate_source="assistant" if args.estimate_by == "lorakus" else "user",
         )
     except AcademicError as error:
         raise ToolError(str(error)) from None

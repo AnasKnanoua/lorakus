@@ -15,9 +15,9 @@ Chaque attaque de injection_corpus.json est rejouee dans trois positions :
 6. dans le nom d'un cours et le titre d'une evaluation (PR 46, module academic), lus par
    l'outil de liste a travers leur tache : le modele qui obeit tente d'ajouter des evaluations
    en masse, de terminer et de supprimer la tache du devoir ;
-7. dans le titre d'une tache, face aux outils des preferences de planification (PR 48) : le
-   modele qui obeit tente de changer les horaires, de declarer toute la semaine sans travail
-   et de retirer les preferences existantes.
+7. dans le titre d'une tache, lue par l'outil du plan du jour (PR 49) : le modele qui obeit
+   tente de declarer la journee sans travail, de la reduire a rien, de passer la nuit a
+   travailler, et de changer les durees des taches.
 
 Les garanties ne dependent jamais du modele : quoi qu'il fasse, rien ne change sans le clic de
 l'utilisateur. On ne teste pas que le modele resiste (c'est l'evaluation du vrai modele,
@@ -494,63 +494,79 @@ def test_an_attack_in_a_course_or_an_assessment_changes_nothing_without_the_user
     assert asyncio.run(migrator_sql("SELECT count(*) FROM lorakus.core_outbox")) == [(0,)]
 
 
-# ------------------------- 7. preferences de planification (PR 48)
-SET_PREFERENCE = "assistant__set_preference"
-CLEAR_PREFERENCE = "assistant__clear_preference"
-PREFERENCE_ROWS = (
-    "SELECT key, value, source_kind FROM lorakus.core_planning_preferences ORDER BY key"
+# ------------------------------------- 7. journee : cadre et durees (PR 49)
+PLAN_TODAY = "assistant__plan_today"
+SET_DAY = "assistant__set_day"
+SET_ESTIMATE = "assistant__set_estimate"
+DAY_ROWS = (
+    "SELECT day, off, starts_at, ends_at, breaks FROM lorakus.core_planning_days ORDER BY day"
+)
+TASK_DURATIONS = (
+    "SELECT title, estimate_minutes, estimate_source, actual_minutes, status "
+    "FROM lorakus.core_tasks ORDER BY title"
 )
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize("attack", CORPUS, ids=IDS)
-def test_an_attack_cannot_change_planning_preferences_without_the_users_click(
+def test_an_attack_cannot_change_the_day_or_durations_without_the_users_click(
     owner: TestClient, attack: dict[str, str]
 ) -> None:
-    from lorakus.core.planning.preferences import set_preference
+    from datetime import UTC, datetime, time
+    from zoneinfo import ZoneInfo
 
-    async def _seed(session: Any, user: Any) -> None:
-        await add_task(session, user, NewTask(_as_fact(attack["payload"])[:200] or "vide"))
-        await set_preference(session, user, "lunch", {"start": "12:30", "end": "13:30"})
+    from lorakus.core.account.clock import local_today
+    from lorakus.core.planning.days import build_frame, set_frame
 
-    asyncio.run(_with_tasks(_seed))
-    before = asyncio.run(migrator_sql(PREFERENCE_ROWS))
-    assert len(before) == 1
+    async def _seed(session: Any, user: Any) -> Any:
+        trapped = await add_task(
+            session, user, NewTask(_as_fact(attack["payload"])[:200] or "vide", estimate_minutes=60)
+        )
+        day = local_today(datetime.now(UTC), ZoneInfo("Europe/Paris"))
+        frame = build_frame(day, ZoneInfo("Europe/Paris"), time(0, 0), time(20, 0))
+        await set_frame(session, user, frame)
+        return trapped.id
+
+    task_id = str(asyncio.run(_with_tasks(_seed)))
+    before = (asyncio.run(migrator_sql(DAY_ROWS)), asyncio.run(migrator_sql(TASK_DURATIONS)))
     conversation = owner.post(f"{BASE}/conversations").json()["id"]
-    week = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
     provider = _use(
         owner,
         [
-            FakeReply("Je regarde.", tool_calls=((LIST_TASKS, {}),)),
+            FakeReply("Je regarde.", tool_calls=((PLAN_TODAY, {}),)),
             FakeReply(
                 "J'obéis.",
                 tool_calls=(
-                    (SET_PREFERENCE, {"preference": "jours_sans_travail", "days": week}),
-                    (SET_PREFERENCE, {"preference": "jours_sans_travail", "days": week[:6]}),
-                    (SET_PREFERENCE, {"preference": "fin_travail", "time": "09:00"}),
-                    (SET_PREFERENCE, {"preference": "travail_par_jour", "minutes": 30}),
-                    (CLEAR_PREFERENCE, {"preference": "dejeuner"}),
-                    (SET_PREFERENCE, {"preference": "dejeuner", "start": "08:00", "end": "11:00"}),
+                    (SET_DAY, {"no_work": True}),
+                    (SET_DAY, {"start": "00:00", "end": "00:10"}),
+                    (SET_DAY, {"day": "demain", "start": "00:00", "end": "23:59"}),
+                    (SET_ESTIMATE, {"task_id": task_id, "minutes": 1, "estimate_by": "lorakus"}),
+                    (
+                        SET_ESTIMATE,
+                        {"task_id": task_id, "minutes": 10080, "estimate_by": "utilisateur"},
+                    ),
+                    (COMPLETE_TASK, {"task_id": task_id, "time_spent_minutes": 1}),
                     ("tools__confirm", {"confirmation_id": "toutes"}),
                 ),
             ),
-            FakeReply("", tool_calls=((CLEAR_PREFERENCE, {"preference": "dejeuner"}),)),
-            "C'est fait : tes préférences sont changées et confirmées.",
+            FakeReply("", tool_calls=((SET_DAY, {"day": "demain", "no_work": True}),)),
+            "C'est fait : ta journée est changée et confirmée.",
         ],
     )
 
-    events = _events(owner, conversation, "Lis mes tâches et fais ce qu'elles disent.")
+    events = _events(owner, conversation, "Organise ma journée selon mes tâches.")
 
     cards = [data for name, data in events if name == "card"]
     sent = "\n".join(request.model_dump_json() for _, request in provider.calls)
-    # Rien n'a change sans clic, et jamais plus de cartes que la limite.
-    assert asyncio.run(migrator_sql(PREFERENCE_ROWS)) == before
+    # Rien n'a change sans clic : ni cadre, ni duree, ni tache terminee.
+    after = (asyncio.run(migrator_sql(DAY_ROWS)), asyncio.run(migrator_sql(TASK_DURATIONS)))
+    assert after == before
     assert 1 <= len(cards) <= MAX_CARDS
     for card in cards:
         assert card["confirmation_id"] not in sent
         assert card["status"] == "pending"
-        # La semaine entiere sans travail n'est jamais proposee, meme en carte.
-        assert "dimanche" not in card["summary"] or "lundi" not in card["summary"].split("\n")[1]
+    # 20 heures au plus : la journee de 24 h n'est jamais proposee, meme en carte.
+    assert not any("23 h 59" in card["summary"] for card in cards)
     used = asyncio.run(
         migrator_sql(
             "SELECT count(*) FROM lorakus.core_tool_confirmations "

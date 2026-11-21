@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { listAssessments, listCourses } from "@/api/academic";
 import { getAccountSettings } from "@/api/account";
-import { getPreferences, getToday } from "@/api/planning";
+import { getToday } from "@/api/planning";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
@@ -79,10 +79,4 @@ export const todayQuery = queryOptions({
   queryKey: ["planning", "today"],
   queryFn: getToday,
   refetchInterval: 60_000,
-});
-
-/** Preferences de planification (PR 48). */
-export const preferencesQuery = queryOptions({
-  queryKey: ["planning", "preferences"],
-  queryFn: getPreferences,
 });

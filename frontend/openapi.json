@@ -690,6 +690,64 @@
         "title": "BackupCodesResponse",
         "type": "object"
       },
+      "BreakOut": {
+        "description": "Une pause du cadre (repas, sport...) : aucun travail n'y est propose.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "meal",
+              "break",
+              "sport",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "BreakOut",
+        "type": "object"
+      },
+      "CompleteIn": {
+        "additionalProperties": false,
+        "description": "Fin d'une evaluation : le temps reellement passe, si l'utilisateur le donne (PR 49).",
+        "properties": {
+          "actual_minutes": {
+            "anyOf": [
+              {
+                "maximum": 10080.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Minutes"
+          }
+        },
+        "title": "CompleteIn",
+        "type": "object"
+      },
       "Confidence": {
         "properties": {
           "level": {
@@ -1046,6 +1104,54 @@
         "title": "ForgetOut",
         "type": "object"
       },
+      "FrameOut": {
+        "description": "Le cadre du jour donne par l'utilisateur. `off` : pas de travail ce jour-la ; sinon la\nplage de travail (elle peut finir le lendemain) et ses pauses.",
+        "properties": {
+          "breaks": {
+            "items": {
+              "$ref": "#/components/schemas/BreakOut"
+            },
+            "title": "Breaks",
+            "type": "array"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "off": {
+            "title": "Off",
+            "type": "boolean"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          }
+        },
+        "required": [
+          "off",
+          "starts_at",
+          "ends_at",
+          "breaks"
+        ],
+        "title": "FrameOut",
+        "type": "object"
+      },
       "FrontendResponse": {
         "properties": {
           "icon": {
@@ -1179,41 +1285,6 @@
           "totp_enabled"
         ],
         "title": "MeResponse",
-        "type": "object"
-      },
-      "MealOut": {
-        "description": "Un repas du jour (preference confirmee) : aucun travail n'y est propose.",
-        "properties": {
-          "ends_at": {
-            "format": "date-time",
-            "title": "Ends At",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "name": {
-            "enum": [
-              "lunch",
-              "dinner"
-            ],
-            "title": "Name",
-            "type": "string"
-          },
-          "starts_at": {
-            "format": "date-time",
-            "title": "Starts At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "label",
-          "starts_at",
-          "ends_at"
-        ],
-        "title": "MealOut",
         "type": "object"
       },
       "MessageIn": {
@@ -1430,12 +1501,8 @@
         "type": "object"
       },
       "PlanBlockOut": {
-        "description": "Un bloc de travail propose. `assumed_duration` : la tache n'a pas de duree estimee.",
+        "description": "Un bloc de travail propose.",
         "properties": {
-          "assumed_duration": {
-            "title": "Assumed Duration",
-            "type": "boolean"
-          },
           "ends_at": {
             "format": "date-time",
             "title": "Ends At",
@@ -1458,47 +1525,9 @@
           "task",
           "starts_at",
           "ends_at",
-          "minutes",
-          "assumed_duration"
+          "minutes"
         ],
         "title": "PlanBlockOut",
-        "type": "object"
-      },
-      "PreferenceOut": {
-        "description": "Une preference de planification, confirmee ou a sa valeur par defaut.",
-        "properties": {
-          "is_default": {
-            "title": "Is Default",
-            "type": "boolean"
-          },
-          "key": {
-            "enum": [
-              "work_start",
-              "work_end",
-              "lunch",
-              "dinner",
-              "rest_days",
-              "daily_cap"
-            ],
-            "title": "Key",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "value": {
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "label",
-          "value",
-          "is_default"
-        ],
-        "title": "PreferenceOut",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -1933,17 +1962,20 @@
             "title": "Day",
             "type": "string"
           },
+          "frame": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrameOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "generated_at": {
             "format": "date-time",
             "title": "Generated At",
             "type": "string"
-          },
-          "meals": {
-            "items": {
-              "$ref": "#/components/schemas/MealOut"
-            },
-            "title": "Meals",
-            "type": "array"
           },
           "overdue": {
             "items": {
@@ -1963,13 +1995,16 @@
             "title": "Planned Minutes",
             "type": "integer"
           },
-          "rest_day": {
-            "title": "Rest Day",
-            "type": "boolean"
-          },
           "timezone": {
             "title": "Timezone",
             "type": "string"
+          },
+          "unestimated": {
+            "items": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Unestimated",
+            "type": "array"
           },
           "unplanned": {
             "items": {
@@ -1984,31 +2019,18 @@
             },
             "title": "Upcoming",
             "type": "array"
-          },
-          "work_ends_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Work Ends At"
           }
         },
         "required": [
           "day",
           "timezone",
           "generated_at",
-          "work_ends_at",
-          "rest_day",
-          "meals",
+          "frame",
           "agenda",
           "plan",
           "planned_minutes",
           "unplanned",
+          "unestimated",
           "overdue",
           "upcoming"
         ],
@@ -2733,6 +2755,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CompleteIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -4308,51 +4347,18 @@
         ]
       }
     },
-    "/api/v1/planning/preferences": {
-      "get": {
-        "description": "Le catalogue entier, dans son ordre : la valeur confirmee, sinon celle par defaut.",
-        "operationId": "preferences_api_v1_planning_preferences_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PreferenceOut"
-                  },
-                  "title": "Response Preferences Api V1 Planning Preferences Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Preferences",
-        "tags": [
-          "planning"
-        ]
-      }
-    },
-    "/api/v1/planning/preferences/{key}": {
+    "/api/v1/planning/days/{day}": {
       "delete": {
-        "description": "Retire une preference confirmee : sa valeur par defaut s'applique de nouveau.",
-        "operationId": "remove_preference_api_v1_planning_preferences__key__delete",
+        "description": "Efface le cadre d'un jour : plus aucun creneau propose ce jour-la.",
+        "operationId": "remove_day_api_v1_planning_days__day__delete",
         "parameters": [
           {
             "in": "path",
-            "name": "key",
+            "name": "day",
             "required": true,
             "schema": {
-              "enum": [
-                "work_start",
-                "work_end",
-                "lunch",
-                "dinner",
-                "rest_days",
-                "daily_cap"
-              ],
-              "title": "Key",
+              "format": "date",
+              "title": "Day",
               "type": "string"
             }
           }
@@ -4372,7 +4378,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Remove Preference",
+        "summary": "Remove Day",
         "tags": [
           "planning"
         ]

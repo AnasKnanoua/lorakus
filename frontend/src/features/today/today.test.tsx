@@ -1,6 +1,7 @@
 /**
- * Page « Ma journée » (PR 47), contre le faux backend : ligne de temps (agenda et plan
- * proposé), heures dans le fuseau du compte, retards, échéances, liens vers les modules.
+ * Page « Ma journée » (PR 47 et 49), contre le faux backend : cadre du jour, ligne de temps
+ * (agenda, pauses et plan proposé), heures dans le fuseau du compte, tâches à estimer,
+ * retards, échéances, liens vers les modules.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -9,6 +10,8 @@ import { describe, expect, it } from "vitest";
 
 import { clockTime } from "@/lib/format";
 import { emptyToday, installFakeApi, type FakeToday } from "@/test/fakeApi";
+
+import { ORGANISE_MESSAGE } from "./TodayScreen";
 import { renderApp } from "@/test/renderApp";
 
 type Task = FakeToday["overdue"][number];
@@ -31,7 +34,15 @@ const REPORT = task({ id: "t2", title: "Rapport", due_on: "2026-11-16", days_lef
 const ERRAND = task({ id: "t3", title: "Courses", due_on: null, days_left: null, estimate_minutes: null, module: null });
 
 // 07:30 à Ankara (UTC+3). Les heures ci-dessous sont en UTC : 06:00Z = 09:00 à Ankara.
+// Cadre du jour : de 8 h à 22 h à Ankara.
+const FRAME: FakeToday["frame"] = {
+  off: false,
+  starts_at: "2026-11-18T05:00:00Z",
+  ends_at: "2026-11-18T19:00:00Z",
+  breaks: [],
+};
 const FULL = emptyToday({
+  frame: FRAME,
   agenda: [
     { title: "Jour férié", location: null, all_day: true, starts_at: null, ends_at: null, module: "calendars" },
     {
@@ -60,12 +71,12 @@ const FULL = emptyToday({
     },
   ],
   plan: [
-    { task: REPORT, starts_at: "2026-11-18T05:00:00Z", ends_at: "2026-11-18T06:00:00Z", minutes: 60, assumed_duration: false },
-    { task: task(), starts_at: "2026-11-18T09:00:00Z", ends_at: "2026-11-18T10:30:00Z", minutes: 90, assumed_duration: false },
-    { task: ERRAND, starts_at: "2026-11-18T10:45:00Z", ends_at: "2026-11-18T11:15:00Z", minutes: 30, assumed_duration: true },
+    { task: REPORT, starts_at: "2026-11-18T05:00:00Z", ends_at: "2026-11-18T06:00:00Z", minutes: 60 },
+    { task: task(), starts_at: "2026-11-18T09:00:00Z", ends_at: "2026-11-18T10:30:00Z", minutes: 90 },
   ],
-  planned_minutes: 180,
+  planned_minutes: 150,
   unplanned: [{ task: task(), minutes: 90 }],
+  unestimated: [ERRAND],
   overdue: [REPORT],
   upcoming: [task()],
 });
@@ -90,9 +101,10 @@ describe("ma journée", () => {
       "08:00 – 09:00RapportProposé · 1 h · pour lundi 16 novembre (il y a 2 jours)",
       "09:00 – 12:00Machine LearningB-104",
       "12:00 – 13:30Machine Learning : TP 2Proposé · 1 h 30 · pour vendredi 20 novembre (dans 2 jours)",
-      "13:45 – 14:15CoursesProposé · 30 min (durée supposée)",
     ]);
-    // Un créneau déjà fini est en retrait ; une proposition se distingue d'un créneau.
+    expect(screen.getByText("Travail de 08:00 à 22:00.")).toBeVisible();
+    // Avec un cadre, l'action reste là, plus discrète.
+    expect(screen.getByRole("button", { name: "Organiser ma journée avec Lorakus" })).not.toHaveClass("bg-accent");
     // Un créneau déjà fini est en retrait ; celui qui est en cours (07:00 – 07:45, il est
     // 07:30) ne l'est pas. Une proposition se distingue d'un créneau de l'agenda.
     expect(lines[0]).toHaveClass("opacity-50");
@@ -104,8 +116,8 @@ describe("ma journée", () => {
     expect(within(lines[4] as HTMLElement).getByText(/Proposé/)).not.toHaveClass("text-danger");
     const wholeDay = within(screen.getByRole("list", { name: "Toute la journée" })).getAllByRole("listitem");
     expect(wholeDay.map((li) => li.textContent)).toEqual(["Jour férié"]);
-    expect(screen.getByText("Travail proposé : 3 h. Rien n'est ajouté à ton agenda.")).toBeVisible();
-    expect(screen.queryByText(/Jour sans travail/)).toBeNull(); // un jour ordinaire
+    expect(screen.getByText("Travail proposé : 2 h 30. Rien n'est ajouté à ton agenda.")).toBeVisible();
+    expect(screen.queryByText(/Pas de travail/)).toBeNull(); // un jour ordinaire
   });
 
   it("liste ce qui ne tient pas, les retards et les échéances", async () => {
@@ -126,37 +138,85 @@ describe("ma journée", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Cours" })).toBeVisible();
   });
 
-  it("dit quand la journée est vide, sans sections inutiles", async () => {
+  it("sans cadre, ne suppose aucune heure et propose d'en parler à Lorakus", async () => {
     installFakeApi({ loggedIn: true });
     renderApp("/today");
 
-    expect(await screen.findByText("Rien de prévu aujourd'hui.")).toBeVisible();
+    expect(await screen.findByText(/Tu n'as pas encore dit quand tu travailles aujourd'hui/)).toBeVisible();
+    expect(screen.getByText("Rien dans ton agenda aujourd'hui.")).toBeVisible();
     expect(screen.getByText("Aucune échéance cette semaine.")).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "En retard" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Pas de place aujourd'hui" })).toBeNull();
+    const organise = screen.getByRole("button", { name: "Organiser ma journée avec Lorakus" });
+    expect(organise).toBeEnabled();
+    expect(organise).toHaveClass("bg-accent"); // l'action principale de la page, sans cadre
+    expect(screen.queryByRole("button", { name: "Effacer" })).toBeNull(); // rien à effacer
+    for (const name of ["En retard", "Pas de place aujourd'hui", "À estimer"]) {
+      expect(screen.queryByRole("heading", { name })).toBeNull();
+    }
     expect(screen.queryByText(/Travail proposé/)).toBeNull();
   });
 
-  it("dit que la journée de travail est finie quand il reste du travail", async () => {
+  it("organise la journée en ouvrant une conversation avec Lorakus", async () => {
+    const api = installFakeApi({ loggedIn: true });
+    renderApp("/today");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Organiser ma journée avec Lorakus" }));
+
+    const log = await screen.findByRole("log");
+    await waitFor(() => {
+      expect(log).toHaveTextContent(ORGANISE_MESSAGE);
+    });
+    const sent = api.requests.find((r) => r.path.endsWith("/messages"));
+    expect(sent?.body).toEqual({ content: "Organise ma journée." });
+  });
+
+  it("dit que la conversation n'a pas pu être créée", async () => {
+    const api = installFakeApi({ loggedIn: true });
+    api.failNextCreate = true;
+    renderApp("/today");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Organiser ma journée avec Lorakus" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("La conversation n'a pas pu être créée.");
+    expect(screen.getByRole("heading", { level: 1, name: "Ma journée" })).toBeVisible(); // on reste ici
+    expect(screen.getByRole("button", { name: "Organiser ma journée avec Lorakus" })).toBeEnabled();
+  });
+
+  it("dit que la plage de travail est finie", async () => {
     installFakeApi({
       loggedIn: true,
-      today: emptyToday({ work_ends_at: null, unplanned: [{ task: task(), minutes: 180 }], upcoming: [task()] }),
+      today: emptyToday({
+        frame: { ...FRAME, ends_at: "2026-11-18T04:30:00Z" }, // finie à l'heure du calcul
+        unplanned: [{ task: task(), minutes: 180 }],
+        upcoming: [task()],
+      }),
     });
     renderApp("/today");
 
-    expect(
-      await screen.findByText("La journée de travail est finie : le plan reprendra demain matin."),
-    ).toBeVisible();
+    expect(await screen.findByText("Ta plage de travail est finie.")).toBeVisible();
     expect(screen.getByText("reste 3 h")).toBeVisible();
   });
 
-  it("ne dit pas que la journée est finie tant que la fenêtre de travail est ouverte", async () => {
-    // Il reste moins d'un quart d'heure avant 22 h : rien ne se place, mais la journée court.
-    installFakeApi({ loggedIn: true, today: emptyToday({ unplanned: [{ task: task(), minutes: 180 }] }) });
+  it("ne dit pas que la plage est finie tant qu'elle est ouverte", async () => {
+    installFakeApi({
+      loggedIn: true,
+      today: emptyToday({ frame: FRAME, unplanned: [{ task: task(), minutes: 180 }] }),
+    });
     renderApp("/today");
 
     expect(await screen.findByText("Rien de prévu aujourd'hui.")).toBeVisible();
-    expect(screen.queryByText(/journée de travail est finie/)).toBeNull();
+    expect(screen.queryByText(/plage de travail est finie/)).toBeNull();
+  });
+
+  it("dit qu'une nuit de travail finit le lendemain", async () => {
+    installFakeApi({
+      loggedIn: true,
+      today: emptyToday({ frame: { ...FRAME, starts_at: "2026-11-18T12:00:00Z", ends_at: "2026-11-19T00:30:00Z" } }),
+    });
+    renderApp("/today");
+
+    expect(await screen.findByText("Travail de 15:00 à 03:30 (le lendemain).")).toBeVisible();
   });
 
   it("montre une erreur si la journée ne se charge pas", async () => {
@@ -179,90 +239,93 @@ describe("ma journée", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Ma journée" })).toBeVisible();
   });
 
-  it("montre les repas dans le déroulé, à leur heure, sans les confondre avec le reste", async () => {
+  it("montre les pauses du cadre dans le déroulé, sans les confondre avec le reste", async () => {
     installFakeApi({
       loggedIn: true,
       today: emptyToday({
         ...FULL,
-        meals: [
-          { name: "dinner", label: "Dîner", starts_at: "2026-11-18T16:00:00Z", ends_at: "2026-11-18T17:00:00Z" },
-          { name: "lunch", label: "Déjeuner", starts_at: "2026-11-18T10:30:00Z", ends_at: "2026-11-18T10:45:00Z" },
-        ],
+        frame: {
+          ...FRAME,
+          breaks: [
+            { kind: "sport", label: "Sport", starts_at: "2026-11-18T16:00:00Z", ends_at: "2026-11-18T17:00:00Z" },
+            { kind: "meal", label: "Repas", starts_at: "2026-11-18T10:30:00Z", ends_at: "2026-11-18T10:45:00Z" },
+          ],
+        },
       }),
     });
     renderApp("/today");
 
     const lines = within(await screen.findByRole("list", { name: "Déroulé de la journée" })).getAllByRole("listitem");
-    const texts = lines.map((li) => li.textContent);
-    expect(texts.slice(4)).toEqual([
+    expect(lines.map((li) => li.textContent).slice(4)).toEqual([
       "12:00 – 13:30Machine Learning : TP 2Proposé · 1 h 30 · pour vendredi 20 novembre (dans 2 jours)",
-      "13:30 – 13:45Déjeuner",
-      "13:45 – 14:15CoursesProposé · 30 min (durée supposée)",
-      "19:00 – 20:00Dîner",
+      "13:30 – 13:45Repas",
+      "19:00 – 20:00Sport",
     ]);
     expect(lines[5]).toHaveClass("text-ink-faint");
     expect(lines[5]).not.toHaveClass("bg-accent-soft");
   });
 
   it("dit qu'un jour est sans travail, avec ou sans créneaux", async () => {
+    const off: FakeToday["frame"] = { off: true, starts_at: null, ends_at: null, breaks: [] };
     const state = installFakeApi({
       loggedIn: true,
-      today: emptyToday({ rest_day: true, work_ends_at: null, unplanned: [{ task: task(), minutes: 180 }] }),
+      today: emptyToday({ frame: off, unplanned: [{ task: task(), minutes: 180 }] }),
     });
     const view = renderApp("/today");
-    expect(await screen.findByText("Jour sans travail : rien n'est proposé aujourd'hui.")).toBeVisible();
-    expect(screen.queryByText(/journée de travail est finie/)).toBeNull();
+    expect(await screen.findByText("Pas de travail aujourd'hui : rien n'est proposé.")).toBeVisible();
+    expect(screen.getByText("Pas de travail aujourd'hui.")).toBeVisible();
     view.unmount();
 
-    state.today = emptyToday({ rest_day: true, work_ends_at: null, agenda: FULL.agenda });
+    state.today = emptyToday({ frame: off, agenda: FULL.agenda });
     renderApp("/today");
     await screen.findByRole("list", { name: "Déroulé de la journée" });
-    expect(screen.getByText("Jour sans travail : rien n'est proposé aujourd'hui.")).toBeVisible();
+    expect(screen.getByText("Pas de travail aujourd'hui : rien n'est proposé.")).toBeVisible();
     expect(screen.queryByText("Rien de prévu aujourd'hui.")).toBeNull();
   });
 
-  it("liste les préférences, par défaut ou confirmées, et en retire une après confirmation", async () => {
-    const state = installFakeApi({
-      loggedIn: true,
-      preferences: { lunch: "de 12 h 30 à 13 h 30", work_end: "21 h" },
-    });
+  it("liste les tâches à estimer, jamais placées", async () => {
+    installFakeApi({ loggedIn: true, today: FULL });
+    renderApp("/today");
+
+    const list = within(await screen.findByRole("list", { name: "À estimer" }));
+    expect(list.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Coursesdurée inconnue"]);
+    expect(screen.getByText(/Sans durée, une tâche n'est jamais placée/)).toBeVisible();
+    const planned = within(screen.getByRole("list", { name: "Déroulé de la journée" }));
+    expect(planned.queryByText("Courses")).toBeNull();
+  });
+
+  it("donne l'échéance d'une tâche à estimer", async () => {
+    installFakeApi({ loggedIn: true, today: emptyToday({ unestimated: [task({ estimate_minutes: null })] }) });
+    renderApp("/today");
+
+    const list = within(await screen.findByRole("list", { name: "À estimer" }));
+    expect(list.getByText("durée inconnue · pour vendredi 20 novembre (dans 2 jours)")).toBeVisible();
+  });
+
+  it("efface le cadre du jour après confirmation", async () => {
+    const state = installFakeApi({ loggedIn: true, today: FULL });
     renderApp("/today");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: /Mes préférences/ }));
-    const list = within(await screen.findByRole("list", { name: "Mes préférences" }));
-    expect(list.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "Début de la journée de travail8 h · par défaut",
-      "Fin de la journée de travail21 hRetirer",
-      "Déjeunerde 12 h 30 à 13 h 30Retirer",
-      "Dîneraucun · par défaut",
-      "Jours sans travailaucun · par défaut",
-      "Travail proposé par jour6 h au plus · par défaut",
-    ]);
-    expect(screen.getByText(/dis-le à Lorakus dans une conversation/)).toBeVisible();
-
-    // Annuler ne retire rien.
-    await user.click(list.getByRole("button", { name: "Retirer la préférence Déjeuner" }));
-    const asked = await screen.findByRole("alertdialog", { name: "Retirer « Déjeuner » ?" });
+    // Annuler n'efface rien.
+    await user.click(await screen.findByRole("button", { name: "Effacer" }));
+    const asked = await screen.findByRole("alertdialog", { name: "Effacer le cadre d'aujourd'hui ?" });
     await user.click(within(asked).getByRole("button", { name: "Annuler" }));
     await waitFor(() => {
       expect(screen.queryByRole("alertdialog")).toBeNull();
     });
-    expect(state.preferences.lunch).toBe("de 12 h 30 à 13 h 30");
+    expect(state.clearedDays).toEqual([]);
 
-    await user.click(list.getByRole("button", { name: "Retirer la préférence Déjeuner" }));
-    const dialog = await screen.findByRole("alertdialog", { name: "Retirer « Déjeuner » ?" });
-    await user.click(within(dialog).getByRole("button", { name: "Retirer" }));
+    await user.click(screen.getByRole("button", { name: "Effacer" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Effacer le cadre d'aujourd'hui ?" });
+    await user.click(within(dialog).getByRole("button", { name: "Effacer" }));
 
     await waitFor(() => {
-      expect(state.preferences).toEqual({ work_end: "21 h" });
+      expect(state.clearedDays).toEqual(["2026-11-18"]);
     });
-    await waitFor(() => {
-      expect(list.getAllByRole("listitem")[2]).toHaveTextContent("Déjeuneraucun · par défaut");
-    });
-    // La journée est relue : le plan dépend des préférences.
-    const reads = state.requests.filter((r) => r.path === "/api/v1/planning/today").length;
-    expect(reads).toBeGreaterThanOrEqual(2);
+    // La journée est relue : sans cadre, rien n'est placé.
+    expect(await screen.findByText(/Tu n'as pas encore dit quand tu travailles/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Effacer" })).toBeNull();
   });
 
   it("n'a pas de défaut d'accessibilité détectable", async () => {

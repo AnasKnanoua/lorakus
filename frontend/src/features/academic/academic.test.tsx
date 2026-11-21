@@ -183,6 +183,36 @@ describe("cours", () => {
     expect(within(done).getByText(/Machine Learning · terminé le mercredi 18 novembre/)).toBeVisible();
   });
 
+  it("note le temps passé quand on le donne, et rien sinon", async () => {
+    const state = installFakeApi({
+      loggedIn: true,
+      courses: [ML],
+      assessments: [homework({ estimate_minutes: 180 }), homework({ id: "a2", title: "TP 3" })],
+    });
+    renderApp("/academic");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Marquer « TP 2 » comme terminé" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Terminer « TP 2 » ?" });
+    const spent = within(dialog).getByLabelText("Temps passé, en heures (facultatif)");
+    expect(spent).toHaveAttribute("placeholder", "3"); // l'estimation, en exemple
+    await user.type(spent, "3,5");
+    await user.click(within(dialog).getByRole("button", { name: "Terminer" }));
+    await waitFor(() => {
+      expect(state.assessments[0]?.status).toBe("done");
+    });
+    expect(state.requests.find((r) => r.path.endsWith("/complete"))?.body).toEqual({ actual_minutes: 210 });
+
+    await user.click(screen.getByRole("button", { name: "Marquer « TP 3 » comme terminé" }));
+    const second = await screen.findByRole("alertdialog", { name: "Terminer « TP 3 » ?" });
+    await user.click(within(second).getByRole("button", { name: "Terminer" }));
+    await waitFor(() => {
+      expect(state.assessments[1]?.status).toBe("done");
+    });
+    expect(state.requests.filter((r) => r.path.endsWith("/complete"))[1]?.body).toBeNull();
+    expect(state.assessments[1]?.actual_minutes).toBeNull();
+  });
+
   it("dit que terminer a échoué, sans fermer la fenêtre", async () => {
     const state = installFakeApi({ loggedIn: true, courses: [ML], assessments: [homework()] });
     renderApp("/academic");

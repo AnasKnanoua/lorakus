@@ -105,6 +105,15 @@ class TaskIn(BaseModel):
     task_id: uuid.UUID = Field(description="Identifiant donné par la liste des tâches.")
 
 
+class CompleteIn(TaskIn):
+    time_spent_minutes: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_ESTIMATE_MINUTES,
+        description="Temps réellement passé, en minutes, seulement si l'utilisateur le donne.",
+    )
+
+
 # ------------------------------------------------------------------ lister
 def _line(task: TaskView, today: date) -> dict[str, Any]:
     line: dict[str, Any] = {"id": str(task.id), "titre": task.title}
@@ -115,6 +124,10 @@ def _line(task: TaskView, today: date) -> dict[str, Any]:
             line["en_retard"] = True
     if task.estimate_minutes is not None:
         line["duree_estimee"] = duration(task.estimate_minutes)
+        if task.estimate_source == "assistant":
+            line["duree_estimee_par"] = "lorakus"
+    if task.actual_minutes is not None:
+        line["temps_passe"] = duration(task.actual_minutes)
     if task.priority != 2:
         line["priorite"] = PRIORITY_LABEL[task.priority]
     if task.parent_id is not None:
@@ -197,20 +210,30 @@ async def _add(call: ToolCall, args: AddIn) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- terminer
-async def _complete_summary(call: ToolCall, args: TaskIn) -> str:
+async def _complete_summary(call: ToolCall, args: CompleteIn) -> str:
     task = await _task(call, args.task_id)
     if task.status == "done":
         raise ToolError("Cette tâche est déjà terminée.")
     text = f"Marquer comme terminée : « {task.title} »"
     if task.open_subtasks:
         text += f"\n(et ses {task.open_subtasks} sous-tâches encore ouvertes)"
+    if args.time_spent_minutes is not None:
+        text += f"\nTemps passé : {duration(args.time_spent_minutes)}"
+        if task.estimate_minutes is not None:
+            text += f" (prévu : {duration(task.estimate_minutes)})"
     return text
 
 
-async def _complete(call: ToolCall, args: TaskIn) -> dict[str, Any]:
+async def _complete(call: ToolCall, args: CompleteIn) -> dict[str, Any]:
     try:
-        closed = await complete_task(call.session, call.user_id, args.task_id, call.ports.clock())
-    except (TaskNotFoundError, TaskStateError) as error:
+        closed = await complete_task(
+            call.session,
+            call.user_id,
+            args.task_id,
+            call.ports.clock(),
+            actual_minutes=args.time_spent_minutes,
+        )
+    except (InvalidTaskError, TaskNotFoundError, TaskStateError) as error:
         raise _error(error) from None
     return {"message": "Tâche terminée.", "taches_closes": closed}
 
@@ -257,10 +280,11 @@ TASK_TOOLS: Final = [
     ),
     ToolSpec(
         "assistant.complete_task",
-        "Propose de marquer une tâche comme terminée (identifiant donné par la liste). Une "
-        "carte s'affiche : rien ne change tant que l'utilisateur ne l'a pas confirmée.",
+        "Propose de marquer une tâche comme terminée (identifiant donné par la liste), avec "
+        "le temps réellement passé s'il le donne. Une carte s'affiche : rien ne change tant "
+        "que l'utilisateur ne l'a pas confirmée.",
         "write",
-        TaskIn,
+        CompleteIn,
         _complete,
         summary=_complete_summary,
     ),

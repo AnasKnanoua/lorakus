@@ -114,9 +114,11 @@ export async function updateAssessment(id: string, draft: AssessmentDraft): Prom
   return data;
 }
 
-export async function completeAssessment(id: string): Promise<Assessment> {
+/** Termine une évaluation ; `actualMinutes` : le temps réellement passé, s'il est donné (PR 49). */
+export async function completeAssessment(id: string, actualMinutes: number | null = null): Promise<Assessment> {
   const { data, response, error } = await api.POST("/api/v1/academic/assessments/{assessment_id}/complete", {
     params: { path: { assessment_id: id } },
+    body: actualMinutes === null ? null : { actual_minutes: actualMinutes },
   });
   if (data === undefined) {
     throw refused(response.status, error);
