@@ -70,3 +70,9 @@ Les trois outils des préférences (PR 48) sont retirés de `CHAT_TOOLS` avec le
 - `assistant.complete_task` prend en plus le temps réellement passé, que la carte affiche avec la durée prévue.
 
 Prompt `assistant-system-2026-11-21.1` : ne jamais supposer d'heure ; lire la journée avant d'en parler ; sans cadre, demander quand l'utilisateur travaille ; demander la durée d'une tâche qui n'en a pas, ou proposer une estimation présentée comme telle ; demander sans insister le temps passé quand une tâche est finie. Corpus : position 7 réécrite (le modèle qui obéit tente de déclarer la journée sans travail, de la réduire à rien, de passer 24 h à travailler, de changer les durées et de terminer la tâche). Banc : 4 cas à la place des 3 des préférences (29 au total, non encore mesurés avec le vrai modèle).
+
+## Amendement du 2026-11-21 (PR 50) : découpage d'une tâche
+
+Ajouté à `CHAT_TOOLS` après revue : `focus.split_task` (`write`, module Sergent, proposé seulement s'il est activé). Le découpage est proposé par le modèle dans l'appel déjà fait pour la réponse ; le code vérifie la tâche (existe, ouverte, ni déjà découpée ni elle-même une étape), les étapes (2 à 8, titres lisibles et distincts, durées bornées), écrit la carte (étapes numérotées, total, durée prévue, échéance) et ne crée rien avant le clic. La carte dit si les durées sont celles de l'utilisateur ou une estimation de Lorakus.
+
+Prompt `assistant-system-2026-11-21.2` : quand un rapport de spécialiste suffit, répondre avec lui sans relire les mêmes données par un outil ; poser la question d'un rapport, une seule, plutôt que deviner. La consigne de proposer un découpage est dans la description de l'outil (absente si le module est désactivé). Corpus : position 8. Banc : 4 cas (33 au total, non encore mesurés avec le vrai modèle).

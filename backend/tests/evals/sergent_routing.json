@@ -1,0 +1,183 @@
+{
+  "description": "Routage des VRAIES phrases du Sergent (module focus, PR 50) avec son vrai profil (mots-cles puis sens). Deux parties disjointes : 'tuning' a servi a ecrire les mots-cles et les exemples du profil ; 'measure' a ete ecrite avant eux et ne sert qu'a mesurer : ne jamais regler le profil en regardant ses erreurs. Attendu : 'focus.day_plan', 'focus.deadlines' ou '_none' (aucun specialiste).",
+  "tuning": [
+    [
+      "Qu'est-ce que je dois faire aujourd'hui ?",
+      "focus.day_plan"
+    ],
+    [
+      "C'est quoi mon programme ?",
+      "focus.day_plan"
+    ],
+    [
+      "Organise ma journée",
+      "focus.day_plan"
+    ],
+    [
+      "Je fais quoi maintenant ?",
+      "focus.day_plan"
+    ],
+    [
+      "J'ai quoi ce soir ?",
+      "focus.day_plan"
+    ],
+    [
+      "Par quoi je commence ?",
+      "focus.day_plan"
+    ],
+    [
+      "Planifie ma journée s'il te plaît",
+      "focus.day_plan"
+    ],
+    [
+      "Qu'est-ce qui m'attend cet après-midi ?",
+      "focus.day_plan"
+    ],
+    [
+      "Quelles sont mes échéances ?",
+      "focus.deadlines"
+    ],
+    [
+      "J'ai des trucs à rendre cette semaine ?",
+      "focus.deadlines"
+    ],
+    [
+      "Qu'est-ce qui est en retard ?",
+      "focus.deadlines"
+    ],
+    [
+      "C'est quand mon prochain examen ?",
+      "focus.deadlines"
+    ],
+    [
+      "Il me reste combien de temps pour le DM ?",
+      "focus.deadlines"
+    ],
+    [
+      "J'ai des deadlines bientôt ?",
+      "focus.deadlines"
+    ],
+    [
+      "Salut, ça va ?",
+      "_none"
+    ],
+    [
+      "Explique-moi la régression logistique",
+      "_none"
+    ],
+    [
+      "Retiens que j'aime le thé",
+      "_none"
+    ],
+    [
+      "Écris un mail à mon prof pour m'excuser",
+      "_none"
+    ],
+    [
+      "Merci !",
+      "_none"
+    ],
+    [
+      "Traduis cette phrase en anglais",
+      "_none"
+    ],
+    [
+      "Quelle heure est-il à Tokyo ?",
+      "_none"
+    ],
+    [
+      "Qu'est-ce que tu sais de moi ?",
+      "_none"
+    ]
+  ],
+  "measure": [
+    [
+      "Dis-moi ce que j'ai à faire là",
+      "focus.day_plan"
+    ],
+    [
+      "Je bosse sur quoi en premier ?",
+      "focus.day_plan"
+    ],
+    [
+      "Montre-moi ma journée",
+      "focus.day_plan"
+    ],
+    [
+      "Il y a quoi au planning aujourd'hui ?",
+      "focus.day_plan"
+    ],
+    [
+      "Qu'est-ce que je fais de ma soirée ?",
+      "focus.day_plan"
+    ],
+    [
+      "Je commence par quel devoir ?",
+      "focus.day_plan"
+    ],
+    [
+      "Aide-moi à organiser mon après-midi",
+      "focus.day_plan"
+    ],
+    [
+      "Ce matin j'ai quoi ?",
+      "focus.day_plan"
+    ],
+    [
+      "Je dois rendre quoi d'ici vendredi ?",
+      "focus.deadlines"
+    ],
+    [
+      "Est-ce que je suis en retard sur quelque chose ?",
+      "focus.deadlines"
+    ],
+    [
+      "Mes examens c'est quand ?",
+      "focus.deadlines"
+    ],
+    [
+      "Liste mes deadlines",
+      "focus.deadlines"
+    ],
+    [
+      "Qu'est-ce qui tombe cette semaine ?",
+      "focus.deadlines"
+    ],
+    [
+      "J'ai oublié un devoir ?",
+      "focus.deadlines"
+    ],
+    [
+      "Bonne nuit",
+      "_none"
+    ],
+    [
+      "Comment marche un transformer ?",
+      "_none"
+    ],
+    [
+      "Souviens-toi que je suis à Ankara",
+      "_none"
+    ],
+    [
+      "Fais-moi un résumé de ce texte",
+      "_none"
+    ],
+    [
+      "Raconte-moi une blague",
+      "_none"
+    ],
+    [
+      "Quel temps fait-il ?",
+      "_none"
+    ],
+    [
+      "Corrige mon code Python",
+      "_none"
+    ],
+    [
+      "Tu peux m'aider à écrire mon CV ?",
+      "_none"
+    ]
+  ]
+}

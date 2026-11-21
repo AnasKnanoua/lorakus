@@ -92,3 +92,10 @@ Retour d'usage de la PR 48, le jour même : des horaires fixes ne décrivent pas
 7. **Ce que fait le modèle, ce que fait le code.** Le modèle comprend la phrase (« je bosse de 15 h à 3 h, je mange vers 22 h ») et l'explique ensuite (le matin, l'après-midi) ; il lit le plan par `assistant.plan_today`. Le code valide le cadre, écrit la carte et calcule le plan. Le modèle ne place jamais un créneau lui-même.
 
 La table `core_planning_preferences` est supprimée par la migration 0015, avec l'accord du propriétaire (elle ne contenait que des essais). Le retour arrière la recrée vide.
+
+## Amendement du 2026-11-21 (PR 50) : étapes d'une tâche
+
+- **Rang des étapes** : `core_tasks.step_number` (migration 0016), seulement pour une sous-tâche (1 à 20). Le découpage du Sergent (`focus.split_task`) crée les étapes dans une même transaction : leur date de création ne dit pas leur ordre, le rang si.
+- **Planificateur** : une tâche qui a été découpée n'est plus placée elle-même, même quand toutes ses étapes sont faites (il reste à la marquer terminée, pas à refaire tout le travail) ; les étapes d'une tâche restent ensemble, dans leur ordre, avec l'échéance et la priorité de la tâche quand elles n'en ont pas.
+- **Fin d'une tâche de module** : `ModuleTasks.complete` termine aussi ses étapes encore ouvertes, comme `complete_task` le fait déjà quand l'utilisateur termine une tâche. Sans cela, finir un devoir découpé depuis la page Cours aurait laissé ses étapes au planning.
+- `TaskView.subtasks` : toutes les sous-tâches, terminées comprises, à côté de `open_subtasks`.
