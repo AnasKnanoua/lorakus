@@ -2,6 +2,34 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnement : [SemVer](https://semver.org/lang/fr/). Depuis la v0.1.0, les nouvelles versions sont écrites par `release-please` à partir des titres de PR (Conventional Commits) : `make release-pr` puis `make release` (`DEVELOPMENT.md`). Les entrées antérieures ont été tenues à la main.
 
+## [0.4.0](https://github.com/AnasKnanoua/lorakus/compare/v0.3.0...v0.4.0) (2026-11-21)
+
+
+### Ajouté
+
+* **academic:** courses and assessments that create their tasks (PR 46) ([#71](https://github.com/AnasKnanoua/lorakus/issues/71)) ([896c592](https://github.com/AnasKnanoua/lorakus/commit/896c592a73eee77107cae6aebe8f611cb6b7ea6f))
+* **calendars:** ICS subscriptions with an SSRF-safe outbound client ([#69](https://github.com/AnasKnanoua/lorakus/issues/69)) ([0b95b90](https://github.com/AnasKnanoua/lorakus/commit/0b95b90dca7801500752d5035a3afdd2d0621b95))
+* **core:** planning foundation with account timezone, tasks and agenda (PR 44) ([#67](https://github.com/AnasKnanoua/lorakus/issues/67)) ([e17cc9d](https://github.com/AnasKnanoua/lorakus/commit/e17cc9d5c78852781386d777fcd6fb5d9988476a))
+* **focus:** Sergent v0 ([#77](https://github.com/AnasKnanoua/lorakus/issues/77)) ([bff7353](https://github.com/AnasKnanoua/lorakus/commit/bff7353ac44fe09ae001249f4263d60c68b60d50))
+* **planning:** confirmed planning preferences ([#75](https://github.com/AnasKnanoua/lorakus/issues/75)) ([38cf6d3](https://github.com/AnasKnanoua/lorakus/commit/38cf6d37d60f80c4d676a7dcb4771ea2d2d4187f))
+* **planning:** day planner and today page (PR 47) ([#74](https://github.com/AnasKnanoua/lorakus/issues/74)) ([8bb2af0](https://github.com/AnasKnanoua/lorakus/commit/8bb2af0dfeaa8c8d2793fe8761f8a7bdb51d75f4))
+* **planning:** plan the day with Lorakus ([#76](https://github.com/AnasKnanoua/lorakus/issues/76)) ([671a4bd](https://github.com/AnasKnanoua/lorakus/commit/671a4bde3635ab23ef7f3c8a2dee8e4b3f45841b))
+* **projects:** idea box, projects and project tasks ([#78](https://github.com/AnasKnanoua/lorakus/issues/78)) ([2da9d80](https://github.com/AnasKnanoua/lorakus/commit/2da9d801782360d07e6bb708210c9e09d21b1853))
+* **ui:** polish chat reading, sidebar and tutoiement ([#70](https://github.com/AnasKnanoua/lorakus/issues/70)) ([3b68009](https://github.com/AnasKnanoua/lorakus/commit/3b6800945f67bb7c1842ada3c1f4797f47a6f282))
+
+
+### Corrigé
+
+* **academic:** ask before completing an assessment ([#72](https://github.com/AnasKnanoua/lorakus/issues/72)) ([e8acda3](https://github.com/AnasKnanoua/lorakus/commit/e8acda3f5d11b9f7d452858c26cb3dcb2cefc590))
+* **assistant:** empty model reply is not an internal error ([#79](https://github.com/AnasKnanoua/lorakus/issues/79)) ([e711a92](https://github.com/AnasKnanoua/lorakus/commit/e711a92002bd7124a7087d156deccc19436f4829))
+* **assistant:** never propose the same confirmation card twice ([#68](https://github.com/AnasKnanoua/lorakus/issues/68)) ([2263d0c](https://github.com/AnasKnanoua/lorakus/commit/2263d0c27cc5c5e2ba15d0065b44bee4301fb8bb))
+* **deploy:** remove old images after each deploy ([#73](https://github.com/AnasKnanoua/lorakus/issues/73)) ([eecb00a](https://github.com/AnasKnanoua/lorakus/commit/eecb00a0cf8c037724191a600287534cdfb55a2d))
+
+
+### Documentation
+
+* validate planning in the core and plan phase 4 ([#66](https://github.com/AnasKnanoua/lorakus/issues/66)) ([bb7dfe9](https://github.com/AnasKnanoua/lorakus/commit/bb7dfe92306a22b7f4d674527b317099ba96e11a))
+
 ## [0.3.0](https://github.com/AnasKnanoua/lorakus/compare/v0.2.0...v0.3.0) (2026-11-18)
 
 
