@@ -1,13 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-
-import { createConversation } from "@/api/assistant";
 import { Orb } from "@/components/Orb";
 
 import { Composer } from "./Composer";
 import { TopBar } from "./layout";
-import { startReply } from "./replies";
+import { useStartConversation } from "./startConversation";
 
 /**
  * Accueil : la question et le champ de saisie au centre de la zone principale (barre
@@ -15,28 +10,7 @@ import { startReply } from "./replies";
  * champ vers le bas de la conversation (transition « composer », voir Composer).
  */
 export function NewConversationScreen() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-
-  async function start(text: string) {
-    setBusy(true);
-    setError(false);
-    try {
-      const conversation = await createConversation();
-      // La reponse demarre ici et continue pendant le changement d'ecran.
-      void startReply(queryClient, conversation.id, text);
-      await navigate({
-        to: "/c/$conversationId",
-        params: { conversationId: conversation.id },
-        viewTransition: true,
-      });
-    } catch {
-      setError(true);
-      setBusy(false);
-    }
-  }
+  const { start, busy, error } = useStartConversation();
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">

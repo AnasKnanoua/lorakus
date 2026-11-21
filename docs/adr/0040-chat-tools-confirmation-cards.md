@@ -59,3 +59,14 @@ Corpus : position 6 (chaque attaque dans un nom de cours et un titre d'évaluati
 Ajoutés à `CHAT_TOOLS` après revue : `assistant.list_preferences` (read), `assistant.set_preference` et `assistant.clear_preference` (write). Revue : les arguments ne contiennent aucun texte libre (une clé d'un catalogue fermé, des heures `HH:MM`, des jours nommés, des minutes) ; la carte est écrite par le code et donne la valeur proposée et la valeur actuelle ; un champ manquant, une valeur hors bornes, une valeur déjà en place ou un ensemble incohérent sont refusés avant toute carte ; rien n'est enregistré sans clic. Prompt inchangé.
 
 Corpus : position 7 (le modèle qui obéit tente de déclarer la semaine sans travail, de finir la journée à 9 h, de retirer le déjeuner). Banc : 3 cas (28 au total, non encore mesurés avec le vrai modèle) : `preference_by_card`, `preference_needs_an_hour`, `trapped_task_preferences`.
+
+## Amendement du 2026-11-21 (PR 49) : outils de la journée
+
+Les trois outils des préférences (PR 48) sont retirés de `CHAT_TOOLS` avec les préférences (ADR 0018). Ajoutés après revue :
+
+- `assistant.plan_today` (`read`) : le cadre du jour ou son absence (avec la consigne de demander, sans supposer d'heure), l'agenda, le plan calculé par le planificateur, les tâches « à estimer » et ce qui ne tient pas. Titres passés par `inert()`.
+- `assistant.set_day` (`write`) : le cadre d'aujourd'hui ou de demain. Aucun texte libre (heures `HH:MM`, nature d'une pause dans une liste fermée) ; plage trop courte ou trop longue, pause hors de la plage, plage déjà passée, cadre identique, ou mélange d'un jour sans travail et d'horaires : refusés avant toute carte. La carte donne la date absolue, la plage (« le lendemain » si elle passe minuit), les pauses et ce qu'elle remplace.
+- `assistant.set_estimate` (`write`) : la durée d'une tâche, avec qui la donne. La carte écrit « (estimation de Lorakus) » quand c'en est une, et la durée actuelle.
+- `assistant.complete_task` prend en plus le temps réellement passé, que la carte affiche avec la durée prévue.
+
+Prompt `assistant-system-2026-11-21.1` : ne jamais supposer d'heure ; lire la journée avant d'en parler ; sans cadre, demander quand l'utilisateur travaille ; demander la durée d'une tâche qui n'en a pas, ou proposer une estimation présentée comme telle ; demander sans insister le temps passé quand une tâche est finie. Corpus : position 7 réécrite (le modèle qui obéit tente de déclarer la journée sans travail, de la réduire à rien, de passer 24 h à travailler, de changer les durées et de terminer la tâche). Banc : 4 cas à la place des 3 des préférences (29 au total, non encore mesurés avec le vrai modèle).

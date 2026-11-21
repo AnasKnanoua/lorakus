@@ -11,6 +11,7 @@ from decimal import Decimal
 import pytest
 from conftest import migrator_sql
 from sqlalchemy import text
+from sqlalchemy import text as sa_text
 from sqlalchemy.exc import IntegrityError
 
 from lorakus.core.events.bus import bus, publish
@@ -19,11 +20,14 @@ from lorakus.core.identity.service import IdentityService
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.planning.service import (
     TASK_COMPLETED,
+    TASK_ESTIMATED,
     ModuleTasks,
     NewTask,
     add_task,
     complete_task,
+    get_task,
     list_tasks,
+    set_estimate,
 )
 from lorakus.db.database import Database
 from lorakus_modules.academic import service as academic
@@ -60,6 +64,7 @@ ModuleRegistry.from_entry_points()
 
 def test_discovering_the_modules_subscribes_the_handler() -> None:
     assert list(bus.handlers_for(TASK_COMPLETED)) == ["academic.task_completed"]
+    assert list(bus.handlers_for(TASK_ESTIMATED)) == ["academic.task_estimated"]
 
 
 async def _owner(identity: IdentityService) -> uuid.UUID:
@@ -451,6 +456,95 @@ async def test_the_event_of_one_user_never_touches_another(
 
     async with database.transaction(user) as session:
         assert [a.status for a in await list_assessments(session)] == ["open"]
+
+
+# ------------------------------------------------- duree et temps (PR 49)
+async def test_an_estimate_given_on_the_task_reaches_the_assessment(
+    database: Database, identity: IdentityService
+) -> None:
+    user = await _owner(identity)
+    async with database.transaction(user) as session:
+        course = await add_course(session, user, "Machine Learning")
+        created = await add_assessment(session, user, course.id, _homework())
+        task = await TASKS.get(session, str(created.id))
+        assert task is not None and task.estimate_minutes is None
+        # L'utilisateur confirme l'estimation de Lorakus (comme le fait la carte du chat).
+        await set_estimate(session, user, task.id, 180, "assistant")
+        [still] = await list_assessments(session)
+        assert still.estimate_minutes is None  # c'est l'evenement qui previent le module
+    payload = {"task_id": str(task.id), "owner_module": "academic", "owner_ref": str(created.id)}
+    assert await _events() == [(TASK_ESTIMATED, payload, False)]
+
+    assert (await OutboxRelay(database, bus).run_once()).delivered == 1
+
+    async with database.transaction(user) as session:
+        [updated] = await list_assessments(session)
+        assert updated.estimate_minutes == 180
+        # Rejoue : sans effet. Corriger le devoir avec la meme duree garde l'origine.
+        assert await academic.on_task_estimated(session, str(created.id)) is False
+        await update_assessment(session, user, created.id, _homework(estimate_minutes=180))
+        again = await get_task(session, task.id)
+        assert (again.estimate_minutes, again.estimate_source) == (180, "assistant")
+        # Une autre duree, donnee dans la page : elle devient celle de l'utilisateur.
+        await update_assessment(session, user, created.id, _homework(estimate_minutes=120))
+        changed = await get_task(session, task.id)
+        assert (changed.estimate_minutes, changed.estimate_source) == (120, "user")
+        # Retirer la duree retire aussi son origine.
+        await update_assessment(session, user, created.id, _homework())
+        cleared = await get_task(session, task.id)
+        assert (cleared.estimate_minutes, cleared.estimate_source) == (None, None)
+
+
+async def test_the_estimate_event_is_only_a_signal(
+    database: Database, identity: IdentityService
+) -> None:
+    user = await _owner(identity)
+    async with database.transaction(user) as session:
+        course = await add_course(session, user, "Algo")
+        created = await add_assessment(session, user, course.id, _homework(estimate_minutes=60))
+        ref = str(created.id)
+        for payload in (
+            {"owner_module": "academic", "owner_ref": "pas-un-identifiant"},
+            {"owner_module": "academic", "owner_ref": str(uuid.uuid4())},
+            {"owner_module": "projects", "owner_ref": ref},
+            {"owner_module": "academic"},
+        ):
+            await publish(session, TASK_ESTIMATED, payload, user_id=user)
+        # La meme duree que le devoir : rien a changer.
+        await publish(
+            session, TASK_ESTIMATED, {"owner_module": "academic", "owner_ref": ref}, user_id=user
+        )
+    assert (await OutboxRelay(database, bus).run_once()).delivered == 5
+    async with database.transaction(user) as session:
+        [same] = await list_assessments(session)
+        assert same.estimate_minutes == 60
+        assert await academic.on_task_estimated(session, "pas-un-identifiant") is False
+        assert await academic.on_task_estimated(session, ref) is False
+        # Une evaluation terminee ne change plus.
+        await complete_assessment(session, user, created.id, NOW)
+        task = await TASKS.get(session, ref)
+        assert task is not None
+        await session.execute(
+            sa_text("UPDATE lorakus.core_tasks SET estimate_minutes = 90 WHERE id = :id"),
+            {"id": task.id},
+        )
+        assert await academic.on_task_estimated(session, ref) is False
+
+
+async def test_completing_an_assessment_keeps_the_time_spent(
+    database: Database, identity: IdentityService
+) -> None:
+    user = await _owner(identity)
+    async with database.transaction(user) as session:
+        course = await add_course(session, user, "Algo")
+        created = await add_assessment(session, user, course.id, _homework(estimate_minutes=120))
+        for wrong in (0, 7 * 24 * 60 + 1):
+            with pytest.raises(AcademicError, match="temps passé"):
+                await complete_assessment(session, user, created.id, NOW, actual_minutes=wrong)
+        await complete_assessment(session, user, created.id, NOW, actual_minutes=150)
+        task = await TASKS.get(session, str(created.id))
+        assert task is not None
+        assert (task.status, task.actual_minutes, task.estimate_minutes) == ("done", 150, 120)
 
 
 # ------------------------------------------------------------- supprimer

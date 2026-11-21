@@ -86,10 +86,11 @@ CHAT_TOOLS: Final = (
     "assistant.complete_task",
     "assistant.delete_task",
     "assistant.list_agenda",
-    # Preferences de planification (PR 48), revus : catalogue ferme, une carte, rien sans clic.
-    "assistant.list_preferences",
-    "assistant.set_preference",
-    "assistant.clear_preference",
+    # Journee (PR 49), revus : plan calcule par le code ; cadre du jour et duree d'une tache
+    # valides par le code, une carte, rien sans clic.
+    "assistant.plan_today",
+    "assistant.set_day",
+    "assistant.set_estimate",
     # Module academic (PR 46), revu : une carte, rien sans clic.
     "academic.add_assessment",
 )

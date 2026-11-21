@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lorakus.core.identity.service import audit
 from lorakus.core.planning.service import (
     MAX_ESTIMATE_MINUTES,
+    EstimateSource,
     InvalidTaskError,
     ModuleTasks,
     TaskLimitError,
@@ -326,7 +327,12 @@ async def find_open_duplicate(
     return await session.scalar(query.limit(1))
 
 
-async def _sync_task(session: AsyncSession, row: Assessment, course_name: str) -> None:
+async def _sync_task(
+    session: AsyncSession,
+    row: Assessment,
+    course_name: str,
+    estimate_source: EstimateSource = "user",
+) -> None:
     try:
         await TASKS.upsert(
             session,
@@ -335,6 +341,7 @@ async def _sync_task(session: AsyncSession, row: Assessment, course_name: str) -
             task_title(course_name, row.title),
             due_on=row.due_on,
             estimate_minutes=row.estimate_minutes,
+            estimate_source=estimate_source,
         )
     except TaskLimitError:
         raise AcademicError(
@@ -350,8 +357,13 @@ async def add_assessment(
     *,
     source_ref: str | None = None,
     ip: str | None = None,
+    estimate_source: EstimateSource = "user",
 ) -> AssessmentView:
-    """Cree une evaluation et sa tache. Jamais deux evaluations ouvertes identiques."""
+    """Cree une evaluation et sa tache. Jamais deux evaluations ouvertes identiques.
+
+    `estimate_source` : « assistant » si la duree est une estimation de Lorakus que
+    l'utilisateur a confirmee (PR 49) ; elle est gardee sur la tache.
+    """
     checked = _checked(new)
     course = await session.get(Course, course_id, with_for_update=True)
     if course is None:
@@ -378,7 +390,7 @@ async def add_assessment(
     session.add(row)
     await session.flush()
     await session.refresh(row)
-    await _sync_task(session, row, course.name)
+    await _sync_task(session, row, course.name, estimate_source)
     await audit(
         session, user_id, "academic.assessment_add", "success", ip, {"assessment_id": str(row.id)}
     )
@@ -436,17 +448,24 @@ async def complete_assessment(
     assessment_id: uuid.UUID,
     now: datetime,
     ip: str | None = None,
+    *,
+    actual_minutes: int | None = None,
 ) -> AssessmentView:
-    """Termine une evaluation et sa tache (par le port : aucun evenement en retour)."""
+    """Termine une evaluation et sa tache (par le port : aucun evenement en retour).
+
+    `actual_minutes` : le temps reellement passe, s'il est donne ; il est note sur la tache.
+    """
     row, course_name = await _locked(session, assessment_id)
     if row.status != "open":
         raise AcademicError("Cette évaluation est déjà terminée.")
+    if actual_minutes is not None and not 1 <= actual_minutes <= MAX_ESTIMATE_MINUTES:
+        raise AcademicError("Le temps passé va de 1 minute à 7 jours.")
     row.status = "done"
     row.completed_at = now
     row.updated_at = datetime.now(UTC)
     await session.flush()
     await session.refresh(row)
-    await TASKS.complete(session, str(row.id), now)
+    await TASKS.complete(session, str(row.id), now, actual_minutes=actual_minutes)
     await audit(
         session,
         user_id,
@@ -494,6 +513,26 @@ async def on_task_completed(session: AsyncSession, owner_ref: str) -> bool:
         return False
     row.status = "done"
     row.completed_at = task.completed_at
+    row.updated_at = datetime.now(UTC)
+    await session.flush()
+    return True
+
+
+async def on_task_estimated(session: AsyncSession, owner_ref: str) -> bool:
+    """L'utilisateur a donne la duree de la tache d'une evaluation (PR 49) : l'evaluation
+    prend la meme. L'evenement n'est qu'un signal : la duree est relue dans le planning.
+    Rejouable sans effet ; rend True si l'evaluation a change."""
+    try:
+        assessment_id = uuid.UUID(owner_ref)
+    except ValueError:
+        return False
+    task = await TASKS.get(session, str(assessment_id))
+    if task is None or task.estimate_minutes is None:
+        return False
+    row = await session.get(Assessment, assessment_id, with_for_update=True)
+    if row is None or row.status != "open" or row.estimate_minutes == task.estimate_minutes:
+        return False
+    row.estimate_minutes = task.estimate_minutes
     row.updated_at = datetime.now(UTC)
     await session.flush()
     return True

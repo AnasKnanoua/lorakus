@@ -32,6 +32,8 @@ from lorakus.core.planning.models import AgendaEntry, Task
 
 TaskStatus = Literal["open", "done"]
 SourceKind = Literal["user", "conversation", "module"]
+# Qui a donne une duree estimee (PR 49) : l'utilisateur, ou Lorakus avec son accord.
+EstimateSource = Literal["user", "assistant"]
 
 MAX_TITLE_CHARS: Final = 200
 MAX_NOTES_CHARS: Final = 2000
@@ -45,6 +47,9 @@ MODULE_ID: Final = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 # Evenement : l'UTILISATEUR a termine une tache creee par un module (PR 46). Charge utile :
 # task_id, owner_module, owner_ref (des identifiants seulement).
 TASK_COMPLETED: Final = "planning.task_completed"
+# Evenement : l'UTILISATEUR a donne la duree estimee d'une tache d'un module (PR 49), pour
+# que le module garde la meme. Charge utile : task_id, owner_module, owner_ref.
+TASK_ESTIMATED: Final = "planning.task_estimated"
 
 
 class InvalidTaskError(ValueError):
@@ -116,6 +121,7 @@ class NewTask:
     priority: int = 2
     notes: str | None = None
     parent_id: uuid.UUID | None = None
+    estimate_source: EstimateSource = "user"  # ignore sans duree
 
 
 @dataclass(frozen=True)
@@ -134,6 +140,8 @@ class TaskView:
     created_at: datetime
     completed_at: datetime | None
     open_subtasks: int = 0
+    estimate_source: str | None = None  # « user » ou « assistant », present avec la duree
+    actual_minutes: int | None = None  # temps reellement passe, donne a la fin
 
     def overdue(self, today: date) -> bool:
         """En retard : ouverte, et son jour d'echeance est passe (pas « aujourd'hui »)."""
@@ -156,6 +164,8 @@ def _view(task: Task, open_subtasks: int = 0) -> TaskView:
         created_at=task.created_at,
         completed_at=task.completed_at,
         open_subtasks=open_subtasks,
+        estimate_source=task.estimate_source,
+        actual_minutes=task.actual_minutes,
     )
 
 
@@ -275,6 +285,7 @@ async def add_task(
         priority=new.priority,
         due_on=new.due_on,
         estimate_minutes=new.estimate_minutes,
+        estimate_source=None if new.estimate_minutes is None else new.estimate_source,
         source_kind=source_kind,
         source_ref=source_ref,
     )
@@ -291,8 +302,13 @@ async def complete_task(
     task_id: uuid.UUID,
     now: datetime,
     ip: str | None = None,
+    *,
+    actual_minutes: int | None = None,
 ) -> int:
     """Termine une tache et ses sous-taches encore ouvertes ; rend le nombre de taches closes.
+
+    `actual_minutes` : le temps reellement passe sur la tache, si l'utilisateur le donne
+    (PR 49) ; il n'est note que sur elle, pas sur ses sous-taches.
 
     Si la tache vient d'un module, l'evenement `planning.task_completed` le previent, dans la
     meme transaction (outbox) : son devoir ou son projet suit. Une tache personnelle n'a
@@ -304,6 +320,7 @@ async def complete_task(
         raise TaskNotFoundError(task_id)
     if task.status == "done":
         raise TaskStateError("tache deja terminee")
+    _check_actual(actual_minutes)
     result = await session.execute(
         update(Task)
         .where(or_(Task.id == task_id, Task.parent_id == task_id), Task.status == "open")
@@ -311,6 +328,8 @@ async def complete_task(
         .returning(Task.id)
     )
     closed = len(result.all())
+    task.actual_minutes = actual_minutes
+    await session.flush()
     if task.owner_module is not None:
         await publish(
             session,
@@ -326,6 +345,51 @@ async def complete_task(
         session, user_id, "planning.task_complete", "success", ip, {"task_id": str(task_id)}
     )
     return closed
+
+
+def _check_actual(actual_minutes: int | None) -> None:
+    if actual_minutes is not None and not 1 <= actual_minutes <= MAX_ESTIMATE_MINUTES:
+        raise InvalidTaskError(f"temps passe : de 1 a {MAX_ESTIMATE_MINUTES} minutes")
+
+
+async def set_estimate(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+    minutes: int,
+    source: EstimateSource,
+    ip: str | None = None,
+) -> TaskView:
+    """Donne la duree estimee d'une tache ouverte (PR 49), confirmee par l'utilisateur.
+
+    Une tache d'un module garde la meme duree que son objet (le devoir d'academic) :
+    l'evenement `planning.task_estimated` le previent, dans la meme transaction (outbox).
+    """
+    _check_numbers(2, minutes)
+    task = await session.get(Task, task_id, with_for_update=True)
+    if task is None:
+        raise TaskNotFoundError(task_id)
+    if task.status != "open":
+        raise TaskStateError("tache deja terminee")
+    task.estimate_minutes = minutes
+    task.estimate_source = source
+    task.updated_at = datetime.now(UTC)
+    await session.flush()
+    if task.owner_module is not None:
+        await publish(
+            session,
+            TASK_ESTIMATED,
+            {
+                "task_id": str(task_id),
+                "owner_module": task.owner_module,
+                "owner_ref": task.owner_ref,
+            },
+            user_id=user_id,
+        )
+    await audit(
+        session, user_id, "planning.task_estimate", "success", ip, {"task_id": str(task_id)}
+    )
+    return await get_task(session, task_id)
 
 
 async def delete_task(
@@ -376,8 +440,14 @@ class ModuleTasks:
         estimate_minutes: int | None = None,
         priority: int = 2,
         notes: str | None = None,
+        estimate_source: EstimateSource = "user",
     ) -> TaskView:
-        """Cree la tache de `ref`, ou met a jour son contenu (jamais son statut)."""
+        """Cree la tache de `ref`, ou met a jour son contenu (jamais son statut).
+
+        L'origine d'une duree inchangee est gardee : renvoyer la meme duree (le module
+        recopie la sienne) ne transforme pas une estimation de Lorakus en celle de
+        l'utilisateur.
+        """
         ref = clean_line(ref, 200, "reference")
         title = clean_line(title, MAX_TITLE_CHARS)
         notes = clean_notes(notes)
@@ -397,6 +467,10 @@ class ModuleTasks:
         task.title = title
         task.notes = notes
         task.due_on = due_on
+        if estimate_minutes is None:
+            task.estimate_source = None
+        elif estimate_minutes != task.estimate_minutes or task.estimate_source is None:
+            task.estimate_source = estimate_source
         task.estimate_minutes = estimate_minutes
         task.priority = priority
         task.updated_at = datetime.now(UTC)
@@ -404,12 +478,26 @@ class ModuleTasks:
         await session.refresh(task)
         return _view(task)
 
-    async def complete(self, session: AsyncSession, ref: str, now: datetime) -> bool:
-        """Termine la tache de `ref` ; False si elle n'existe pas ou l'est deja."""
+    async def complete(
+        self,
+        session: AsyncSession,
+        ref: str,
+        now: datetime,
+        *,
+        actual_minutes: int | None = None,
+    ) -> bool:
+        """Termine la tache de `ref` (avec le temps passe, s'il est donne) ; False si elle
+        n'existe pas ou l'est deja."""
+        _check_actual(actual_minutes)
         result = await session.execute(
             update(Task)
             .where(*self._mine(ref), Task.status == "open")
-            .values(status="done", completed_at=now, updated_at=func.now())
+            .values(
+                status="done",
+                completed_at=now,
+                actual_minutes=actual_minutes,
+                updated_at=func.now(),
+            )
             .returning(Task.id)
         )
         return result.first() is not None

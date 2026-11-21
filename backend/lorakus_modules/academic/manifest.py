@@ -1,15 +1,15 @@
 """Manifeste du module Academic (MODULE_SYSTEM.md §2, PR 46)."""
 
 from lorakus.core.modules.manifest import DataDeclaration, FrontendEntry, ModuleManifest
-from lorakus.core.planning.service import TASK_COMPLETED
+from lorakus.core.planning.service import TASK_COMPLETED, TASK_ESTIMATED
 
-# Importer le handler l'abonne (@on) dans l'API et dans le worker.
-from lorakus_modules.academic.events import task_completed
+# Importer les handlers les abonne (@on) dans l'API et dans le worker.
+from lorakus_modules.academic.events import task_completed, task_estimated
 from lorakus_modules.academic.export import export_academic
 from lorakus_modules.academic.router import router
 from lorakus_modules.academic.tools import TOOLS
 
-__all__ = ["manifest", "task_completed"]
+__all__ = ["manifest", "task_completed", "task_estimated"]
 
 
 async def check_health() -> bool:
@@ -24,8 +24,8 @@ manifest = ModuleManifest(
     requires_core=">=0.3,<1.0",
     description="Cours et evaluations (devoirs, examens) : chacune cree sa tache.",
     permissions=["academic:read", "academic:write"],
-    # Premier consommateur de l'evenement du planning (ADR 0018).
-    events_consumed=[TASK_COMPLETED],
+    # Consommateur des evenements du planning (ADR 0018) : fin et duree d'une tache.
+    events_consumed=[TASK_COMPLETED, TASK_ESTIMATED],
     api_router=router,
     models="lorakus_modules.academic.models",
     migrations="academic",

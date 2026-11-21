@@ -78,3 +78,17 @@ Retour d'usage le jour de la PR 47 : le plan ignore les repas et les horaires r�
 Non couvert : les activités récurrentes (sport, trajets) sont des créneaux d'agenda, pas des préférences ; les préférences par jour de la semaine (déjeuner plus tard le vendredi) attendront un besoin réel.
 
 Tests : `tests/unit/test_preference_catalogue.py`, `tests/unit/test_planner.py` (préférences), `tests/integration/test_planning_preferences.py` (service sous RLS, lignes illisibles, cartes, routes, scénario 6), corpus d'injections (position 7), banc (3 cas).
+
+## Amendement du 2026-11-21 (PR 49) : le cadre du jour remplace les préférences fixes
+
+Retour d'usage de la PR 48, le jour même : des horaires fixes ne décrivent pas la vie du propriétaire. Il mange à 18 h un jour, à 22 h le lendemain, une fois ou pas du tout ; il fait des nuits blanches ; il ne se lève pas à 8 h. Un planificateur qui suppose des heures place du travail quand il dort et rend le plan faux, donc inutile. L'amendement de la PR 48 est remplacé :
+
+1. **Aucune heure supposée.** Le planificateur ne lit plus de bornes par défaut : sans cadre pour le jour, aucun créneau n'est proposé. La page dit ce qui est à faire et pour quand, et propose d'en parler à Lorakus.
+2. **Cadre du jour** (`lorakus/core/planning/days.py`, table `core_planning_days`, migration 0015, RLS forcée) : pour UN jour local, soit « pas de travail », soit une plage de travail et ses pauses (repas, pause, sport, autre). La plage commence le jour dit dans le fuseau du compte ; une fin plus tôt que le début tombe le lendemain (« de 22 h à 4 h ») ; de 30 minutes à 20 heures. Une pause tient dans la plage, de 10 minutes à 4 heures, 6 au plus. Les heures sont converties en instants UTC une fois pour toutes. Il se donne en conversation, confirmé par une carte (`assistant.set_day`) ; il s'efface depuis la page (`DELETE /api/v1/planning/days/{day}`).
+3. **Journée en cours.** Tant que la plage de la veille n'est pas finie, la journée en cours est celle de la veille : à 2 h du matin pendant une nuit de travail, « aujourd'hui » et la page parlent de la nuit commencée la veille.
+4. **Durées.** Une tâche sans durée n'est plus placée avec 30 minutes supposées : elle est rendue « à estimer ». Lorakus demande la durée, ou propose son estimation si on la lui demande ; la carte (`assistant.set_estimate`) dit laquelle des deux. `core_tasks.estimate_source` garde l'origine (`user` ou `assistant`). Une tâche d'un module garde la même durée que son objet : l'événement `planning.task_estimated` prévient le module (academic met à jour l'évaluation).
+5. **Temps réel.** À la fin d'une tâche, le temps réellement passé peut être donné (carte du chat, fenêtre de la page Cours) : `core_tasks.actual_minutes`. Avec l'origine des estimations, il permettra de mesurer l'écart entre prévu et réel. Aucune prédiction n'est faite avant d'avoir des données : c'est le préalable d'un éventuel modèle (P16), pas un modèle.
+6. **Plus de plafond caché.** Les 6 h par jour disparaissent : la plage dite par l'utilisateur est la seule limite.
+7. **Ce que fait le modèle, ce que fait le code.** Le modèle comprend la phrase (« je bosse de 15 h à 3 h, je mange vers 22 h ») et l'explique ensuite (le matin, l'après-midi) ; il lit le plan par `assistant.plan_today`. Le code valide le cadre, écrit la carte et calcule le plan. Le modèle ne place jamais un créneau lui-même.
+
+La table `core_planning_preferences` est supprimée par la migration 0015, avec l'accord du propriétaire (elle ne contenait que des essais). Le retour arrière la recrée vide.

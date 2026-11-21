@@ -84,6 +84,14 @@ class AssessmentIn(AssessmentBody):
     course_id: uuid.UUID
 
 
+class CompleteIn(BaseModel):
+    """Fin d'une evaluation : le temps reellement passe, si l'utilisateur le donne (PR 49)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actual_minutes: int | None = Field(default=None, ge=1, le=MAX_ESTIMATE_MINUTES)
+
+
 class AssessmentOut(BaseModel):
     """Une evaluation, avec ce que le serveur sait du temps : retard et jours restants."""
 
@@ -194,14 +202,19 @@ async def change_assessment(
 
 @router.post("/assessments/{assessment_id}/complete")
 async def finish_assessment(
-    assessment_id: uuid.UUID, request: Request, user: User
+    assessment_id: uuid.UUID, request: Request, user: User, body: CompleteIn | None = None
 ) -> AssessmentOut:
     try:
         async with _database(request).transaction(user.id) as session:
             now = datetime.now(UTC)
             today = local_today(now, await user_timezone(session))
             view = await complete_assessment(
-                session, user.id, assessment_id, now, client_ip(request)
+                session,
+                user.id,
+                assessment_id,
+                now,
+                client_ip(request),
+                actual_minutes=None if body is None else body.actual_minutes,
             )
             return _assessment(view, today)
     except AcademicError as error:

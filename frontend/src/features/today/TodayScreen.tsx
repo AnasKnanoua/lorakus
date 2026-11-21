@@ -3,28 +3,33 @@ import { Link } from "@tanstack/react-router";
 import { useId, useState, type ReactNode } from "react";
 
 import {
-  removePreference,
+  clearDay,
   type AgendaEntry,
-  type Meal,
+  type DayBreak,
+  type DayFrame,
   type PlanBlock,
   type PlannedTask,
-  type Preference,
   type Today,
 } from "@/api/planning";
-import { Collapsible } from "@/components/Collapsible";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/features/chat/ConfirmDialog";
 import { TopBar } from "@/features/chat/layout";
+import { useStartConversation } from "@/features/chat/startConversation";
 import { cn } from "@/lib/cn";
 import { clockTime, duration, longDate, relativeDay } from "@/lib/format";
-import { preferencesQuery, todayQuery } from "@/lib/queries";
+import { todayQuery } from "@/lib/queries";
 import { NAV_ITEMS } from "@/navigation";
 
+/** Premier message envoyé par « Organiser ma journée avec Lorakus ». */
+export const ORGANISE_MESSAGE = "Organise ma journée.";
+
 /**
- * Page « Ma journée » (PR 47, docs/frontend.md) : l'agenda du jour et le plan proposé sur une
- * seule ligne de temps, puis ce qui ne tient pas, les retards et les échéances de la semaine.
- * Lecture seule : le plan est une proposition du serveur, recalculée à chaque lecture et
- * jamais écrite dans l'agenda. Jour, heures et retards viennent du serveur (fuseau du compte).
+ * Page « Ma journée » (PR 47 et 49, docs/frontend.md) : le cadre du jour, l'agenda et le plan
+ * proposé sur une seule ligne de temps, puis ce qu'il faut estimer, ce qui ne tient pas, les
+ * retards et les échéances de la semaine. Le plan est une proposition du serveur, recalculée
+ * à chaque lecture et jamais écrite dans l'agenda. Aucune heure n'est supposée : sans cadre,
+ * rien n'est placé, et la page propose d'en parler à Lorakus. Jour, heures et retards viennent
+ * du serveur (fuseau du compte).
  */
 export function TodayScreen() {
   const today = useQuery(todayQuery);
@@ -58,7 +63,7 @@ export function TodayScreen() {
 
 type Moment =
   | { kind: "event"; at: string; end: string; entry: AgendaEntry }
-  | { kind: "meal"; at: string; meal: Meal }
+  | { kind: "break"; at: string; pause: DayBreak }
   | { kind: "block"; at: string; block: PlanBlock };
 
 function Day({ data }: { data: Today }) {
@@ -70,12 +75,15 @@ function Day({ data }: { data: Today }) {
         ? [{ kind: "event", at: entry.starts_at, end: entry.ends_at, entry }]
         : [],
     ),
-    ...data.meals.map((meal): Moment => ({ kind: "meal", at: meal.starts_at, meal })),
+    ...(data.frame?.breaks ?? []).map((pause): Moment => ({ kind: "break", at: pause.starts_at, pause })),
     ...data.plan.map((block): Moment => ({ kind: "block", at: block.starts_at, block })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
+  const frame = data.frame;
+  const over = frame?.ends_at != null && new Date(frame.ends_at).getTime() <= new Date(data.generated_at).getTime();
   return (
     <div className="flex flex-col gap-7">
+      <FrameBar data={data} />
       <Section title="Déroulé">
         {allDay.length > 0 && (
           <ul aria-label="Toute la journée" className="flex flex-wrap gap-2 px-3 pb-2">
@@ -88,11 +96,13 @@ function Day({ data }: { data: Today }) {
         )}
         {moments.length === 0 ? (
           <p className="px-3 text-base text-ink-muted">
-            {data.rest_day
-              ? "Jour sans travail : rien n'est proposé aujourd'hui."
-              : data.work_ends_at === null && data.unplanned.length > 0
-                ? "La journée de travail est finie : le plan reprendra demain matin."
-                : "Rien de prévu aujourd'hui."}
+            {frame?.off
+              ? "Pas de travail aujourd'hui : rien n'est proposé."
+              : over
+                ? "Ta plage de travail est finie."
+                : frame === null
+                  ? "Rien dans ton agenda aujourd'hui."
+                  : "Rien de prévu aujourd'hui."}
           </p>
         ) : (
           <ol aria-label="Déroulé de la journée" className="flex flex-col gap-0.5">
@@ -105,18 +115,16 @@ function Day({ data }: { data: Today }) {
                   end={moment.end}
                   data={data}
                 />
-              ) : moment.kind === "meal" ? (
-                <MealLine key={`m-${moment.meal.name}`} meal={moment.meal} timeZone={data.timezone} />
+              ) : moment.kind === "break" ? (
+                <BreakLine key={`p-${moment.at}`} pause={moment.pause} timeZone={data.timezone} />
               ) : (
                 <BlockLine key={`b-${moment.at}`} block={moment.block} timeZone={data.timezone} />
               ),
             )}
           </ol>
         )}
-        {data.rest_day && moments.length > 0 && (
-          <p className="px-3 pt-3 text-sm text-ink-faint">
-            Jour sans travail : rien n'est proposé aujourd'hui.
-          </p>
+        {frame?.off && moments.length > 0 && (
+          <p className="px-3 pt-3 text-sm text-ink-faint">Pas de travail aujourd'hui : rien n'est proposé.</p>
         )}
         {data.plan.length > 0 && (
           <p className="px-3 pt-3 text-sm text-ink-faint">
@@ -124,6 +132,22 @@ function Day({ data }: { data: Today }) {
           </p>
         )}
       </Section>
+
+      {data.unestimated.length > 0 && (
+        <Section title="À estimer">
+          <TaskList
+            label="À estimer"
+            items={data.unestimated.map((task) => ({
+              task,
+              detail: ["durée inconnue", dueText(task)].filter(Boolean).join(" · pour "),
+            }))}
+          />
+          <p className="px-3 pt-2 text-sm text-ink-faint">
+            Sans durée, une tâche n'est jamais placée. Dis à Lorakus combien de temps elle te prendra, ou
+            demande-lui de l'estimer.
+          </p>
+        </Section>
+      )}
 
       {data.unplanned.length > 0 && (
         <Section title="Pas de place aujourd'hui">
@@ -156,70 +180,82 @@ function Day({ data }: { data: Today }) {
           />
         )}
       </Section>
-      <Preferences />
     </div>
   );
 }
 
 /**
- * Ce que le planificateur sait de toi (PR 48) : horaires de travail, repas, jours sans travail,
- * maximum par jour. On les RÈGLE en le disant à Lorakus (une carte demande confirmation) ; ici
- * on les lit et on peut en retirer une.
+ * Le cadre du jour (PR 49) : ce que tu as dit à Lorakus de ta journée. Il se donne en
+ * conversation (une carte demande confirmation) ; ici on le lit, on peut l'effacer, et
+ * « Organiser ma journée avec Lorakus » ouvre une conversation qui commence par là.
  */
-function Preferences() {
+function FrameBar({ data }: { data: Today }) {
   const queryClient = useQueryClient();
-  const preferences = useQuery(preferencesQuery);
-  const [removing, setRemoving] = useState<Preference | null>(null);
-  if (!preferences.data) return null;
+  const conversation = useStartConversation();
+  const [clearing, setClearing] = useState(false);
+  const frame = data.frame;
   return (
-    <Collapsible title="Mes préférences" defaultOpen={false} headerClassName="px-3">
-      <ul aria-label="Mes préférences" className="flex flex-col gap-0.5 pb-2">
-        {preferences.data.map((preference) => (
-          <li key={preference.key} className="flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5">
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base text-ink">{preference.label}</span>
-              <span className="block truncate text-sm text-ink-muted">
-                {preference.value}
-                {preference.is_default && <span className="text-ink-faint"> · par défaut</span>}
-              </span>
-            </span>
-            {!preference.is_default && (
-              <Button
-                variant="quiet"
-                size="sm"
-                aria-label={`Retirer la préférence ${preference.label}`}
-                onClick={() => {
-                  setRemoving(preference);
-                }}
-              >
-                Retirer
-              </Button>
-            )}
-          </li>
-        ))}
-      </ul>
-      <p className="px-3 pb-3 text-sm text-ink-faint">
-        Pour en changer, dis-le à Lorakus dans une conversation, par exemple : « je déjeune de 12 h 30 à 13 h 30 »
-        ou « pas de travail après 21 h ». Une carte te demandera de confirmer.
-      </p>
+    <div className="flex flex-col gap-3 rounded-2xl bg-raised px-4 py-3.5">
+      <div className="flex items-start gap-2">
+        <p className={cn("min-w-0 flex-1 pt-1 text-base", frame ? "text-ink" : "text-ink-muted")}>
+          {frameText(frame, data)}
+        </p>
+        {frame && (
+          <Button
+            variant="quiet"
+            size="sm"
+            className="-mr-2 shrink-0"
+            onClick={() => {
+              setClearing(true);
+            }}
+          >
+            Effacer
+          </Button>
+        )}
+      </div>
+      <div>
+        <Button
+          variant={frame ? "outline" : "primary"}
+          size="sm"
+          disabled={conversation.busy}
+          onClick={() => void conversation.start(ORGANISE_MESSAGE)}
+        >
+          Organiser ma journée avec Lorakus
+        </Button>
+      </div>
+      {conversation.error && (
+        <p role="alert" className="text-sm text-danger">
+          La conversation n'a pas pu être créée. Vérifie ta connexion, puis réessaie.
+        </p>
+      )}
       <ConfirmDialog
-        open={removing !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setRemoving(null);
-        }}
+        open={clearing}
+        onOpenChange={setClearing}
         tone="plain"
-        title={`Retirer « ${removing?.label ?? ""} » ?`}
-        description="La valeur par défaut s'appliquera de nouveau. Tu pourras la redire à Lorakus."
-        confirmLabel="Retirer"
-        failure="Impossible de retirer cette préférence. Réessaie."
+        title="Effacer le cadre d'aujourd'hui ?"
+        description="Plus aucun créneau ne sera proposé aujourd'hui, tant que tu n'auras pas redit à Lorakus quand tu travailles."
+        confirmLabel="Effacer"
+        failure="Impossible d'effacer le cadre du jour. Réessaie."
         onConfirm={async () => {
-          if (removing) await removePreference(removing.key);
-          setRemoving(null);
+          await clearDay(data.day);
           await queryClient.invalidateQueries({ queryKey: ["planning"] });
         }}
       />
-    </Collapsible>
+    </div>
   );
+}
+
+function frameText(frame: DayFrame | null, data: Today): string {
+  if (frame === null) {
+    return "Tu n'as pas encore dit quand tu travailles aujourd'hui : rien n'est placé, aucune heure n'est supposée.";
+  }
+  // Un jour sans travail n'a pas d'horaires (contrainte du serveur).
+  if (frame.starts_at == null || frame.ends_at == null) return "Pas de travail aujourd'hui.";
+  const start = clockTime(frame.starts_at, data.timezone);
+  const end = clockTime(frame.ends_at, data.timezone);
+  // Une plage qui passe minuit finit « demain » par rapport au jour affiché.
+  const endDay = new Intl.DateTimeFormat("en-CA", { timeZone: data.timezone }).format(new Date(frame.ends_at));
+  return `Travail de ${start} à ${end}${endDay > data.day ? " (le lendemain)" : ""}.`;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -261,12 +297,12 @@ function EventLine({ entry, start, end, data }: { entry: AgendaEntry; start: str
   );
 }
 
-function MealLine({ meal, timeZone }: { meal: Meal; timeZone: string }) {
+function BreakLine({ pause, timeZone }: { pause: DayBreak; timeZone: string }) {
   return (
-    // Un repas (preference) : ni un creneau de l'agenda, ni du travail ; en retrait.
+    // Une pause du cadre (repas, sport...) : ni un créneau de l'agenda, ni du travail ; en retrait.
     <li className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-ink-faint">
-      <Hours start={meal.starts_at} end={meal.ends_at} timeZone={timeZone} />
-      <span className="min-w-0 flex-1 truncate text-base">{meal.label}</span>
+      <Hours start={pause.starts_at} end={pause.ends_at} timeZone={timeZone} />
+      <span className="min-w-0 flex-1 truncate text-base">{pause.label}</span>
     </li>
   );
 }
@@ -282,7 +318,6 @@ function BlockLine({ block, timeZone }: { block: PlanBlock; timeZone: string }) 
         {/* Sur deux lignes au besoin : l'echeance ne doit pas etre coupee sur un telephone. */}
         <span className={cn("block text-sm", block.task.overdue ? "text-danger" : "text-ink-muted")}>
           Proposé · {duration(block.minutes)}
-          {block.assumed_duration ? " (durée supposée)" : ""}
           {due ? ` · pour ${due}` : ""}
         </span>
       </span>
@@ -306,7 +341,8 @@ function TaskList({ label, items }: { label: string; items: TaskItem[] }) {
           <>
             <span className="block truncate text-base text-ink">{task.title}</span>
             {detail && (
-              <span className={cn("block truncate text-sm", danger ? "text-danger" : "text-ink-muted")}>
+              // Sur deux lignes au besoin : une échéance ne doit pas être coupée sur un téléphone.
+              <span className={cn("block text-sm", danger ? "text-danger" : "text-ink-muted")}>
                 {detail}
               </span>
             )}

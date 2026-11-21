@@ -1,4 +1,4 @@
-"""Tables du planning (migrations 0013 et 0014). RLS forcee : chacun ne voit que ses lignes.
+"""Tables du planning (migrations 0013 et 0015). RLS forcee : chacun ne voit que ses lignes.
 
 Generiques (ADR 0018) : une tache ne connait ni devoir ni projet. `owner_module` et
 `owner_ref` disent quel module l'a creee et a quel objet elle correspond ; nuls pour une
@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -67,6 +68,11 @@ class Task(Base):
     # Echeance : un jour local (« pour vendredi »), rendu en fin de journee chez l'utilisateur.
     due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     estimate_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Qui a donne la duree (PR 49) : « user », ou « assistant » (estimation de Lorakus
+    # confirmee par l'utilisateur) ; present si et seulement si la duree l'est.
+    estimate_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Temps reellement passe, donne a la fin (PR 49) : l'ecart avec l'estimation.
+    actual_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     owner_module: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_kind: Mapped[str] = mapped_column(Text)
@@ -115,20 +121,24 @@ class AgendaEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PlanningPreference(Base):
-    """Une preference de planification confirmee (migration 0014) : une ligne par cle.
+class PlanningDay(Base):
+    """Le cadre d'UN jour local, donne par l'utilisateur (migration 0015, PR 49).
 
-    Le catalogue des cles est ferme (preferences.py) ; la valeur est un petit objet JSON type
-    par la cle, valide par le code a l'ecriture ET a la lecture.
+    Soit un jour sans travail (`off`), soit une plage de travail en instants UTC (elle peut
+    passer minuit) et ses pauses : un tableau JSON valide par le code a l'ecriture ET a la
+    lecture (days.py). Sans ligne, le planificateur ne devine aucune heure.
     """
 
-    __tablename__ = "core_planning_preferences"
+    __tablename__ = "core_planning_days"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("core_users.id", ondelete="CASCADE"), primary_key=True
     )
-    key: Mapped[str] = mapped_column(Text, primary_key=True)
-    value: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    off: Mapped[bool] = mapped_column(Boolean)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    breaks: Mapped[Any] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     # Provenance (ADR 0015) : carte confirmee d'une conversation, ou saisie directe.
     source_kind: Mapped[str] = mapped_column(Text)
     source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)

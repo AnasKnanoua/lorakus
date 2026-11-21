@@ -10,9 +10,10 @@ Cours et évaluations (devoirs, examens). Chaque évaluation crée **sa tâche**
 - **Terminer, dans les deux sens** :
   - depuis la page, après une fenêtre de confirmation (terminer ne se défait pas), l'évaluation et sa tâche sont terminées ensemble (par le port : aucun événement en retour) ;
   - depuis le chat, l'utilisateur termine la **tâche** (carte) ; le Core publie `planning.task_completed` dans la même transaction, et le worker livre l'événement au module, qui termine l'évaluation (le relais du worker passe toutes les 2 secondes au repos).
+- **Durée et temps passé (PR 49)** : une durée donnée dans le chat sur la tâche d'un devoir revient à l'évaluation par l'événement `planning.task_estimated`. Dans la fenêtre « Terminer », un champ facultatif « Temps passé, en heures » (l'estimation sert d'exemple) envoie `actual_minutes`, noté sur la tâche. Ajouté par le chat, un devoir peut porter une durée estimée par Lorakus : la carte l'écrit, et la tâche garde cette origine tant que la durée ne change pas.
 - **Retards** : une évaluation ouverte est en retard quand son jour d'échéance est passé (à rendre aujourd'hui : pas encore en retard). « Aujourd'hui » est calculé par le serveur dans le fuseau du compte, jamais par la page ni à l'heure du serveur.
 
-Non couvert pour l'instant (aucun consommateur) : renommer un cours, rouvrir une évaluation terminée, rappels à J-3 (signaux, P5), durée par défaut d'après les devoirs passés (PR 47 et 48).
+Non couvert pour l'instant (aucun consommateur) : renommer un cours, rouvrir une évaluation terminée, rappels à J-3 (signaux, P5), durée par défaut d'après les devoirs passés (il faut d'abord des temps réels : PR 49, puis P16).
 
 ## Approche (programmation classique, ML ou LLM)
 
@@ -28,17 +29,18 @@ Non couvert pour l'instant (aucun consommateur) : renommer un cours, rouvrir une
 
 | Outil | Risque | Effet |
 | --- | --- | --- |
-| `academic.add_assessment` | `write` | Carte « Ajouter un devoir : « … » / Cours : … / Échéance : vendredi 20 novembre 2026 (demain) » ; le clic crée le cours s'il manque, puis l'évaluation et sa tâche (provenance `conversation:<id>`) |
+| `academic.add_assessment` | `write` | Carte « Ajouter un devoir : « … » / Cours : … / Échéance : vendredi 20 novembre 2026 (demain) » ; le clic crée le cours s'il manque, puis l'évaluation et sa tâche (provenance `conversation:<id>`). Depuis la PR 49, `estimate_by` : la durée donnée par l'utilisateur, ou estimée par Lorakus (« (estimation de Lorakus) » sur la carte) |
 
 Ajouté à `CHAT_TOOLS` après revue (ADR 0040, amendement du 2026-11-20) ; proposé au modèle seulement si le module est activé. Refusés **avant toute carte** : échéance absente (schéma), passée ou à plus de 5 ans, évaluation ouverte identique, cours de trop. La carte écrit « (nouveau cours) » quand le nom ne correspond à aucun cours : une faute dans le nom se voit avant le clic. Lire, terminer ou supprimer passe par les outils des tâches de l'assistant (une tâche d'un module ne se supprime pas depuis le chat).
 
-## Événement consommé
+## Événements consommés
 
 | Événement | Émis par | Effet |
 | --- | --- | --- |
 | `planning.task_completed` (`task_id`, `owner_module`, `owner_ref`) | Le Core, quand l'**utilisateur** termine une tâche créée par un module | Si `owner_module` vaut `academic` : l'évaluation `owner_ref` est terminée, à l'instant où la tâche l'a été |
+| `planning.task_estimated` (mêmes champs, PR 49) | Le Core, quand l'**utilisateur** confirme la durée d'une tâche créée par un module | Si `owner_module` vaut `academic` : l'évaluation ouverte `owner_ref` prend la durée de sa tâche |
 
-L'événement n'est qu'un signal : le handler relit la tâche par le port et n'agit que si elle existe, appartient au module et est terminée. Un événement rejoué, forgé, d'un autre module ou d'un autre utilisateur (RLS) ne change rien. Le handler agit même si le module est désactivé : désactiver ne supprime pas les données, elles doivent rester justes au retour.
+Un événement n'est qu'un signal : le handler relit la tâche par le port et n'agit que si elle existe, appartient au module et est terminée. Un événement rejoué, forgé, d'un autre module ou d'un autre utilisateur (RLS) ne change rien. Le handler agit même si le module est désactivé : désactiver ne supprime pas les données, elles doivent rester justes au retour.
 
 ## Sécurité
 

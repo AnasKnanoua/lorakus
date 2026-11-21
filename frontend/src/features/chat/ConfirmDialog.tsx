@@ -1,12 +1,13 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
 /**
  * Confirmation d'une action qu'on ne peut pas defaire (Radix Dialog : focus piege, Echap,
  * annonce). Destructive par defaut (bouton rouge) ; `tone="plain"` pour une action definitive
- * qui ne detruit rien, comme terminer un devoir.
+ * qui ne detruit rien, comme terminer un devoir. `children` : un champ facultatif sous le texte
+ * (le temps passe sur un devoir, PR 49).
  */
 export function ConfirmDialog({
   open,
@@ -17,6 +18,7 @@ export function ConfirmDialog({
   onConfirm,
   tone = "danger",
   failure = "La suppression a échoué. Réessaie.",
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   tone?: "danger" | "plain";
   /** Message affiche si `onConfirm` echoue. */
   failure?: string;
+  children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -41,6 +44,7 @@ export function ConfirmDialog({
         >
           <Dialog.Title className="text-lg font-semibold tracking-[-0.01em]">{title}</Dialog.Title>
           <Dialog.Description className="mt-2 text-ink-muted">{description}</Dialog.Description>
+          {children}
           {failed && (
             <p role="alert" className="mt-3 text-sm text-danger">
               {failure}

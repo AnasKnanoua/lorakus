@@ -34,7 +34,7 @@ from lorakus.core.identity.service import CurrentUser, audit
 from lorakus.core.memory.models import MemoryRejection
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
-from lorakus.core.planning.models import AgendaEntry, PlanningPreference, Task
+from lorakus.core.planning.models import AgendaEntry, PlanningDay, Task
 from lorakus.db.database import Database
 
 log = structlog.get_logger("lorakus.data")
@@ -180,6 +180,8 @@ class DataExportService:
                             Task.priority,
                             Task.due_on,
                             Task.estimate_minutes,
+                            Task.estimate_source,
+                            Task.actual_minutes,
                             Task.owner_module,
                             Task.owner_ref,
                             Task.source_kind,
@@ -210,15 +212,18 @@ class DataExportService:
                 .mappings()
                 .all()
             )
-            preferences = (
+            days = (
                 (
                     await session.execute(
                         select(
-                            PlanningPreference.key,
-                            PlanningPreference.value,
-                            PlanningPreference.source_ref,
-                            PlanningPreference.updated_at,
-                        ).order_by(PlanningPreference.key)
+                            PlanningDay.day,
+                            PlanningDay.off,
+                            PlanningDay.starts_at,
+                            PlanningDay.ends_at,
+                            PlanningDay.breaks,
+                            PlanningDay.source_ref,
+                            PlanningDay.updated_at,
+                        ).order_by(PlanningDay.day)
                     )
                 )
                 .mappings()
@@ -227,10 +232,8 @@ class DataExportService:
         return {
             "tasks": [{**row, "source_ref": _source(row["source_ref"])} for row in tasks],
             "agenda": [dict(row) for row in agenda],
-            # Preferences de planification confirmees (PR 48).
-            "preferences": [
-                {**row, "source_ref": _source(row["source_ref"])} for row in preferences
-            ],
+            # Cadres des jours donnes par l'utilisateur (PR 49).
+            "days": [{**row, "source_ref": _source(row["source_ref"])} for row in days],
         }
 
     async def _identity_data(self, user_id: uuid.UUID) -> dict[str, Any]:
