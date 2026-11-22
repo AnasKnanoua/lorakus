@@ -11,6 +11,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Production disparue](production-down.md) | Message healthchecks.io « DOWN », `LorakusHeartbeatFailing` |
 | [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
 | [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError`, `LorakusAssistantEmptyReplies` |
+| [Rappels et notifications : signaux, Web Push, Telegram](notifications.md) | `LorakusSignalsDispatchLate`, `LorakusSignalsDispatchErrors`, `LorakusInterventionDuplicate`, `LorakusNotificationsFailing`, `LorakusTelegramPollStopped` |
 | [Accès public : Caddy, limites, origine](web.md) | `LorakusWebDown`, `LorakusRateLimited`, `LorakusOriginRefused` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |

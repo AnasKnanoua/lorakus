@@ -13,7 +13,7 @@ import structlog
 
 from lorakus.core.jobs.port import JobContext, periodic
 from lorakus.core.modules.registry import ModuleRegistry
-from lorakus.core.telegram.inbox import PollState, poll_round
+from lorakus.core.telegram.inbox import CONFIGURED, PollState, poll_round
 from lorakus.core.telegram.setup import bot
 
 log = structlog.get_logger("lorakus.telegram")
@@ -29,6 +29,7 @@ def registry() -> ModuleRegistry:
 @periodic("telegram.poll", cron="* * * * *")
 async def poll(ctx: JobContext, payload: dict[str, Any]) -> None:
     current = bot()
+    CONFIGURED.set(0 if current is None else 1)  # l'alerte de releve arretee ne vaut qu'avec un bot
     if current is None:
         return
     counts = await poll_round(ctx.database, current, registry(), STATE, lambda: datetime.now(UTC))

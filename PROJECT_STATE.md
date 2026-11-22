@@ -4,7 +4,7 @@
 
 - **Version** : v0.4.0 (2026-11-21)
 - **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042). P4 close le 2026-11-21 (v0.4.0).
-- **Dernière mise à jour** : 2026-11-22 (PR 54)
+- **Dernière mise à jour** : 2026-11-22 (PR 55)
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -61,6 +61,19 @@
   - **Second canal** : case « rappels sans détail » ; message sans cause ; même budget et même règle « jamais deux fois » que le Web Push ; la notification de test part aussi sur Telegram.
   - **Interface** : section Telegram de la page Notifications (non configuré, code et relecture toutes les 5 s jusqu'à la liaison, case des rappels, « Délier »).
   - Vérifié localement : voir le message de livraison. Mutations : 30 côté serveur (1 survivante : un point de sauvegarde inutile, retiré ; 1 mal visée, corrigée puis détectée), 7 côté page (1 survivante, qui a révélé que la page continuait de relire après la liaison : corrigé et testé).
+- PR 54 fusionnée (#83) et déployée le 2026-11-22 ; bot lié, une idée envoyée est arrivée dans la boîte (scénario 5, confirmé par le propriétaire).
+- PR 55 — Exploitation (ADR 0042), **livrée le 2026-11-22, à déployer** (rien à saisir ; Prometheus et Grafana sont recréés par le déploiement) :
+  - **Alertes** (groupe `lorakus-notifications`, composant `worker`, chacune testée par promtool, cas sans alerte compris) : `LorakusSignalsDispatchLate` (aucun passage depuis 5 minutes ; pas d'alerte au redémarrage du worker), `LorakusSignalsDispatchErrors`, `LorakusInterventionDuplicate` (même après la remise à zéro du compteur), `LorakusNotificationsFailing` (2 échecs en 6 heures ; un appareil désabonné n'en est pas un), `LorakusTelegramPollStopped` (seulement si un jeton est configuré). Runbook `docs/runbooks/notifications.md`.
+  - **Métriques ajoutées** : `lorakus_telegram_configured`, `lorakus_signals_dispatch_errors_total` ; issues d'envoi initialisées à 0 (sinon le premier échec ne se voit pas).
+  - **Grafana** : tableau « Lorakus — Rappels et notifications » (doublons refusés et plantages sur la période affichée, âge du dernier passage et du dernier relevé Telegram, interventions par niveau et raison, envois par issue, signaux émis, messages du bot). Expressions vérifiées par promtool ; rendu non vu dans Grafana avant le déploiement. `make obs-check` valide désormais tous les tableaux.
+  - Mutations : 9 sur les règles (1 survivante : le test du démarrage ne modélisait pas un vrai redémarrage ; réécrit, détectée).
+- **Recette de clôture de la P5** (en production, après le déploiement de la PR 55) :
+  - Scénario 3 : un soir après la fin de la plage de travail donnée, « Briefing · Demain » est dans Ma journée ; le lendemain, rien n'a sonné hors de la plage.
+  - Scénario 4 : une tâche à rendre dans 3 jours sans étape terminée donne une carte « À noter » ; laissée sans réponse, une seule notification le lendemain dans la plage de travail (Web Push et Telegram si coché).
+  - Scénario 5 : fait (PR 54).
+  - Scénario 7 : « Pourquoi ? » d'une carte (règle, faits, décisions) et « Pourquoi cette réponse ? » d'une réponse du chat.
+  - Scénario 8 : API coupée → alerte déjà mesurée le 2026-11-10 (2 min 21 s), à refaire seulement si l'on veut ; fournisseur d'IA coupé (`LORAKUS_AI_KILL_SWITCH=true`, API recréée) → réponse par gabarit, cartes et notifications intactes, puis remettre à `false`.
+  - Zéro doublon : tableau « Rappels et notifications », « Last 14 days », « Doublons refusés » à 0 le 2026-12-06 au plus tôt (PR 52 déployée le 2026-11-22). Puis la P5 est close (pas de version : D11).
 - À faire le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part).
 
 ## Détail de la P4 (close le 2026-11-21, v0.4.0)

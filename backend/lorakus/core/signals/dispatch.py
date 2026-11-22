@@ -60,6 +60,15 @@ PUSHES = Counter(
     "Notifications envoyees, par issue (ok, gone : appareil desabonne, failed, error)",
     ["outcome"],
 )
+# Issues connues initialisees a 0 : sans cela, Prometheus ne verrait pas le premier echec
+# (une serie qui nait a 1 n'a pas d'augmentation).
+PUSH_OUTCOMES: Final = ("ok", "gone", "failed", "error", "telegram_ok", "telegram_failed")
+for _outcome in PUSH_OUTCOMES:
+    PUSHES.labels(outcome=_outcome)
+DISPATCH_ERRORS = Counter(
+    "lorakus_signals_dispatch_errors_total",
+    "Signaux dont le traitement a plante (repris a l'expiration du bail ; attendu : 0)",
+)
 LAST_RUN = Gauge(
     "lorakus_signals_dispatch_last_run_timestamp_seconds", "Dernier passage de signals.dispatch"
 )
@@ -154,6 +163,7 @@ async def dispatch_due(
             outcome = await process(database, pusher, signal_id, user_id, now, telegram)
         except Exception:
             log.exception("signal_dispatch_crashed", signal=str(signal_id))
+            DISPATCH_ERRORS.inc()
             outcome = "crashed"
         outcomes[outcome] = outcomes.get(outcome, 0) + 1
     LAST_RUN.set_to_current_time()

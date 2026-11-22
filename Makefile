@@ -109,7 +109,7 @@ obs-up: up ## Ajoute Prometheus (9090), Alertmanager (9093), Grafana (3000) et n
 > $(OBS) up -d --wait prometheus alertmanager grafana node-exporter
 
 obs-check: ## Valide Prometheus (config, regles et leurs tests), Alertmanager et Grafana
-> python3 -m json.tool infra/observability/grafana/dashboards/lorakus-api.json > /dev/null
+> for f in infra/observability/grafana/dashboards/*.json; do python3 -m json.tool "$$f" > /dev/null || exit 1; done
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
 > $(OBS) run --rm --no-deps --entrypoint promtool prometheus test rules /etc/prometheus/tests/lorakus_test.yml
 > ./infra/observability/check-runbooks.sh
