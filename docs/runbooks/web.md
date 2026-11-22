@@ -9,7 +9,7 @@ Préparer la session : [README](README.md#session).
 - `LorakusWebDown` : Prometheus ne joint plus Caddy (service `web`) depuis 2 minutes. L'interface `https://app.lorakus.app` et l'API ne répondent plus depuis Internet ; l'API peut encore répondre sur `127.0.0.1:8001`.
 - `LorakusRateLimited` : plus de 20 requêtes refusées en 15 minutes par les limites par utilisateur (erreur 429, `Retry-After`). Un appel IA refusé pour le rythme reçoit le message de secours « courte pause ».
 - `LorakusOriginRefused` : des écritures (POST, PUT, PATCH, DELETE) ont été refusées en 403 `origin_refused` parce qu'elles venaient d'un autre site.
-- Sans alerte : le navigateur signale un certificat invalide ou expiré.
+- Certificat invalide, expiré ou qui n'est plus renouvelé, DNS ou ports fermés vus d'Internet : message healthchecks.io « lorakus-public is DOWN » ([sonde externe](external-probe.md)), avec la raison.
 
 ## Vérifications
 

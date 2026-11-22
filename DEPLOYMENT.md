@@ -134,6 +134,21 @@ ssh -t lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh com
 
 Vérifications depuis le Dell : `curl -sI https://app.lorakus.app/ | head -3` (HTTP/2 200), puis sur le téléphone, installer l'application depuis Chrome (« Ajouter à l'écran d'accueil »). Les journaux de Caddy doivent montrer les vraies adresses des visiteurs (`dc logs --tail 20 web`), pas une adresse en `172.`.
 
+### 4.7 Sonde externe de l'adresse publique (PR 56, une fois)
+
+Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner GitHub toutes les 15 minutes (redirection HTTP, certificat, `/api/health/ready`, HSTS) et prévient un second check healthchecks.io ([runbook](docs/runbooks/external-probe.md)).
+
+1. Sur healthchecks.io, dans le même projet que `lorakus-prod` : « Add Check », nom `lorakus-public`, période 15 minutes, tolérance 1 heure ; même intégration Discord.
+2. Copier l'adresse de ping du check, puis depuis le Dell (l'adresse est demandée, jamais affichée) :
+
+   ```bash
+   gh secret set HEALTHCHECKS_PUBLIC_PING_URL && gh workflow run external-probe.yml
+   ```
+
+3. Vérifier : le run `External probe` est vert, son résumé commence par `OK app.lorakus.app`, et healthchecks.io affiche « up » avec ce compte rendu.
+
+GitHub ne lance les workflows programmés que depuis `main`, avec un retard possible aux heures chargées ; il les désactive après 60 jours sans activité sur le dépôt (la sonde se tait alors, et healthchecks.io prévient).
+
 ## 5. Migrations en production
 
 - Le conteneur `migrate` exécute `alembic upgrade heads` avant le démarrage de l'API.

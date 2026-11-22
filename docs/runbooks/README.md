@@ -8,7 +8,8 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Sauvegarde en échec ou manquante](backup-failed.md) | `LorakusBackupFailed`, `LorakusBackupMissing`, `LorakusBackupNeverRecorded` |
 | [Disque plein](disk-full.md) | `LorakusDiskSpaceLow`, `LorakusDiskSpaceCritical` |
 | [Mémoire basse, métriques du serveur absentes](host.md) | `LorakusHostMemoryLow`, `LorakusNodeExporterDown` |
-| [Production disparue](production-down.md) | Message healthchecks.io « DOWN », `LorakusHeartbeatFailing` |
+| [Production disparue](production-down.md) | Message healthchecks.io « lorakus-prod is DOWN », `LorakusHeartbeatFailing` |
+| [Accès public vu d'Internet : sonde externe](external-probe.md) | Message healthchecks.io « lorakus-public is DOWN » |
 | [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
 | [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError`, `LorakusAssistantEmptyReplies` |
 | [Rappels et notifications : signaux, Web Push, Telegram](notifications.md) | `LorakusSignalsDispatchLate`, `LorakusSignalsDispatchErrors`, `LorakusInterventionDuplicate`, `LorakusNotificationsFailing`, `LorakusTelegramPollStopped` |
