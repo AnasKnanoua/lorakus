@@ -3,9 +3,9 @@
 *Nom de code depuis le 2026-11-08 (anciennement JARVIS). Le nom affiché de l'assistant sera configurable.*
 
 - **Version** : v0.4.0 (2026-11-21)
-- **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042). P4 close le 2026-11-21 (v0.4.0).
-- **Dernière mise à jour** : 2026-11-22 (PR 55)
-- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
+- **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042), en recette jusqu'au 2026-12-06 au plus tôt ; P6 — Stabilisation et v0.5, commencée en parallèle le 2026-11-22 (découpage en PR 56 à 59 validé), sauf ce qui touche aux rappels. P4 close le 2026-11-21 (v0.4.0).
+- **Dernière mise à jour** : 2026-11-22 (PR 56)
+- **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037) ; sonde externe de l'adresse publique depuis GitHub (PR 56, amendement de l'ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
 ## Terminé
@@ -75,6 +75,14 @@
   - Scénario 8 : API coupée → alerte déjà mesurée le 2026-11-10 (2 min 21 s), à refaire seulement si l'on veut ; fournisseur d'IA coupé (`LORAKUS_AI_KILL_SWITCH=true`, API recréée) → réponse par gabarit, cartes et notifications intactes, puis remettre à `false`.
   - Zéro doublon : tableau « Rappels et notifications », « Last 14 days », « Doublons refusés » à 0 le 2026-12-06 au plus tôt (PR 52 déployée le 2026-11-22). Puis la P5 est close (pas de version : D11).
 - À faire le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part).
+
+## En cours (P6, en parallèle de la recette de la P5)
+
+- Découpage validé le 2026-11-22 (`ROADMAP.md`, P6) : PR 56 (sonde externe), 57 (ZAP baseline), 58 (relecture des runbooks et exercice d'incident), 59 (usage réel, recette, v0.5.0). **Gel des fonctionnalités** jusqu'à la v0.5.0. Décisions dans `DECISIONS.md` (ligne du 2026-11-22).
+- PR 56 — Sonde externe de l'adresse publique (amendement des ADR 0037 et 0038), **livrée le 2026-11-22**, sans déploiement (workflow et documentation seulement) ; à faire par le propriétaire : check healthchecks.io `lorakus-public` et secret `HEALTHCHECKS_PUBLIC_PING_URL` (`DEPLOYMENT.md` §4.7) :
+  - **Sonde** (`infra/probe/external_probe.py`, bibliothèque standard seulement) : redirection HTTP vers HTTPS, certificat (autorité, nom, au moins un sixième de sa durée de vie), `/api/health/ready` (200 et `{"status": "ok"}`), HSTS ; trois essais à 20 secondes ; compte rendu d'une ligne sans secret.
+  - **Workflow** `external-probe.yml` (toutes les 15 minutes et à la demande) : signal de réussite ou d'échec au second check healthchecks.io, avec le compte rendu ; un échec prévient Discord tout de suite, une sonde muette après 1 heure de tolérance. Runbook `docs/runbooks/external-probe.md`.
+  - Vérifié localement : 24 tests contre de vrais serveurs HTTP et HTTPS locaux et de vrais certificats OpenSSL (autorité inconnue, mauvais nom, magasin du système sans l'autorité de test, fin de vie proche, 429 et 503, page HTML à la place de l'API, HSTS absent, ports fermés, délai dépassé, redirections absentes, vers un autre site, en HTTP ou vers un nom ressemblant, nouvel essai après un échec passager), sous Python 3.13 et 3.12 (celui du runner) ; pyright strict ; `make probe-check` ajouté à `make check`. Mutations : 21, toutes détectées (1 survivante au premier passage : une erreur 4xx n'était pas testée). Version minimale TLS 1.2 écrite explicitement (sonde et serveur de test) : déjà le défaut de Python, mais CodeQL (`py/insecure-protocol`) refusait la première version de la PR (#85, fermée). Script du workflow exercé avec une fausse sonde et un faux healthchecks.io (réussite, échec, secret absent, healthchecks.io injoignable) ; actionlint et shellcheck. **Non vérifié** : un passage contre la vraie adresse (l'environnement de développement ne résout pas les noms externes) ; premier vrai passage par `gh workflow run external-probe.yml` après la fusion.
 
 ## Détail de la P4 (close le 2026-11-21, v0.4.0)
 
