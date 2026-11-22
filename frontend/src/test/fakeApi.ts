@@ -102,11 +102,14 @@ export interface FakeState {
   /** Notifications (P5) : clé publique (null : indisponible) et appareils abonnés. */
   pushKey: string | null;
   devices: FakeDevice[];
+  /** Préparations à lire (P5) : une lecture (consulted) les retire. */
+  preparations: FakePreparation[];
 }
 
 export type FakeReminder = Schemas["ReminderOut"];
 export type FakeReminderWhy = Schemas["ReminderWhyOut"];
 export type FakeDevice = Schemas["PushDeviceOut"];
+export type FakePreparation = Schemas["PreparationOut"];
 
 export type FakeIdea = Schemas["IdeaOut"];
 export type FakeProject = Schemas["ProjectOut"];
@@ -232,6 +235,7 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     reminderWhy: new Map(),
     pushKey: null,
     devices: [],
+    preparations: [],
     ...overrides,
   };
   let counter = 0;
@@ -545,6 +549,17 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     }
     if (path.startsWith("/api/v1/academic/")) {
       return academic(request.method, path, url.searchParams, body);
+    }
+    if (path === "/api/v1/preparations" && request.method === "GET") {
+      return json(200, state.preparations);
+    }
+    const consulted = /^\/api\/v1\/preparations\/([^/]+)\/consulted$/.exec(path);
+    if (consulted && request.method === "POST") {
+      const before = state.preparations.length;
+      state.preparations = state.preparations.filter((p) => p.id !== consulted[1]);
+      return state.preparations.length < before
+        ? new Response(null, { status: 204 })
+        : json(404, { detail: "Préparation inconnue." });
     }
     if (path === "/api/v1/notifications/cards" && request.method === "GET") {
       return json(200, state.reminders);

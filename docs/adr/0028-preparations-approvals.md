@@ -19,3 +19,9 @@ Exécution directe des actions par les spécialistes ; préparations sans budget
 ## Conséquences
 
 Préparations livrées en phase 5 (briefing du lendemain). File d'approbation livrée avec la **première action à conséquence externe**, pas avant ; d'ici là, les cartes de confirmation du Tool Runtime suffisent.
+
+## Amendement du 2026-11-22 (P5, PR 53) : premières préparations
+
+- Table `core_preparations` dans le Core (pas de service `agents` à part) : une préparation par module, type et jour (contrainte d'unicité : jamais deux briefings pour un jour), sections de texte écrites par le code du module, statut `ready` puis `consulted` (alors figée), expiration. Refaite tant qu'elle n'est pas lue ; Ma journée ne montre que la plus récente de chaque type, trois au plus.
+- Première préparation : le briefing du Sergent (`focus.briefing`, toutes les 15 minutes, un seul job pour tous) : le lendemain dès que la plage de travail du jour est finie, sinon le jour en cours dès minuit. Par des règles : coût nul.
+- Le budget par préparation et la suspension après trois préparations ignorées attendent la première préparation qui coûte (un appel à un modèle) ou qui interrompt : le briefing ne fait ni l'un ni l'autre.
