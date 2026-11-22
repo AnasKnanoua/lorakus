@@ -59,7 +59,13 @@ def _touches(entry: AgendaView, day: date, start: datetime, end: datetime) -> bo
 async def read_today(session: AsyncSession, now: datetime) -> TodayView:
     """La journee de l'utilisateur de la session, vue a l'instant `now` (aware)."""
     tz = await user_timezone(session)
-    day = await current_day(session, now, tz)
+    return await read_day(session, now, await current_day(session, now, tz))
+
+
+async def read_day(session: AsyncSession, now: datetime, day: date) -> TodayView:
+    """La vue d'un jour donne (le lendemain pour le briefing, P5), vue a l'instant `now` :
+    meme calcul que « Ma journee », avec le cadre et l'agenda de ce jour-la."""
+    tz = await user_timezone(session)
     frame = await get_frame(session, day)
     start, end = day_bounds(day, tz)
     if frame is not None and frame.end is not None:

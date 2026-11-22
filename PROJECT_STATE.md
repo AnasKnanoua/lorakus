@@ -4,7 +4,7 @@
 
 - **Version** : v0.4.0 (2026-11-21)
 - **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042). P4 close le 2026-11-21 (v0.4.0).
-- **Dernière mise à jour** : 2026-11-22
+- **Dernière mise à jour** : 2026-11-22 (PR 53)
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -47,6 +47,12 @@
   - **Interface** : cartes « À noter » en tête de Ma journée (OK, Plus tard, Pourquoi ?), page « Notifications » (icône cloche du pied de la barre latérale, chargée à la demande), service worker (`push`, `notificationclick` vers une page de l'application seulement). Seuil d'avertissement du paquet porté à 750 Ko (701 mesurés).
   - Vérifié localement (PostgreSQL 18.7, pgvector 0.8.7) : voir le message de livraison. Mutations : 46 côté serveur (6 survivantes au premier passage, toutes détectées après de nouveaux tests), 1 dans `compose.yml`, 9 côté page (1 survivante, puis détectée). Rendu vérifié dans Chrome sans interface (téléphone et ordinateur, clair et sombre).
   - Non fait, et pourquoi : briefing (PR 53), Telegram (PR 54), alertes (PR 55) ; « commencé » ne se voit que par une étape terminée (« OK » ferme la carte) ; boutons d'action dans la notification écartés (on répond dans la page).
+- PR 52 fusionnée (#81) et déployée le 2026-11-22 ; le propriétaire confirme que tout fonctionne après le déploiement.
+- PR 53 — Préparations et briefing du lendemain (ADR 0028 amendée, amendement de l'ADR 0042), **livrée le 2026-11-22, à déployer** (migration `0018_core_preparations`, rien à saisir) :
+  - **Préparations** (`lorakus/core/preparations/`) : table `core_preparations` (une par module, type et jour, unique ; refaite tant qu'elle n'est pas lue, puis figée ; expiration), routes `GET /api/v1/preparations` (la plus récente de chaque type, trois au plus) et `POST /api/v1/preparations/{id}/consulted` ; dans « Mes données ». Fonction `core_users_with_module` (SECURITY DEFINER, identifiants seulement).
+  - **Briefing du Sergent** (`focus.briefing`, toutes les 15 minutes) : le lendemain dès que la plage de travail du jour est finie, sinon le jour en cours dès minuit ; agenda, ta journée (plage, plan, tâches sans durée), échéances des 3 jours, retards, écrit du point de vue du jour décrit. Par des règles (contrat import-linter : aucun modèle de langage). Ne sonne pas.
+  - **Interface** : carte « Briefing · Demain / Aujourd'hui » sous « À noter » dans Ma journée, « Lu », heure de préparation dans le fuseau du compte. La vue d'un jour donné (`read_day`) est extraite de celle de Ma journée, sans changement pour la page.
+  - Vérifié localement : voir le message de livraison. Mutations : 19 côté serveur (4 survivantes au premier passage, aux bornes, toutes détectées après un test des limites, qui a aussi trouvé « 1 autres créneaux » au lieu du singulier), 5 côté page (1 survivante, puis détectée).
 - À faire le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part).
 
 ## Détail de la P4 (close le 2026-11-21, v0.4.0)

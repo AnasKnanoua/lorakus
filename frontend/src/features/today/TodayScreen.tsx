@@ -20,6 +20,7 @@ import { clockTime, duration, longDate, relativeDay } from "@/lib/format";
 import { todayQuery } from "@/lib/queries";
 import { NAV_ITEMS } from "@/navigation";
 
+import { Briefing } from "./Briefing";
 import { Reminders } from "./Reminders";
 
 /** Premier message envoyé par « Organiser ma journée avec Lorakus ». */
@@ -86,6 +87,7 @@ function Day({ data }: { data: Today }) {
   return (
     <div className="flex flex-col gap-7">
       <Reminders timeZone={data.timezone} />
+      <Briefing today={data.day} timeZone={data.timezone} />
       <FrameBar data={data} />
       <Section title="Déroulé">
         {allDay.length > 0 && (

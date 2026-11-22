@@ -40,3 +40,7 @@ Premier producteur : le Sergent (`focus.deadline_watch`, toutes les 10 minutes) 
 - Le budget et les heures calmes sont uniques pour toutes les sources : un nouveau module qui émet des signaux n'ajoute pas de bruit sans passer par eux.
 - Limite connue : « commencé » ne se voit que par une étape terminée. Une tâche commencée sans découpage garde sa carte ; un geste (« OK ») la ferme pour de bon.
 - Amende les ADR 0014 (version minimale sans Context Engine), 0019 (mise en œuvre), 0020 et 0035 (Web Push en principal, secrets au worker) et 0029 (définition des niveaux 1 et 2).
+
+## Amendement du 2026-11-22 (PR 53) : le briefing ne sonne pas
+
+Le briefing du lendemain est une préparation (ADR 0028) montrée en tête de Ma journée, pas un signal : aucune notification. Une notification chaque matin userait un tiers du budget quotidien pour une information que la page donne à la première ouverture (scénario 3 : « présenté au début de la journée déclarée ou à la première ouverture »). Une notification du briefing, réglable, est notée dans les idées de `ROADMAP.md`.

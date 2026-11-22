@@ -999,6 +999,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/preparations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preparations */
+        get: operations["preparations_api_v1_preparations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/preparations/{preparation_id}/consulted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Consulted */
+        post: operations["consulted_api_v1_preparations__preparation_id__consulted_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/ideas": {
         parameters: {
             query?: never;
@@ -1849,6 +1883,39 @@ export interface components {
              */
             starts_at: string;
             task: components["schemas"]["TaskOut"];
+        };
+        /** PreparationOut */
+        PreparationOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Module */
+            module: string;
+            /**
+             * Prepared At
+             * Format: date-time
+             */
+            prepared_at: string;
+            /** Sections */
+            sections: components["schemas"]["PreparationSectionOut"][];
+            /** Title */
+            title: string;
+        };
+        /** PreparationSectionOut */
+        PreparationSectionOut: {
+            /** Heading */
+            heading: string;
+            /** Lines */
+            lines: string[];
         };
         /** ProjectIn */
         ProjectIn: {
@@ -4079,6 +4146,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+        };
+    };
+    preparations_api_v1_preparations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreparationOut"][];
+                };
+            };
+        };
+    };
+    consulted_api_v1_preparations__preparation_id__consulted_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preparation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

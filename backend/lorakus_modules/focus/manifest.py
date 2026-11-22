@@ -1,13 +1,14 @@
 """Manifeste du module Focus : le Sergent (MODULE_SYSTEM.md §2, PR 50)."""
 
 from lorakus.core.modules.manifest import ModuleManifest, Signal
+
+# Importer les jobs les enregistre (@periodic) dans l'API et dans le worker.
+from lorakus_modules.focus.briefing import briefing
 from lorakus_modules.focus.specialist import PROFILE
 from lorakus_modules.focus.tools import TOOLS
-
-# Importer le job l'enregistre (@periodic) dans l'API et dans le worker.
 from lorakus_modules.focus.watch import SIGNAL, deadline_watch
 
-__all__ = ["deadline_watch", "manifest"]
+__all__ = ["briefing", "deadline_watch", "manifest"]
 
 
 async def check_health() -> bool:

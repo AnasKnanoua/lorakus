@@ -35,6 +35,7 @@ from lorakus.core.memory.models import MemoryRejection
 from lorakus.core.memory.service import MemoryService
 from lorakus.core.modules.service import ModuleService
 from lorakus.core.planning.models import AgendaEntry, PlanningDay, Task
+from lorakus.core.preparations.models import PreparationRow
 from lorakus.core.signals.models import InterventionRow, PushSubscriptionRow, SignalRow
 from lorakus.core.signals.webpush import push_host
 from lorakus.db.database import Database
@@ -240,7 +241,8 @@ class DataExportService:
         }
 
     async def _notifications_data(self, user_id: uuid.UUID) -> dict[str, Any]:
-        """Signaux, decisions et appareils (P5, ADR 0042). Jamais l'adresse d'abonnement ni
+        """Preparations (briefings), signaux, decisions et appareils (P5, ADR 0028 et 0042).
+        Jamais l'adresse d'abonnement ni
         les cles d'un appareil : seulement son nom et le domaine de son service."""
         async with self._db.transaction(user_id) as session:
             signals = (
@@ -299,7 +301,27 @@ class DataExportService:
                 .mappings()
                 .all()
             )
+            preparations = (
+                (
+                    await session.execute(
+                        select(
+                            PreparationRow.module,
+                            PreparationRow.kind,
+                            PreparationRow.day,
+                            PreparationRow.title,
+                            PreparationRow.sections,
+                            PreparationRow.status,
+                            PreparationRow.prepared_at,
+                            PreparationRow.expires_at,
+                            PreparationRow.consulted_at,
+                        ).order_by(PreparationRow.day, PreparationRow.kind)
+                    )
+                )
+                .mappings()
+                .all()
+            )
         return {
+            "preparations": [dict(row) for row in preparations],
             "signals": [dict(row) for row in signals],
             "interventions": [dict(row) for row in interventions],
             "devices": [

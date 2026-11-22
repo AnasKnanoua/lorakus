@@ -33,7 +33,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0025](docs/adr/0025-multi-agent-architecture.md) | Architecture multi-agents hiérarchique | Validé (D-H), amendé 2026-11-14 (routage en deux paliers) | Fin de la phase 3 |
 | [0026](docs/adr/0026-specialist-contract.md) | Contrat des spécialistes, registre et orchestrateur | Validé (D-H), amendé 2026-11-14 (orchestrateur, cache par durée de vie, trace) | Fin de la phase 3 |
 | [0027](docs/adr/0027-report-confidentiality.md) | Confidentialité des rapports transmis au LLM | Validé (D-I) | Après la phase 14 |
-| [0028](docs/adr/0028-preparations-approvals.md) | Préparations en arrière-plan et file d'approbation | Accepté | Phase 6 |
+| [0028](docs/adr/0028-preparations-approvals.md) | Préparations en arrière-plan et file d'approbation | Accepté (mis en œuvre 2026-11-22 : `core_preparations`, briefing du lendemain) | Phase 6 |
 | [0029](docs/adr/0029-progressive-friction.md) | Friction progressive et pactes volontaires (amende 0016) | Validé (D-J) | Phase 12 |
 | [0030](docs/adr/0030-situation-engine.md) | Moteur de situations | Accepté | Phase 12 |
 | [0031](docs/adr/0031-sentinel-push-probes.md) | Veilleur par sondes qui poussent leurs données | Accepté | Phase 17 |

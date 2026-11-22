@@ -1559,6 +1559,76 @@
         "title": "PlanBlockOut",
         "type": "object"
       },
+      "PreparationOut": {
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "prepared_at": {
+            "format": "date-time",
+            "title": "Prepared At",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PreparationSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "module",
+          "kind",
+          "day",
+          "title",
+          "sections",
+          "prepared_at"
+        ],
+        "title": "PreparationOut",
+        "type": "object"
+      },
+      "PreparationSectionOut": {
+        "properties": {
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heading",
+          "lines"
+        ],
+        "title": "PreparationSectionOut",
+        "type": "object"
+      },
       "ProjectIn": {
         "additionalProperties": false,
         "properties": {
@@ -5261,6 +5331,67 @@
         "summary": "Today",
         "tags": [
           "planning"
+        ]
+      }
+    },
+    "/api/v1/preparations": {
+      "get": {
+        "operationId": "preparations_api_v1_preparations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PreparationOut"
+                  },
+                  "title": "Response Preparations Api V1 Preparations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preparations",
+        "tags": [
+          "preparations"
+        ]
+      }
+    },
+    "/api/v1/preparations/{preparation_id}/consulted": {
+      "post": {
+        "operationId": "consulted_api_v1_preparations__preparation_id__consulted_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preparation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Preparation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Consulted",
+        "tags": [
+          "preparations"
         ]
       }
     },

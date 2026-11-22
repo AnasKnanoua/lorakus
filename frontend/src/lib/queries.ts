@@ -5,6 +5,7 @@ import { listIdeas, listProjects } from "@/api/projects";
 import { getAccountSettings } from "@/api/account";
 import { getToday } from "@/api/planning";
 import { getPushInfo, listReminders } from "@/api/notifications";
+import { listPreparations } from "@/api/preparations";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
@@ -110,4 +111,11 @@ export const remindersQuery = queryOptions({
 export const pushQuery = queryOptions({
   queryKey: ["notifications", "push"],
   queryFn: getPushInfo,
+});
+
+/** Préparations à lire (P5) : le briefing du lendemain. Relues chaque minute. */
+export const preparationsQuery = queryOptions({
+  queryKey: ["preparations"],
+  queryFn: listPreparations,
+  refetchInterval: 60_000,
 });

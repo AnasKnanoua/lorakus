@@ -11,7 +11,7 @@ Il n'a aucune table : il lit le planning du Core (tâches, agenda, journée donn
 - **Une seule question, et seulement si elle change le résultat** : sans journée dite et avec du travail ouvert, « Quand comptes-tu travailler aujourd'hui ? » ; avec une journée encore ouverte, la durée de la tâche la plus urgente qui n'en a pas. Le Majordome la pose telle quelle. Pas de réponse par défaut : le planificateur ne suppose ni heure ni durée (PR 49), le Sergent non plus. La roadmap prévoyait une réponse par défaut tirée de l'historique ; elle est écartée tant que l'historique ne dit rien de fiable (les horaires du propriétaire changent tous les jours).
 - **Découper une tâche** (`focus.split_task`) : 2 à 8 étapes ordonnées, avec une durée par étape si elle est connue. Les étapes sont des sous-tâches du Core (`step_number` garde l'ordre) ; le planificateur les place à la place de la tâche, dans leur ordre, avec l'échéance et la priorité de la tâche.
 
-Non couvert pour l'instant : présenter la journée le matin (briefing, PR 53) ; le palier 3 du routage (petit appel au modèle quand c'est ambigu) ; le cache des rapports (inutile : un rapport se calcule en quelques millisecondes).
+Non couvert pour l'instant : le palier 3 du routage (petit appel au modèle quand c'est ambigu) ; le cache des rapports (inutile : un rapport se calcule en quelques millisecondes).
 
 ## Prendre les devants (P5, ADR 0042)
 
@@ -20,6 +20,12 @@ Non couvert pour l'instant : présenter la journée le matin (briefing, PR 53) ;
 - **Textes**, écrits par le code : « À rendre dans 3 jours » ; « CSEC507 : rapport · jeudi 26 novembre 2026. Pas encore commencé. » ; pour la notification : « Toujours pas commencé : « … » est à rendre dans 3 jours (jeudi 26 novembre 2026). Il te faut environ 3 h. Ouvre Ma journée pour lui trouver un créneau. » Faits pour « Pourquoi ? » : tâche, échéance (source : Cours, Projets ou Tâches), avancement, durée estimée (« estimé » si c'est Lorakus qui l'a proposée).
 - **Ce que le Sergent ne fait pas** : il ne notifie jamais lui-même. La politique du Core montre une carte, puis une notification seulement si la carte n'a pas été vue en 24 h, pendant la plage de travail du jour (scénario 4).
 - **Limite assumée** : sans découpage, Lorakus ne voit pas qu'une tâche est commencée. « OK » sur la carte suffit : rien d'autre ne suivra.
+
+## Briefing du lendemain (P5, PR 53, scénario 3)
+
+- **Quand** (`briefing.py`, job `focus.briefing` toutes les 15 minutes, un seul pour tous les utilisateurs du Sergent, fonction `core_users_with_module`) : dès que la plage de travail du jour est finie, celui du lendemain ; sinon (aucune plage donnée, jour sans travail), celui du jour en cours, dès minuit. Aucune heure supposée. Une nuit de travail compte pour le jour où elle a commencé ; son briefing vaut jusqu'à la fin de la nuit.
+- **Quoi**, par des règles, du point de vue du jour décrit : « Agenda » (journées entières puis créneaux, avec le lieu), « Ta journée » (plage et pauses, plan proposé, 4 créneaux au plus puis le compte, tâches sans durée ; sans plage : la demander), « Échéances » (du jour à J+3), « En retard » (dues avant ce jour-là, seulement s'il y en a). Six lignes au plus par liste, la suite comptée.
+- **Vie** : une préparation du Core (ADR 0028), refaite à chaque passage tant qu'elle n'est pas lue (elle suit l'agenda et les tâches), figée une fois lue, expirée à la fin de son jour. Un seul briefing par jour. Elle ne sonne pas.
 
 ## Approche (programmation classique, ML ou LLM)
 
@@ -30,6 +36,7 @@ Non couvert pour l'instant : présenter la journée le matin (briefing, PR 53) ;
 | Reconnaître une question pour le Sergent | Mots-clés (palier 1), puis similarité avec des exemples par le modèle d'embeddings local (palier 2) | Aucun appel au modèle ; rien ne sort du serveur ; mesuré sur un jeu distinct |
 | Proposer un découpage | LLM, dans l'appel déjà fait pour la réponse | Langage naturel ; le code vérifie tout et la carte attend le clic |
 | Formuler la réponse | LLM | Le rapport est une donnée ; le modèle l'explique et cite ses sources |
+| Briefing du lendemain | Règles sur la vue du jour du Core (même plan que Ma journée) | Gratuit, immédiat, chaque ligne vient de l'agenda ou d'une tâche ; un modèle ne ferait que reformuler |
 | Rappeler une échéance proche | Règle (3 jours, aucune étape terminée), puis politique d'intervention du Core | Un seul rappel, explicable, sans appel au modèle : il part même si le fournisseur d'IA est coupé |
 | Durée d'un devoir sans estimation | Rien : on la demande | Pas assez de temps réels enregistrés (PR 49) pour estimer ; ML en P16 |
 
