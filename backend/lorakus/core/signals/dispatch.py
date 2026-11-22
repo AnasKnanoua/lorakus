@@ -39,6 +39,7 @@ from lorakus.core.signals.models import InterventionRow, PushSubscriptionRow, Si
 from lorakus.core.signals.policy import TEST_SIGNAL, Decision, SignalState, Surroundings, decide
 from lorakus.core.signals.service import open_tasks_among, task_ref
 from lorakus.core.signals.webpush import VapidKeys, check_endpoint, encrypt
+from lorakus.core.telegram.service import notify_chat
 from lorakus.db.database import Database
 
 log = structlog.get_logger("lorakus.signals")
@@ -101,6 +102,32 @@ class WebPusher:
         return result.status
 
 
+class TelegramSender(Protocol):
+    async def send(self, chat_id: int, message: str) -> None: ...
+
+
+@dataclass(frozen=True)
+class TelegramChannel:
+    """Second canal (PR 54) : les serveurs de Telegram lisent les messages d'un bot, donc
+    jamais aucun detail, seulement « un rappel t'attend » et le lien vers l'application."""
+
+    sender: TelegramSender
+    app_url: str  # « https://app.lorakus.app »
+
+    def message(self, test: bool) -> str:
+        if test:
+            return "Lorakus : notification de test. Les rappels arriveront aussi ici, sans détail."
+        return f"Lorakus : un rappel t'attend. Ouvre Ma journée : {self.app_url}/today"
+
+    async def notify(self, chat_id: int, test: bool) -> str:
+        try:
+            await self.sender.send(chat_id, self.message(test))
+        except Exception as error:  # OutboundError, TelegramError : jamais le jeton
+            log.warning("telegram_notify_failed", reason=getattr(error, "reason", "error"))
+            return "failed"
+        return "ok"
+
+
 async def claim_due(
     database: Database, now: datetime, limit: int = CLAIM_BATCH
 ) -> list[tuple[uuid.UUID, uuid.UUID]]:
@@ -113,14 +140,18 @@ async def claim_due(
 
 
 async def dispatch_due(
-    database: Database, pusher: Pusher | None, now: datetime, limit: int = CLAIM_BATCH
+    database: Database,
+    pusher: Pusher | None,
+    now: datetime,
+    limit: int = CLAIM_BATCH,
+    telegram: TelegramChannel | None = None,
 ) -> dict[str, int]:
     """Tout ce qui est du maintenant ; rend les issues comptees. Un signal en echec
     n'empeche jamais les suivants (son bail expire seul, il sera repris)."""
     outcomes: dict[str, int] = {}
     for signal_id, user_id in await claim_due(database, now, limit):
         try:
-            outcome = await process(database, pusher, signal_id, user_id, now)
+            outcome = await process(database, pusher, signal_id, user_id, now, telegram)
         except Exception:
             log.exception("signal_dispatch_crashed", signal=str(signal_id))
             outcome = "crashed"
@@ -149,7 +180,7 @@ async def _state(session: AsyncSession, row: SignalRow) -> SignalState:
     )
 
 
-async def _surroundings(session: AsyncSession, now: datetime) -> Surroundings:
+async def _surroundings(session: AsyncSession, now: datetime, devices: int) -> Surroundings:
     tz = await user_timezone(session)
     day = await current_day(session, now, tz)
     start, next_day = day_bounds(local_today(now, tz), tz)
@@ -164,12 +195,11 @@ async def _surroundings(session: AsyncSession, now: datetime) -> Surroundings:
             SignalRow.name != TEST_SIGNAL,
         )
     )
-    devices = await session.scalar(select(func.count()).select_from(PushSubscriptionRow))
     return Surroundings(
         frame=await get_frame(session, day),
         next_day_start=next_day,
         pushes_today=pushes or 0,
-        devices=devices or 0,
+        devices=devices,
     )
 
 
@@ -254,6 +284,7 @@ async def process(
     signal_id: uuid.UUID,
     user_id: uuid.UUID,
     now: datetime,
+    telegram: TelegramChannel | None = None,
 ) -> str:
     """Examine un signal ; rend l'issue (pour les metriques)."""
     async with database.transaction(user_id) as session:
@@ -267,9 +298,15 @@ async def process(
             row.status, row.outcome = "withdrawn", gone
             row.next_check_at = row.locked_until = None
             return gone
-        around = await _surroundings(session, now)
-        if pusher is None:  # notifications non configurees ici (developpement)
-            around = Surroundings(around.frame, around.next_day_start, around.pushes_today, 0)
+        # Appareils joignables : Web Push (si les cles VAPID sont la) et Telegram (si
+        # l'utilisateur a choisi d'y recevoir aussi les rappels, et si le bot est configure).
+        pushed = 0
+        if pusher is not None:
+            pushed = (
+                await session.scalar(select(func.count()).select_from(PushSubscriptionRow)) or 0
+            )
+        chat = await notify_chat(session) if telegram is not None else None
+        around = await _surroundings(session, now, pushed + (1 if chat is not None else 0))
         decision = decide(await _state(session, row), around, now)
         if decision.action == "app":
             await _intervene(session, row, 1, decision, _record(decision, around), now)
@@ -279,7 +316,8 @@ async def process(
             _settle(row, decision)
             return decision.reason
         intervention = await _intervene(session, row, 2, decision, _record(decision, around), now)
-        devices = list(await session.scalars(select(PushSubscriptionRow)))
+        devices = list(await session.scalars(select(PushSubscriptionRow))) if pusher else []
+        test = row.name == TEST_SIGNAL
         payload = {
             "title": row.title,
             "body": row.firm_body or row.body,
@@ -290,12 +328,15 @@ async def process(
         row.locked_until = None
         # Notification de test : fini apres l'envoi. Sinon, plus rien a decider (une par cause).
         row.status, row.outcome, row.next_check_at = "done", decision.reason, None
-    if intervention is None or pusher is None:
+    if intervention is None:
         return "duplicate"
     # Decision enregistree et validee : l'envoi se fait hors de la transaction.
-    results = await _send_all(pusher, devices, payload, ttl)
+    results = await _send_all(pusher, devices, payload, ttl) if pusher is not None else {}
+    extra: list[str] = []
+    if telegram is not None and chat is not None:
+        extra.append(await telegram.notify(chat, test))
     async with database.transaction(user_id) as session:
-        await _account(session, intervention, results, now)
+        await _account(session, intervention, results, now, extra)
     return decision.reason
 
 
@@ -324,9 +365,14 @@ async def _send_all(
 
 
 async def _account(
-    session: AsyncSession, intervention: uuid.UUID, results: dict[uuid.UUID, str], now: datetime
+    session: AsyncSession,
+    intervention: uuid.UUID,
+    results: dict[uuid.UUID, str],
+    now: datetime,
+    extra: Sequence[str] = (),
 ) -> None:
-    """Bilan de l'envoi : intervention, appareils (un appareil desabonne est oublie)."""
+    """Bilan de l'envoi : intervention, appareils (un appareil desabonne est oublie), et
+    Telegram (`extra`)."""
     for device_id, outcome in results.items():
         PUSHES.labels(outcome=outcome).inc()
         device = await session.get(PushSubscriptionRow, device_id)
@@ -338,7 +384,10 @@ async def _account(
             device.last_success_at, device.failures = now, 0
         else:
             device.last_failure_at, device.failures = now, device.failures + 1
+    for outcome in extra:
+        PUSHES.labels(outcome=f"telegram_{outcome}").inc()
+    outcomes = [*results.values(), *extra]
     row = await session.get(InterventionRow, intervention)
     if row is not None:
-        row.delivered = sum(1 for o in results.values() if o == "ok")
-        row.failed = sum(1 for o in results.values() if o != "ok")
+        row.delivered = sum(1 for o in outcomes if o == "ok")
+        row.failed = sum(1 for o in outcomes if o != "ok")

@@ -25,6 +25,8 @@ from lorakus.core.jobs.port import registry as job_registry
 from lorakus.core.jobs.procrastinate_queue import ProcrastinateQueue
 from lorakus.core.modules.registry import ModuleRegistry
 from lorakus.core.signals import jobs as signal_jobs
+from lorakus.core.telegram import jobs as telegram_jobs
+from lorakus.core.telegram import setup as telegram_setup
 from lorakus.db.database import Database
 from lorakus.observability.logging import configure_logging
 from lorakus.observability.metrics import start_metrics_server
@@ -68,6 +70,10 @@ async def run() -> None:
     # Cles VAPID (ADR 0042) : une paire incoherente empeche de demarrer, plutot que d'echouer
     # a chaque notification. Absentes : cartes seulement, sans notification.
     signal_jobs.pusher()
+    # Bot Telegram (PR 54) : un jeton mal forme empeche de demarrer ; absent, aucun releve.
+    # Importer telegram_jobs enregistre le job telegram.poll.
+    telegram_setup.bot()
+    log.info("telegram_poll_registered", job=telegram_jobs.poll.__name__)
     # Importer les manifestes enregistre les handlers (@on) et les jobs (@job) des modules.
     modules = ModuleRegistry.from_entry_points()
     database = Database.connect(settings)

@@ -2584,6 +2584,87 @@
         "title": "TaskOut",
         "type": "object"
       },
+      "TelegramCodeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "title": "TelegramCodeOut",
+        "type": "object"
+      },
+      "TelegramIn": {
+        "properties": {
+          "notify": {
+            "title": "Notify",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "notify"
+        ],
+        "title": "TelegramIn",
+        "type": "object"
+      },
+      "TelegramOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "linked": {
+            "title": "Linked",
+            "type": "boolean"
+          },
+          "linked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked At"
+          },
+          "notify": {
+            "title": "Notify",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available",
+          "linked",
+          "notify",
+          "linked_at",
+          "last_message_at"
+        ],
+        "title": "TelegramOut",
+        "type": "object"
+      },
       "TimezoneIn": {
         "additionalProperties": false,
         "properties": {
@@ -5879,6 +5960,99 @@
         "summary": "Finish Task",
         "tags": [
           "Projets"
+        ]
+      }
+    },
+    "/api/v1/telegram": {
+      "delete": {
+        "operationId": "forget_api_v1_telegram_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Forget",
+        "tags": [
+          "telegram"
+        ]
+      },
+      "get": {
+        "operationId": "telegram_api_v1_telegram_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Telegram",
+        "tags": [
+          "telegram"
+        ]
+      },
+      "put": {
+        "operationId": "choose_api_v1_telegram_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Choose",
+        "tags": [
+          "telegram"
+        ]
+      }
+    },
+    "/api/v1/telegram/code": {
+      "post": {
+        "operationId": "code_api_v1_telegram_code_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Code",
+        "tags": [
+          "telegram"
         ]
       }
     },

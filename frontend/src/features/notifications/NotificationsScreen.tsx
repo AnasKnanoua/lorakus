@@ -14,7 +14,9 @@ import {
   subscribeThisDevice,
   type PushSupport,
 } from "@/lib/push";
-import { pushQuery } from "@/lib/queries";
+import { accountSettingsQuery, pushQuery } from "@/lib/queries";
+
+import { TelegramSection } from "./TelegramSection";
 
 function shortDate(iso: string): string {
   return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" }).format(new Date(iso));
@@ -32,6 +34,7 @@ interface Notice {
  */
 export function NotificationsScreen() {
   const push = useQuery(pushQuery);
+  const account = useQuery(accountSettingsQuery);
   const queryClient = useQueryClient();
   const [support] = useState<PushSupport>(() => pushSupport());
   const [thisEndpoint, setThisEndpoint] = useState<string | null>(null);
@@ -212,6 +215,7 @@ export function NotificationsScreen() {
               </section>
             </>
           )}
+          {account.data && <TelegramSection timeZone={account.data.timezone} />}
           {notice && (
             <p role={notice.kind} className={notice.kind === "alert" ? "text-sm text-danger" : "text-sm text-ink-muted"}>
               {notice.text}

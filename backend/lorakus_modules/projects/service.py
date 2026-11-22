@@ -204,6 +204,13 @@ def _source(source_ref: str | None) -> dict[str, str | None]:
     return {"source_kind": "conversation" if source_ref else "user", "source_ref": source_ref}
 
 
+def _idea_source(source_ref: str | None, channel: str | None) -> dict[str, str | None]:
+    """Provenance d'une idee : la conversation, un canal externe (Telegram), ou la page."""
+    if channel is not None:
+        return {"source_kind": channel, "source_ref": None}
+    return _source(source_ref)
+
+
 def _idea(row: Idea) -> IdeaView:
     return IdeaView(row.id, row.text, row.status, row.created_at, row.archived_at)
 
@@ -233,6 +240,7 @@ async def add_idea(
     text: str,
     *,
     source_ref: str | None = None,
+    channel: Literal["telegram"] | None = None,
     ip: str | None = None,
 ) -> IdeaView:
     clean = clean_idea(text)
@@ -245,11 +253,14 @@ async def add_idea(
         raise ProjectsError(
             f"{MAX_IDEAS} idées au plus dans la boîte : archives-en avant d'en noter d'autres."
         )
-    row = Idea(id=uuid.uuid4(), user_id=user_id, text=clean, **_source(source_ref))
+    row = Idea(id=uuid.uuid4(), user_id=user_id, text=clean, **_idea_source(source_ref, channel))
     session.add(row)
     await session.flush()
     await session.refresh(row)
-    await audit(session, user_id, "projects.idea_add", "success", ip, {"idea_id": str(row.id)})
+    detail: dict[str, object] = {"idea_id": str(row.id)}
+    if channel is not None:
+        detail["channel"] = channel
+    await audit(session, user_id, "projects.idea_add", "success", ip, detail)
     return _idea(row)
 
 

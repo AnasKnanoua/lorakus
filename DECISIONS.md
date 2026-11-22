@@ -47,7 +47,7 @@ Les décisions d'architecture sont consignées dans [`docs/adr/`](docs/adr). Sta
 | [0039](docs/adr/0039-memory-v1.md) | Mémoire v1 : rien n'est retenu sans confirmation ; recherche hybride des souvenirs | Validé (2026-11-12, amendé 2026-11-13) | Avant toute ouverture commerciale |
 | [0040](docs/adr/0040-chat-tools-confirmation-cards.md) | Outils dans le chat : le modèle demande, l'utilisateur confirme par une carte | Accepté (2026-11-14, amendé 2026-11-18 : jamais deux fois la même carte) | À chaque nouvel outil du chat ; avant toute ouverture commerciale |
 | [0041](docs/adr/0041-outbound-http-and-calendars.md) | Client HTTP sortant du Core (SSRF), abonnements ICS chiffrés, `icalendar` + `recurring-ical-events` | Accepté (2026-11-18, amendé 2026-11-22 : POST borné pour Web Push) | À chaque nouveau connecteur ; avant toute ouverture commerciale |
-| [0042](docs/adr/0042-signals-intervention-policy-web-push.md) | Signaux, politique d'intervention (niveaux 1 et 2, heures calmes tirées du cadre du jour, budget, jamais deux fois) et notifications Web Push | Validé (2026-11-21, D1 à D11) | Fin de la phase 5 ; avant toute ouverture commerciale |
+| [0042](docs/adr/0042-signals-intervention-policy-web-push.md) | Signaux, politique d'intervention (niveaux 1 et 2, heures calmes tirées du cadre du jour, budget, jamais deux fois) et notifications Web Push | Validé (2026-11-21, D1 à D11 ; amendé 2026-11-22 : briefing sans sonnerie, Telegram) | Fin de la phase 5 ; avant toute ouverture commerciale |
 
 ## Décisions en attente d'avis
 

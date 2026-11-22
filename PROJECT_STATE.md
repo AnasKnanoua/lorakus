@@ -4,7 +4,7 @@
 
 - **Version** : v0.4.0 (2026-11-21)
 - **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042). P4 close le 2026-11-21 (v0.4.0).
-- **Dernière mise à jour** : 2026-11-22 (PR 53)
+- **Dernière mise à jour** : 2026-11-22 (PR 54)
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -53,6 +53,14 @@
   - **Briefing du Sergent** (`focus.briefing`, toutes les 15 minutes) : le lendemain dès que la plage de travail du jour est finie, sinon le jour en cours dès minuit ; agenda, ta journée (plage, plan, tâches sans durée), échéances des 3 jours, retards, écrit du point de vue du jour décrit. Par des règles (contrat import-linter : aucun modèle de langage). Ne sonne pas.
   - **Interface** : carte « Briefing · Demain / Aujourd'hui » sous « À noter » dans Ma journée, « Lu », heure de préparation dans le fuseau du compte. La vue d'un jour donné (`read_day`) est extraite de celle de Ma journée, sans changement pour la page.
   - Vérifié localement : voir le message de livraison. Mutations : 19 côté serveur (4 survivantes au premier passage, aux bornes, toutes détectées après un test des limites, qui a aussi trouvé « 1 autres créneaux » au lieu du singulier), 5 côté page (1 survivante, puis détectée).
+- PR 53 fusionnée (#82).
+- PR 54 — Bot Telegram et capture d'idées (amendement de l'ADR 0042), **livrée le 2026-11-22, à déployer** (migrations `0019_core_telegram` et `projects_0002` ; jeton du bot à saisir sur le serveur, `DEPLOYMENT.md` §10) :
+  - **Bot** (`lorakus/core/telegram/`) : relève `telegram.poll` par le worker (attente longue, 45 s au plus par minute, aucune route publique) ; lecture des réponses de Telegram par un schéma strict ; le jeton n'apparaît dans aucun journal ni aucune erreur (canari dans les tests). `OutboundHttp.post` peut garder la réponse (`keep_body`, bornée).
+  - **Liaison** : code de 8 caractères, 10 minutes, usage unique, haché ; `core_telegram_link` et `core_telegram_user` (SECURITY DEFINER) ; une discussion par compte ; 5 mauvais codes par heure puis silence ; discussions privées seulement. Tables `core_telegram_links` et `core_telegram_codes` (RLS forcée), dans « Mes données ».
+  - **Capture** : port `Capture` du Core, fourni par `projects` (`manifest.capture`) ; un message devient une idée (provenance `telegram`), sans carte ; doublon, longueur et module désactivé refusés en clair ; texte inerte (31 attaques rejouées).
+  - **Second canal** : case « rappels sans détail » ; message sans cause ; même budget et même règle « jamais deux fois » que le Web Push ; la notification de test part aussi sur Telegram.
+  - **Interface** : section Telegram de la page Notifications (non configuré, code et relecture toutes les 5 s jusqu'à la liaison, case des rappels, « Délier »).
+  - Vérifié localement : voir le message de livraison. Mutations : 30 côté serveur (1 survivante : un point de sauvegarde inutile, retiré ; 1 mal visée, corrigée puis détectée), 7 côté page (1 survivante, qui a révélé que la page continuait de relire après la liaison : corrigé et testé).
 - À faire le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part).
 
 ## Détail de la P4 (close le 2026-11-21, v0.4.0)

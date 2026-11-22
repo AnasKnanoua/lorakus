@@ -218,6 +218,15 @@ Durée cible : une soirée.
 - [ ] Sauvegarde du jour présente, métriques à jour
 - [ ] `PROJECT_STATE.md` et `CHANGELOG.md` à jour
 
+### Jeton du bot Telegram (PR 54)
+
+1. Le jeton vient de BotFather (bot déjà créé). Un seul programme peut relever les messages d'un bot : arrêter tout autre script qui l'utilise, et supprimer un éventuel webhook (sinon Telegram répond 409 et la relève s'arrête).
+2. Sur le serveur, en tant que `deploy`, avant ou après le déploiement : `/opt/lorakus/app/infra/deploy/init-env.sh` le demande (saisie masquée) s'il manque ; à défaut, l'ajouter à `/opt/lorakus/.env` sous `TELEGRAM_BOT_TOKEN=` sans qu'il passe dans l'historique (`read -rs`).
+3. Recréer l'API et le worker pour qu'ils le lisent : `dc up -d --force-recreate api worker`. Le jeton ne va qu'au worker ; l'API reçoit seulement `LORAKUS_TELEGRAM_AVAILABLE` (test `test_compose_environment.py`).
+4. Page Notifications → « Lier Telegram » → envoyer le code au bot.
+
+Sans jeton, la page dit que le bot n'est pas configuré et rien ne tourne. Rotation : nouveau jeton dans BotFather (`/revoke`), puis étapes 2 et 3.
+
 ### Clé d'API Anthropic (PR 33, D-D)
 
 1. Console Anthropic : clé dédiée `lorakus-prod`, crédit prépayé, **rechargement automatique désactivé** (c'est le plafond global).

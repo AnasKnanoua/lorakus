@@ -86,6 +86,8 @@ services:
       LORAKUS_AI_MONTHLY_BUDGET_USD: ${LORAKUS_AI_MONTHLY_BUDGET_USD:-3.00}
       # Notifications (ADR 0042) : l'API ne recoit que la cle VAPID PUBLIQUE (abonnements).
       LORAKUS_VAPID_PUBLIC_KEY: ${LORAKUS_VAPID_PUBLIC_KEY:-}
+      # Bot Telegram (PR 54) : l'API sait seulement s'il existe, jamais son jeton.
+      LORAKUS_TELEGRAM_AVAILABLE: ${TELEGRAM_BOT_TOKEN:+true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,6 +117,8 @@ services:
       # Notifications (ADR 0042) : le worker envoie ; lui seul recoit la cle VAPID privee.
       LORAKUS_VAPID_PUBLIC_KEY: ${LORAKUS_VAPID_PUBLIC_KEY:-}
       LORAKUS_VAPID_PRIVATE_KEY: ${LORAKUS_VAPID_PRIVATE_KEY:-}
+      # Bot Telegram (PR 54) : le worker releve les messages et y repond ; lui seul a le jeton.
+      LORAKUS_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     healthcheck:
       # Battement de coeur ecrit a chaque tour de boucle : un worker bloque est detecte.
       test: ["CMD", "python", "-m", "lorakus.worker", "healthcheck"]

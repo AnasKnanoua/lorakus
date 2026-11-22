@@ -38,6 +38,7 @@ from lorakus.core.planning.models import AgendaEntry, PlanningDay, Task
 from lorakus.core.preparations.models import PreparationRow
 from lorakus.core.signals.models import InterventionRow, PushSubscriptionRow, SignalRow
 from lorakus.core.signals.webpush import push_host
+from lorakus.core.telegram.models import TelegramLink
 from lorakus.db.database import Database
 
 log = structlog.get_logger("lorakus.data")
@@ -320,7 +321,22 @@ class DataExportService:
                 .mappings()
                 .all()
             )
+            telegram = (
+                (
+                    await session.execute(
+                        select(
+                            TelegramLink.chat_id,
+                            TelegramLink.notify,
+                            TelegramLink.linked_at,
+                            TelegramLink.last_message_at,
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
         return {
+            "telegram": [dict(row) for row in telegram],
             "preparations": [dict(row) for row in preparations],
             "signals": [dict(row) for row in signals],
             "interventions": [dict(row) for row in interventions],

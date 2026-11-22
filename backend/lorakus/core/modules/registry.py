@@ -46,6 +46,11 @@ class ModuleRegistry:
                     f"module '{manifest.id}' depend de module(s) absent(s) : {', '.join(missing)}"
                 )
         _check_tools_and_specialists(by_id)
+        capturing = sorted(m.id for m in by_id.values() if m.capture is not None)
+        if len(capturing) > 1:
+            raise ModuleRegistryError(
+                f"capture rapide declaree par plusieurs modules : {', '.join(capturing)}"
+            )
         self._ordered = _topological_order(by_id)
         self._by_id = by_id
 
@@ -74,6 +79,10 @@ class ModuleRegistry:
 
     def get(self, module_id: str) -> ModuleManifest | None:
         return self._by_id.get(module_id)
+
+    def capturing(self) -> ModuleManifest | None:
+        """Le module qui range la capture rapide (scenario 5), s'il y en a un."""
+        return next((m for m in self._ordered if m.capture is not None), None)
 
     def dependents_of(self, module_id: str) -> list[str]:
         """Modules qui dependent directement de module_id."""

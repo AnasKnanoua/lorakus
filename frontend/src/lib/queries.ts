@@ -6,6 +6,7 @@ import { getAccountSettings } from "@/api/account";
 import { getToday } from "@/api/planning";
 import { getPushInfo, listReminders } from "@/api/notifications";
 import { listPreparations } from "@/api/preparations";
+import { getTelegram } from "@/api/telegram";
 import { getConversation, listConversations } from "@/api/assistant";
 import { listSubscriptions } from "@/api/calendars";
 import { fetchMe } from "@/api/auth";
@@ -118,4 +119,10 @@ export const preparationsQuery = queryOptions({
   queryKey: ["preparations"],
   queryFn: listPreparations,
   refetchInterval: 60_000,
+});
+
+/** Bot Telegram (P5) : configuré sur le serveur, compte lié, rappels choisis. */
+export const telegramQuery = queryOptions({
+  queryKey: ["telegram"],
+  queryFn: getTelegram,
 });

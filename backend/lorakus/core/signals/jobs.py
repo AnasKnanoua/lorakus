@@ -12,8 +12,9 @@ import structlog
 
 from lorakus.core.jobs.port import JobContext, periodic
 from lorakus.core.outbound import OutboundHttp
-from lorakus.core.signals.dispatch import WebPusher, dispatch_due
+from lorakus.core.signals.dispatch import TelegramChannel, WebPusher, dispatch_due
 from lorakus.core.signals.webpush import VapidKeys
+from lorakus.core.telegram.setup import bot as telegram_bot
 from lorakus.settings import get_settings
 
 log = structlog.get_logger("lorakus.signals")
@@ -34,8 +35,17 @@ def pusher() -> WebPusher | None:
     return WebPusher(keys, settings.public_origin or DEFAULT_SUBJECT, OutboundHttp())
 
 
+@cache
+def telegram() -> TelegramChannel | None:
+    """Second canal (PR 54) : le bot, s'il est configure."""
+    current = telegram_bot()
+    if current is None:
+        return None
+    return TelegramChannel(current, get_settings().public_origin or DEFAULT_SUBJECT)
+
+
 @periodic("signals.dispatch", cron="* * * * *")
 async def dispatch(ctx: JobContext, payload: dict[str, Any]) -> None:
-    outcomes = await dispatch_due(ctx.database, pusher(), datetime.now(UTC))
+    outcomes = await dispatch_due(ctx.database, pusher(), datetime.now(UTC), telegram=telegram())
     if outcomes:
         log.info("signals_dispatch_round", **outcomes)

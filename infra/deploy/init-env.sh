@@ -4,7 +4,7 @@
 # --generated-only : n'ajoute que les secrets tires au hasard, sans rien demander. deploy.sh
 #   l'appelle a chaque deploiement : un nouveau secret interne arrive donc tout seul.
 # - Les mots de passe internes sont tires au hasard ici meme : ils ne quittent jamais le serveur.
-# - Les valeurs venant de services externes (Discord, Backblaze B2, age, Anthropic) sont demandees
+# - Les valeurs venant de services externes (Discord, Backblaze B2, age, Anthropic, Telegram) sont demandees
 #   au clavier.
 # - Une valeur deja presente n'est JAMAIS modifiee : relancer le script est sans danger, et
 #   PostgreSQL garde les mots de passe choisis a la creation de la base.
@@ -152,6 +152,8 @@ asked BACKUP_AGE_RECIPIENT "Cle PUBLIQUE age (commence par age1)" '^age1[a-z0-9]
 # credit prepaye et le rechargement automatique desactive.
 asked LORAKUS_ANTHROPIC_API_KEY "Cle d'API Anthropic (commence par sk-ant-)" '^sk-ant-[A-Za-z0-9_-]{20,}$' secret
 asked HEALTHCHECKS_PING_URL "Adresse de ping healthchecks.io (sentinelle externe)" '^https://hc-ping\.com/[0-9a-f-]{36}$' secret
+# Bot Telegram (P5, PR 54) : jeton donne par BotFather (« 123456789:AA... »), au seul worker.
+asked TELEGRAM_BOT_TOKEN "Jeton du bot Telegram (BotFather)" '^[0-9]{5,15}:[A-Za-z0-9_-]{30,60}$' secret
 
 chmod 600 "$ENV_FILE"
 echo "Termine. Aucun secret n'a ete affiche."

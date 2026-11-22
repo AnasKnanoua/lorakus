@@ -11,7 +11,9 @@ Boîte d'idées, projets et tâches de projet. Chaque tâche de projet crée **s
 - **Terminer un projet** : ses tâches ouvertes sont terminées avec lui (ici et dans le planning, étapes du Sergent comprises), après une confirmation qui dit combien. **Supprimer un projet** supprime ses tâches et leurs tâches du planning.
 - **Projets qui dorment** : un projet actif sans activité depuis 14 jours ou plus (`IDLE_DAYS`). L'activité, c'est la création du projet, l'ajout d'une tâche et la fin d'une tâche (depuis la page ou le chat, à l'instant où la tâche a été terminée). La page affiche « Sans activité depuis N jours » ; la carte « Commencer un projet » rappelle les projets qui dorment ; l'outil de liste les signale au modèle. Les projets actifs sont triés de celui qui a le moins bougé (le plus exposé à l'oubli) à celui qui a bougé en dernier ; les terminés, du plus récent au plus ancien.
 
-Non couvert pour l'instant (aucun consommateur) : renommer un projet ou une tâche, rouvrir, désarchiver une idée, capture d'idée par Telegram (P5), rappel proactif d'un projet qui dort (signaux, P5), découpage d'une tâche de projet par le Sergent depuis la page (il passe par le chat, `focus.split_task`).
+Non couvert pour l'instant (aucun consommateur) : renommer un projet ou une tâche, rouvrir, désarchiver une idée, rappel proactif d'un projet qui dort (signaux, P5), découpage d'une tâche de projet par le Sergent depuis la page (il passe par le chat, `focus.split_task`).
+
+- **Capture par Telegram** (PR 54) : le module fournit le port `capture` du Core (`capture.py`). Un message envoyé au bot lié devient une idée de la boîte, provenance `telegram` (migration `projects_0002`, contrainte `ck_proj_ideas_source` ; la descente les range en `user`), sans carte ; mêmes règles que la page (500 caractères, pas de doublon, 300 au plus), refus renvoyés tels quels au bot. Le texte n'est jamais lu par un modèle à la réception ; l'outil de liste le rend par `inert()`.
 
 ## Approche (programmation classique, ML ou LLM)
 

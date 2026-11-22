@@ -1188,6 +1188,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Telegram */
+        get: operations["telegram_api_v1_telegram_get"];
+        /** Choose */
+        put: operations["choose_api_v1_telegram_put"];
+        post?: never;
+        /** Forget */
+        delete: operations["forget_api_v1_telegram_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Code */
+        post: operations["code_api_v1_telegram_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tools": {
         parameters: {
             query?: never;
@@ -2261,6 +2297,34 @@ export interface components {
             priority: number;
             /** Title */
             title: string;
+        };
+        /** TelegramCodeOut */
+        TelegramCodeOut: {
+            /** Code */
+            code: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** TelegramIn */
+        TelegramIn: {
+            /** Notify */
+            notify: boolean;
+        };
+        /** TelegramOut */
+        TelegramOut: {
+            /** Available */
+            available: boolean;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Linked */
+            linked: boolean;
+            /** Linked At */
+            linked_at: string | null;
+            /** Notify */
+            notify: boolean;
         };
         /** TimezoneIn */
         TimezoneIn: {
@@ -4542,6 +4606,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_api_v1_telegram_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramOut"];
+                };
+            };
+        };
+    };
+    choose_api_v1_telegram_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_api_v1_telegram_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    code_api_v1_telegram_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramCodeOut"];
                 };
             };
         };

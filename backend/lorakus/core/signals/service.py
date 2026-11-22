@@ -34,6 +34,7 @@ from lorakus.core.signals.webpush import (
     load_device_key,
     push_host,
 )
+from lorakus.core.telegram.service import notify_chat
 
 SIGNAL_NAME: Final = re.compile(r"^[a-z][a-z0-9_]{1,30}\.[a-z][a-z0-9_]{1,60}$")
 URL: Final = re.compile(r"^/[a-z]+(/[a-z0-9_-]+)*$")
@@ -384,9 +385,11 @@ async def remove_device(session: AsyncSession, device_id: uuid.UUID) -> bool:
 
 
 async def request_test(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> bool:
-    """Notification de test vers tous les appareils, par le meme chemin que les vraies
-    (job du worker). Une par minute au plus ; False s'il n'y a aucun appareil."""
-    if not await session.scalar(select(func.count()).select_from(PushSubscriptionRow)):
+    """Notification de test vers tous les appareils (et Telegram, s'il est choisi), par le
+    meme chemin que les vraies (job du worker). Une par minute au plus ; False s'il n'y a
+    aucun appareil."""
+    devices = await session.scalar(select(func.count()).select_from(PushSubscriptionRow))
+    if not devices and await notify_chat(session) is None:
         return False
     await emit(
         session,

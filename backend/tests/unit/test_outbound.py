@@ -295,6 +295,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(429, headers={"Retry-After": "60"})
         elif self.path == "/push/hop":
             self._send(307, headers={"Location": "https://prive.example.com/push/ok"})
+        elif self.path == "/bot/json":
+            self._send(200, b'{"ok":true,"result":[]}', {"Content-Type": "application/json"})
+        elif self.path == "/bot/big":
+            self._send(200, b"x" * 5000)
         elif self.path == "/push/slow":
             time.sleep(3)
             self._send(201)
@@ -591,3 +595,17 @@ async def test_post_with_an_untrusted_certificate_is_refused(server: int) -> Non
     with pytest.raises(OutboundError) as error:
         await production.post(f"https://agenda.example.com:{server}/push/ok", b"x", [])
     assert error.value.reason == "tls"
+
+
+async def test_post_can_keep_a_bounded_response(server: int, tls_files: dict[str, Path]) -> None:
+    http = client(tls_files, standard_dns())
+    url = f"https://agenda.example.com:{server}/bot/"
+    kept = await http.post(url + "json", b"{}", [], keep_body=True)
+    assert (kept.status, kept.body) == (200, b'{"ok":true,"result":[]}')
+    assert (await http.post(url + "json", b"{}", [])).body == b""  # ignoree par defaut
+    with pytest.raises(OutboundError) as error:
+        await http.post(url + "big", b"{}", [], limits=FetchLimits(max_bytes=4096), keep_body=True)
+    assert error.value.reason == "too_large"
+    assert (
+        await http.post(url + "big", b"{}", [], limits=FetchLimits(max_bytes=4096))
+    ).status == 200
