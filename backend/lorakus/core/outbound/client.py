@@ -253,6 +253,7 @@ class PostResult:
     status: int
     host: str
     retry_after: str | None = None
+    body: bytes = b""  # seulement si l'appelant l'a demande (keep_body)
 
 
 # Un POST ne lit de la reponse que de quoi la consommer : c'est le statut qui compte.
@@ -321,12 +322,15 @@ class OutboundHttp:
         headers: Sequence[tuple[str, str]],
         *,
         limits: FetchLimits = POST_LIMITS,
+        keep_body: bool = False,
     ) -> PostResult:
         """POST unique (Web Push, ADR 0042) : memes controles qu'un GET pour l'adresse, aucune
         redirection suivie (une redirection est rendue comme un statut), aucune reprise.
 
         Le statut est rendu quel qu'il soit : c'est a l'appelant de savoir ce que 404 ou 429
         veulent dire pour lui. Seules les pannes de transport levent OutboundError.
+        `keep_body` : la reponse est gardee (API Telegram), jusqu'a `limits.max_bytes` ; au-dela,
+        OutboundError("too_large"). Sinon elle est lue puis ignoree.
         """
         try:
             safe = parse_public_url(url)
@@ -353,13 +357,18 @@ class OutboundHttp:
                     ) as r,
                 ):
                     read = 0
+                    kept: list[bytes] = []
                     async for chunk in r.aiter_stream():
                         read += len(chunk)
                         if read > limits.max_bytes:
+                            if keep_body:
+                                raise OutboundError("too_large")
                             break  # reponse trop longue : on n'en a pas besoin
+                        if keep_body:
+                            kept.append(chunk)
                     retry_after = _header(r.headers, b"retry-after")
                     log.info("outbound_post", host=safe.host, status=r.status)
-                    return PostResult(r.status, safe.host, retry_after)
+                    return PostResult(r.status, safe.host, retry_after, b"".join(kept))
         except TimeoutError:
             raise OutboundError("timeout") from None
         except Exception as error:

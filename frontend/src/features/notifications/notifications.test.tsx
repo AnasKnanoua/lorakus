@@ -166,4 +166,67 @@ describe("notifications", () => {
       expect(screen.getByRole("link", { name: "Notifications" })).toHaveAttribute("aria-current", "page");
     });
   });
+
+  it("Telegram : dit quand le bot n'est pas configuré", async () => {
+    installFakeApi({ loggedIn: true, pushKey: SERVER_PUBLIC });
+    renderApp("/notifications");
+    expect(await screen.findByText("Le bot Telegram n'est pas configuré sur ce serveur.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Lier Telegram" })).toBeNull();
+  });
+
+  it("Telegram : lie le compte par un code, puis se met à jour seul", async () => {
+    const telegram = { available: true, linked: false, notify: false, linked_at: null, last_message_at: null };
+    const state = installFakeApi({
+      loggedIn: true,
+      pushKey: SERVER_PUBLIC,
+      telegram,
+      telegramLinkOnCode: true,
+      timezone: "Europe/Istanbul",
+    });
+    renderApp("/notifications");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Lier Telegram" }));
+    expect(await screen.findByLabelText("Code K7QM-2XPH")).toHaveTextContent("K7QM-2XPH");
+    // 06:10 UTC = 09:10 à Ankara, le fuseau du compte.
+    expect(screen.getByText(/Valable jusqu'à 09:10, une seule fois/)).toBeVisible();
+    const results = await axe.run(document.body);
+    expect(results.violations).toEqual([]);
+    expect(
+      await screen.findByText(/Ton compte Telegram est lié/, undefined, { timeout: 7_000 }),
+    ).toBeVisible();
+    // Une fois lié, la page cesse de demander.
+    const asked = () => state.requests.filter((r) => r.path === "/api/v1/telegram").length;
+    const before = asked();
+    await new Promise((resolve) => setTimeout(resolve, 5_500));
+    expect(asked()).toBe(before);
+    // Le code a servi : délier ne le fait pas revenir.
+    await user.click(screen.getByRole("button", { name: "Délier Telegram" }));
+    expect(await screen.findByRole("button", { name: "Lier Telegram" })).toBeVisible();
+    expect(screen.queryByLabelText("Code K7QM-2XPH")).toBeNull();
+  }, 20_000);
+
+  it("Telegram : rappels sans détail au choix, et délier", async () => {
+    const telegram = {
+      available: true,
+      linked: true,
+      notify: false,
+      linked_at: "2026-11-20T08:00:00Z",
+      last_message_at: null,
+    };
+    const state = installFakeApi({ loggedIn: true, pushKey: SERVER_PUBLIC, telegram });
+    renderApp("/notifications");
+    const user = userEvent.setup();
+
+    const box = await screen.findByRole("checkbox", { name: /Recevoir aussi les rappels sur Telegram/ });
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: /Recevoir aussi les rappels/ })).toBeChecked();
+    });
+    expect(state.telegram.notify).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Délier Telegram" }));
+    expect(await screen.findByRole("button", { name: "Lier Telegram" })).toBeVisible();
+    expect(state.telegram.linked).toBe(false);
+  });
 });

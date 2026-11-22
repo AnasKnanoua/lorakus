@@ -104,12 +104,17 @@ export interface FakeState {
   devices: FakeDevice[];
   /** Préparations à lire (P5) : une lecture (consulted) les retire. */
   preparations: FakePreparation[];
+  /** Bot Telegram (P5) : configuré, lié, rappels choisis ; `telegramLinkOnCode` : le compte
+   * se lie dès qu'un code est demandé (le bot l'aurait reçu). */
+  telegram: FakeTelegram;
+  telegramLinkOnCode: boolean;
 }
 
 export type FakeReminder = Schemas["ReminderOut"];
 export type FakeReminderWhy = Schemas["ReminderWhyOut"];
 export type FakeDevice = Schemas["PushDeviceOut"];
 export type FakePreparation = Schemas["PreparationOut"];
+export type FakeTelegram = Schemas["TelegramOut"];
 
 export type FakeIdea = Schemas["IdeaOut"];
 export type FakeProject = Schemas["ProjectOut"];
@@ -236,6 +241,8 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     pushKey: null,
     devices: [],
     preparations: [],
+    telegram: { available: false, linked: false, notify: false, linked_at: null, last_message_at: null },
+    telegramLinkOnCode: false,
     ...overrides,
   };
   let counter = 0;
@@ -549,6 +556,26 @@ export function installFakeApi(overrides: Partial<FakeState> = {}): FakeState {
     }
     if (path.startsWith("/api/v1/academic/")) {
       return academic(request.method, path, url.searchParams, body);
+    }
+    if (path === "/api/v1/telegram") {
+      if (request.method === "GET") return json(200, state.telegram);
+      if (request.method === "PUT") {
+        if (!state.telegram.linked) return json(404, { detail: "Aucun compte Telegram lié." });
+        state.telegram = { ...state.telegram, notify: (body as { notify: boolean }).notify };
+        return json(200, state.telegram);
+      }
+      if (request.method === "DELETE") {
+        const was = state.telegram.linked;
+        state.telegram = { ...state.telegram, linked: false, notify: false, linked_at: null };
+        return new Response(null, { status: was ? 204 : 404 });
+      }
+    }
+    if (path === "/api/v1/telegram/code" && request.method === "POST") {
+      if (!state.telegram.available) return json(409, { detail: "Le bot Telegram n'est pas configuré." });
+      if (state.telegramLinkOnCode) {
+        state.telegram = { ...state.telegram, linked: true, linked_at: "2026-11-23T09:01:00Z" };
+      }
+      return json(201, { code: "K7QM-2XPH", expires_at: "2026-11-23T06:10:00Z" });
     }
     if (path === "/api/v1/preparations" && request.method === "GET") {
       return json(200, state.preparations);

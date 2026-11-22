@@ -170,6 +170,8 @@ type = "forbidden"
 source_modules = [
     "lorakus.core.signals",
     "lorakus.core.preparations",
+    "lorakus.core.telegram.setup",
+    "lorakus.core.telegram.bot",
     "lorakus_modules.focus.watch",
     "lorakus_modules.focus.briefing",
 ]

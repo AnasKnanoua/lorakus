@@ -22,6 +22,8 @@ ALLOWED = {
     # Notifications (ADR 0042) : le worker envoie ; l'API ne voit que la cle publique.
     "LORAKUS_VAPID_PRIVATE_KEY": {"worker"},
     "LORAKUS_VAPID_PUBLIC_KEY": {"api", "worker"},
+    # Bot Telegram (PR 54) : le jeton au seul worker ; l'API sait seulement s'il existe.
+    "LORAKUS_TELEGRAM_BOT_TOKEN": {"worker"},
 }
 
 

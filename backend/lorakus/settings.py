@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -112,6 +112,17 @@ class Settings(BaseSettings):
     # Vides : notifications indisponibles (les cartes de l'application restent).
     vapid_public_key: str = Field(default="", pattern=r"^(04[0-9a-f]{128})?$")
     vapid_private_key: SecretStr = SecretStr("")
+
+    # --- Bot Telegram (P5, PR 54, ADR 0042) ---
+    # Le jeton (BotFather) n'est donne qu'au worker, qui releve les messages et envoie les
+    # reponses. L'API ne sait que s'il existe (« true » : compose.yml, ${TELEGRAM_BOT_TOKEN:+true}).
+    telegram_bot_token: SecretStr = SecretStr("")
+    telegram_available: bool = False
+
+    @field_validator("telegram_available", mode="before")
+    @classmethod
+    def _telegram_available(cls, value: object) -> object:
+        return False if value == "" else value
 
     # --- Memoire (PR 36) ---
     # Delai entre le dernier message d'une conversation et l'analyse qui propose des faits :

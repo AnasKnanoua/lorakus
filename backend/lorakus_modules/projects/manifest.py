@@ -4,6 +4,7 @@ from lorakus.core.modules.manifest import DataDeclaration, FrontendEntry, Module
 from lorakus.core.planning.service import TASK_COMPLETED
 
 # Importer le handler l'abonne (@on) dans l'API et dans le worker.
+from lorakus_modules.projects.capture import capture_idea
 from lorakus_modules.projects.events import task_completed
 from lorakus_modules.projects.export import export_projects
 from lorakus_modules.projects.router import router
@@ -39,5 +40,7 @@ manifest = ModuleManifest(
     tools=TOOLS,
     # « Mes donnees » : idees, projets et taches, meme module desactive.
     data_exporter=export_projects,
+    # Capture rapide (P5, scenario 5) : un texte envoye au bot Telegram devient une idee.
+    capture=capture_idea,
     health=check_health,
 )

@@ -24,6 +24,7 @@ from lorakus.api.routes import (
     notifications,
     planning,
     preparations,
+    telegram,
     tools,
 )
 from lorakus.core.agents.orchestrator import Orchestrator
@@ -140,6 +141,7 @@ def create_app(registry: ModuleRegistry | None = None) -> FastAPI:
     app.include_router(planning.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
     app.include_router(preparations.router, prefix="/api")
+    app.include_router(telegram.router, prefix="/api")
     app.include_router(modules.router, prefix="/api")
     app.include_router(tools.router, prefix="/api")
     app.include_router(memory.router, prefix="/api")
