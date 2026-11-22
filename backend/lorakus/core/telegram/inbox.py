@@ -65,6 +65,9 @@ FAILED: Final = "Je n'ai pas pu noter ton idée. Réessaie dans un instant."
 UPDATES = Counter(
     "lorakus_telegram_updates_total", "Messages recus par le bot, par issue", ["outcome"]
 )
+CONFIGURED = Gauge(
+    "lorakus_telegram_configured", "1 si le worker a un jeton de bot (la releve doit tourner)"
+)
 LAST_POLL = Gauge(
     "lorakus_telegram_poll_last_success_timestamp_seconds", "Dernier releve reussi du bot"
 )

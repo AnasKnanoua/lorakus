@@ -114,6 +114,64 @@ groups:
           description: Au moins un evenement a echoue 8 fois et n'est plus retente ; voir last_error dans core_outbox.
           runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/worker.md
 
+  # Rappels et notifications (P5, ADR 0042). Composant « worker » : si le worker tombe,
+  # LorakusWorkerDown (critique) masque ces avertissements.
+  - name: lorakus-notifications
+    rules:
+      - alert: LorakusSignalsDispatchLate
+        expr: time() - lorakus_signals_dispatch_last_run_timestamp_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Les rappels ne sont plus traites
+          description: signals.dispatch ne s'est pas termine depuis plus de 5 minutes alors que le worker repond ; aucune carte ni notification ne part.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/notifications.md
+
+      - alert: LorakusSignalsDispatchErrors
+        expr: increase(lorakus_signals_dispatch_errors_total[30m]) > 0
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Le traitement d'un rappel a plante
+          description: Au moins un signal a fait planter signals.dispatch dans la derniere demi-heure (il est repris a l'expiration de son bail, puis replante tant que la cause reste) ; voir signal_dispatch_crashed dans les journaux.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/notifications.md
+
+      - alert: LorakusInterventionDuplicate
+        expr: increase(lorakus_interventions_duplicate_total[1h]) > 0
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Une seconde intervention pour la meme cause a ete refusee
+          description: La base a refuse un doublon (contrainte d'unicite) ; rien n'est parti deux fois, mais deux traitements se sont chevauches. Attendu a 0 (critere de fin de la P5).
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/notifications.md
+
+      - alert: LorakusNotificationsFailing
+        expr: sum(increase(lorakus_push_sent_total{outcome=~"failed|error|telegram_failed"}[6h])) >= 2
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Des notifications n'arrivent pas
+          description: Au moins deux envois (Web Push ou Telegram) ont echoue en 6 heures ; un envoi echoue n'est jamais repris, la carte reste dans Ma journee.
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/notifications.md
+
+      - alert: LorakusTelegramPollStopped
+        expr: |
+          lorakus_telegram_configured == 1
+          and (time() - lorakus_telegram_poll_last_success_timestamp_seconds) > 600
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: Le bot Telegram ne releve plus ses messages
+          description: Aucun releve reussi depuis plus de 10 minutes alors qu'un jeton est configure ; les idees envoyees au bot attendent chez Telegram (24 heures au plus).
+          runbook_url: https://github.com/AnasKnanoua/lorakus/blob/main/docs/runbooks/notifications.md
+
   - name: lorakus-backup
     rules:
       - alert: LorakusBackupFailed

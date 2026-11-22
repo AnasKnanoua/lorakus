@@ -646,3 +646,34 @@ def test_a_user_whose_only_task_moves_far_away_still_gets_cleaned(owner: TestCli
     assert watch(at(8, 10)) == {"users": 1, "emitted": 0, "withdrawn": 1, "crashed": 0}
     assert cards(owner, at(8, 11)) == []
     assert watch(at(8, 20))["users"] == 0  # plus rien a surveiller
+
+
+def test_a_crashing_signal_is_counted_and_does_not_block_the_others(
+    owner: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prometheus_client import REGISTRY
+
+    def errors() -> float:
+        return REGISTRY.get_sample_value("lorakus_signals_dispatch_errors_total") or 0.0
+
+    task("CSEC507 : rapport", THURSDAY, 180)
+    task("MATH : feuille", THURSDAY, 60)
+    assert watch(at(8))["emitted"] == 2
+    calls: list[uuid.UUID] = []
+    real = dispatch_module.process
+
+    async def flaky(database: Database, pusher: Any, signal_id: uuid.UUID, *args: Any) -> str:
+        calls.append(signal_id)
+        if len(calls) == 1:
+            raise RuntimeError("panne simulee")
+        return await real(database, pusher, signal_id, *args)
+
+    monkeypatch.setattr(dispatch_module, "process", flaky)
+    before = errors()
+    assert dispatch(at(8, 11), None) == {"crashed": 1, "level1_pending": 1}
+    assert errors() == before + 1
+    # Un echec au premier envoi est visible : chaque issue connue existe des le depart.
+    for outcome in dispatch_module.PUSH_OUTCOMES:
+        assert (
+            REGISTRY.get_sample_value("lorakus_push_sent_total", {"outcome": outcome}) is not None
+        )

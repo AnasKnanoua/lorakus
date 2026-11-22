@@ -202,3 +202,28 @@ async def test_polling_acknowledges_what_it_read_and_stays_within_its_minute() -
     assert bot_.offsets == [None, 10] and state.offset == 10
     # Jamais plus de 45 s : la derniere attente laisse 10 s de marge.
     assert bot_.waits == [20, 15]
+
+
+@pytest.mark.anyio
+async def test_the_poll_job_says_whether_a_bot_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from prometheus_client import REGISTRY
+
+    from lorakus.core.telegram import jobs
+
+    def configured() -> float | None:
+        return REGISTRY.get_sample_value("lorakus_telegram_configured")
+
+    async def no_round(*args: Any, **kwargs: Any) -> dict[str, int]:
+        return {}
+
+    monkeypatch.setattr(jobs, "poll_round", no_round)
+    monkeypatch.setattr(jobs, "registry", lambda: None)
+    ctx = cast(Any, type("Ctx", (), {"database": None})())
+    monkeypatch.setattr(jobs, "bot", lambda: None)
+    await jobs.poll(ctx, {})
+    assert configured() == 0
+    monkeypatch.setattr(jobs, "bot", lambda: RecordingBot([]))
+    await jobs.poll(ctx, {})
+    assert configured() == 1
