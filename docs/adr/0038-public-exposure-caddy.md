@@ -45,3 +45,7 @@ Elles s'ajoutent au plafond mensuel (3 $) et au crédit prépayé sans rechargem
 - Docker publie ses ports en contournant `firewalld` : seul `web` publie un port sur toutes les interfaces, tout le reste est lié à `127.0.0.1` (vérifié dans les fichiers Compose).
 - L'expiration du certificat n'est pas encore surveillée (Caddy renouvelle 30 jours avant ; un échec se voit dans ses journaux) : surveillance externe de l'adresse publique prévue en P6.
 - Les compteurs de simultanéité IA sont propres au processus : à revoir si l'API tourne un jour dans plusieurs processus.
+
+## Amendement du 2026-11-22 (P6, PR 56)
+
+L'expiration du certificat et l'accès depuis Internet sont surveillés par la sonde externe (amendement de l'ADR 0037, runbook `docs/runbooks/external-probe.md`).

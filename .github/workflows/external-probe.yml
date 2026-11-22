@@ -1,0 +1,50 @@
+# Sonde externe de https://app.lorakus.app, depuis Internet (ADR 0037, amendement P6) :
+# redirection HTTP, certificat (nom, autorite, duree restante), /api/health/ready, HSTS.
+# Chaque passage previent un second check healthchecks.io ("lorakus-public") : reussite, ou
+# echec avec la raison. healthchecks.io previent Discord sur un echec, ou si la sonde se tait.
+# Runbook : docs/runbooks/external-probe.md. Mise en place : DEPLOYMENT.md, section 4.7.
+name: External probe
+
+on:
+  schedule:
+    # Toutes les 15 minutes, hors des minutes rondes (GitHub y retarde les runs programmes).
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: external-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Sonder app.lorakus.app et prevenir healthchecks.io
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_PUBLIC_PING_URL }}
+        run: |
+          if [ -z "$PING_URL" ]; then
+            echo "::error::Secret HEALTHCHECKS_PUBLIC_PING_URL absent (DEPLOYMENT.md, section 4.7)"
+            exit 1
+          fi
+          if report=$(python3 -I infra/probe/external_probe.py app.lorakus.app 2>&1); then
+            status=0 suffix=""
+          else
+            status=1 suffix="/fail"
+          fi
+          printf '%s\n' "$report" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Le compte rendu ne contient aucun secret ; healthchecks.io le garde avec le signal.
+          if ! curl -fsS -m 10 --retry 3 --retry-connrefused -o /dev/null --data-raw "$report" "$PING_URL$suffix"; then
+            echo "::warning::healthchecks.io injoignable : sans signal, il previendra a la fin de sa tolerance"
+          fi
+          exit "$status"
