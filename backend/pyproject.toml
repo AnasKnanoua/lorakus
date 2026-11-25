@@ -53,6 +53,16 @@ dev = [
     "ruff>=0.17.4",
 ]
 
+# --- uv : age minimal des paquets --------------------------------------------
+# Regle du projet : aucune version publiee depuis moins de 14 jours, directe ou
+# transitive (meme regle que minimumReleaseAge de pnpm pour le frontend, et que
+# le cooldown de Dependabot). uv ignore les fichiers plus recents a chaque
+# resolution (uv lock, uv add, mises a jour de Dependabot). Il faut uv 0.9.17 ou
+# plus : un uv plus ancien ignore cette section et recalculerait le verrou sans
+# elle ; la CI (uv sync --locked) refuse alors le verrou.
+[tool.uv]
+exclude-newer = "14 days"
+
 # --- Ruff : linter + formateur ---------------------------------------------
 [tool.ruff]
 line-length = 100

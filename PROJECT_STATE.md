@@ -4,7 +4,7 @@
 
 - **Version** : v0.4.0 (2026-11-21)
 - **Phase** : P5 — Proactivité, commencée le 2026-11-21 (découpage en PR 52 à 55 et décisions D1 à D11 validés, ADR 0042), en recette jusqu'au 2026-12-06 au plus tôt ; P6 — Stabilisation et v0.5, commencée en parallèle le 2026-11-22 (découpage en PR 56 à 59 validé), sauf ce qui touche aux rappels. P4 close le 2026-11-21 (v0.4.0).
-- **Dernière mise à jour** : 2026-11-22 (PR 56)
+- **Dernière mise à jour** : 2026-11-24 (règle des 14 jours dans uv)
 - **Déploiement** : en production depuis le 2026-11-10 sur `oracleworker` (alias SSH `lorakus-prod`), par `deploy.yml` avec approbation ; version en service : `make prod-status` ; services sains dont Caddy (`web`, ajouté aux cibles Prometheus), sauvegarde quotidienne vers B2. Seul Caddy est public (80 et 443). PR n°19 (runbooks) et n°20 (staging et sentinelle) déployées. Staging éphémère dans la CI avant chaque déploiement et sentinelle healthchecks.io (ADR 0037) ; sonde externe de l'adresse publique depuis GitHub (PR 56, amendement de l'ADR 0037).
 - **Dépôt** : https://github.com/AnasKnanoua/lorakus
 
@@ -74,7 +74,7 @@
   - Scénario 7 : « Pourquoi ? » d'une carte (règle, faits, décisions) et « Pourquoi cette réponse ? » d'une réponse du chat.
   - Scénario 8 : API coupée → alerte déjà mesurée le 2026-11-10 (2 min 21 s), à refaire seulement si l'on veut ; fournisseur d'IA coupé (`LORAKUS_AI_KILL_SWITCH=true`, API recréée) → réponse par gabarit, cartes et notifications intactes, puis remettre à `false`.
   - Zéro doublon : tableau « Rappels et notifications », « Last 14 days », « Doublons refusés » à 0 le 2026-12-06 au plus tôt (PR 52 déployée le 2026-11-22). Puis la P5 est close (pas de version : D11).
-- À faire le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part).
+- Fait le 2026-11-24 : `exclude-newer = "14 days"` dans `[tool.uv]` (petite PR à part, voir « Dette »).
 
 ## En cours (P6, en parallèle de la recette de la P5)
 
@@ -215,7 +215,7 @@
 ## Problèmes connus
 
 - Quota Oracle Always Free réduit en juin 2026 ; aucune marge pour un serveur gratuit supplémentaire.
-- **Règle des 14 jours non respectée dans `uv.lock`** (vu le 2026-11-18, en vérifiant les dépendances de la PR 45) : plusieurs versions ajoutées par les PR précédentes avaient moins de 14 jours à leur entrée (croniter 7.0.0 et python-dateutil 4.0.0 avec la PR 29, puis pydantic 2.14.3, fastapi 0.162.2, ruff 0.17.4, grimp 3.19, click 8.5.1, markdown-it-py 4.3.0…), faute de garde-fou dans uv. Toutes auront 14 jours le 2026-11-24 ; ce jour-là, ajouter `exclude-newer = "14 days"` à `[tool.uv]` (vérifié avec uv 0.11 : durée relative acceptée) pour que le verrou l'impose seul.
+- ~~**Règle des 14 jours non respectée dans `uv.lock`**~~ **Réglée le 2026-11-24** (vu le 2026-11-18, en vérifiant les dépendances de la PR 45) : plusieurs versions ajoutées par les PR précédentes avaient moins de 14 jours à leur entrée (croniter 7.0.0 et python-dateutil 4.0.0 avec la PR 29, puis pydantic 2.14.3, fastapi 0.162.2, ruff 0.17.4, grimp 3.19, click 8.5.1, markdown-it-py 4.3.0…), faute de garde-fou dans uv. Toutes auront 14 jours le 2026-11-24 ; ce jour-là, ajouter `exclude-newer = "14 days"` à `[tool.uv]` (vérifié avec uv 0.11 : durée relative acceptée) pour que le verrou l'impose seul. Fait : `[tool.uv] exclude-newer = "14 days"` dans `backend/pyproject.toml` ; le verrou n'a changé que par ses options (`exclude-newer-span = "P14D"`, aucune version déplacée). Vérifié : `uv lock --check` avec uv 0.9.17, 0.11.32 et 0.13.0 (celui de l'image) ; mutation : ruff 0.17.6, sqlalchemy 2.1.9 et pyyaml 6.0.4 (moins de 14 jours) sont refusés avec la règle et acceptés sans elle. Limite : un uv antérieur à 0.9.17 ignore toute la section `[tool.uv]` (même `required-version`) et recalculerait le verrou sans la règle ; la CI (`uv sync --locked`, uv récent) refuse alors ce verrou (vérifié avec uv 0.9.0). Mettre uv à jour sur le Dell au besoin (`uv self update`).
 - Les versions de Gitleaks (8.30.1) et Trivy (0.76.1) sont figées dans `ci.yml` et ne sont pas suivies par Dependabot : les vérifier une fois par mois.
 - Le DNS du réseau de METU redirige les domaines de téléchargement de Backblaze B2 : `make backup` et `make restore-test` ne fonctionnent pas depuis le campus. Utiliser le partage de connexion du téléphone, Wi-Fi du téléphone désactivé. Sans effet en production.
 - La pile d'observabilité lancée sur le Dell alerte dans le même salon Discord que la production ; ses alertes portent `[development]` dans le titre. `make down` après les tests reste conseillé.
