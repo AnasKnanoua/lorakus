@@ -1,14 +1,17 @@
 # Sonde externe de https://app.lorakus.app, depuis Internet (ADR 0037, amendement P6) :
 # redirection HTTP, certificat (nom, autorite, duree restante), /api/health/ready, HSTS.
 # Chaque passage previent un second check healthchecks.io ("lorakus-public") : reussite, ou
-# echec avec la raison. healthchecks.io previent Discord sur un echec, ou si la sonde se tait.
+# echec avec la raison. healthchecks.io previent Discord sur un echec, ou si la sonde se tait
+# plus de deux jours. Ce n'est PAS une surveillance de disponibilite : GitHub ne garantit pas
+# la frequence des workflows programmes (programmee toutes les 15 minutes, la sonde a tourne
+# 9 fois en deux jours et demi, a 4 a 12 heures d'intervalle ; correction du 2026-11-25).
 # Runbook : docs/runbooks/external-probe.md. Mise en place : DEPLOYMENT.md, section 4.7.
 name: External probe
 
 on:
   schedule:
-    # Toutes les 15 minutes, hors des minutes rondes (GitHub y retarde les runs programmes).
-    - cron: "4,19,34,49 * * * *"
+    # Quatre fois par jour demandees, hors des minutes rondes ; GitHub en lance ce qu'il veut.
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:

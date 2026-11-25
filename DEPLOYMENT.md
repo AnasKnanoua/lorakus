@@ -136,9 +136,9 @@ Vérifications depuis le Dell : `curl -sI https://app.lorakus.app/ | head -3` (H
 
 ### 4.7 Sonde externe de l'adresse publique (PR 56, une fois)
 
-Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner GitHub toutes les 15 minutes (redirection HTTP, certificat, `/api/health/ready`, HSTS) et prévient un second check healthchecks.io ([runbook](docs/runbooks/external-probe.md)).
+Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner GitHub quelques fois par jour (redirection HTTP, certificat, `/api/health/ready`, HSTS) et prévient un second check healthchecks.io ([runbook](docs/runbooks/external-probe.md)).
 
-1. Sur healthchecks.io, dans le même projet que `lorakus-prod` : « Add Check », nom `lorakus-public`, période 15 minutes, tolérance 1 heure ; même intégration Discord.
+1. Sur healthchecks.io, dans le même projet que `lorakus-prod` : « Add Check », nom `lorakus-public`, période 1 jour, tolérance 1 jour (GitHub ne garantit pas la fréquence des workflows programmés) ; même intégration Discord.
 2. Copier l'adresse de ping du check, puis depuis le Dell (l'adresse est demandée, jamais affichée) :
 
    ```bash
@@ -147,7 +147,7 @@ Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner Gi
 
 3. Vérifier : le run `External probe` est vert, son résumé commence par `OK app.lorakus.app`, et healthchecks.io affiche « up » avec ce compte rendu.
 
-GitHub ne lance les workflows programmés que depuis `main`, avec un retard possible aux heures chargées ; il les désactive après 60 jours sans activité sur le dépôt (la sonde se tait alors, et healthchecks.io prévient).
+GitHub ne lance les workflows programmés que depuis `main`, et sans garantie de fréquence (4 à 12 heures d'écart mesurées pour une programmation toutes les 15 minutes) ; il les désactive après 60 jours sans activité sur le dépôt (la sonde se tait alors, et healthchecks.io prévient).
 
 ## 5. Migrations en production
 
