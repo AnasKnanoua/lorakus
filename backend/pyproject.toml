@@ -47,7 +47,7 @@ packages = ["lorakus", "lorakus_modules"]
 [dependency-groups]
 dev = [
     "httpx2>=2.16.0",
-    "import-linter>=2.15,<2.16",
+    "import-linter>=2.15,<2.17",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.4",
