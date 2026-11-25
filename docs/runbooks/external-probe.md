@@ -1,6 +1,8 @@
 # Accès public vu d'Internet : sonde externe
 
-Alerte : le message de healthchecks.io « lorakus-public is DOWN » sur Discord. Elle ne vient pas de la production : le workflow `External probe` (`.github/workflows/external-probe.yml`) sonde `https://app.lorakus.app` depuis un runner GitHub toutes les 15 minutes (ADR 0037, amendement de la P6).
+Alerte : le message de healthchecks.io « lorakus-public is DOWN » sur Discord. Elle ne vient pas de la production : le workflow `External probe` (`.github/workflows/external-probe.yml`) sonde `https://app.lorakus.app` depuis un runner GitHub, quelques fois par jour (ADR 0037, amendement de la P6 et sa correction du 2026-11-25).
+
+Ce n'est pas une surveillance de disponibilité : GitHub lance les workflows programmés quand il le veut (de 4 à 12 heures d'écart mesurées). La sonde attrape ce qui casse et reste cassé : certificat qui ne se renouvelle plus, DNS, port 80 fermé, `/api` mal routé, Caddy remplacé.
 
 Préparer la session : [README](README.md#session).
 
@@ -8,8 +10,8 @@ Préparer la session : [README](README.md#session).
 
 Deux cas, à distinguer d'abord :
 
-- **La sonde a vu une panne** : un passage a échoué trois fois de suite, à 20 secondes d'intervalle, et a envoyé un signal d'échec. Le message arrive au passage qui la constate, donc 15 minutes au plus après le début de la panne (plus le retard éventuel de GitHub). Le site est probablement inaccessible depuis Internet, ou le sera bientôt (certificat).
-- **La sonde se tait** : aucun signal depuis plus d'une heure et quart (période 15 minutes, tolérance 1 heure). Le site va peut-être très bien ; c'est la sonde qui ne tourne plus.
+- **La sonde a vu une panne** : un passage a échoué trois fois de suite, à 20 secondes d'intervalle, et a envoyé un signal d'échec. Le message arrive au passage qui la constate, donc parfois plusieurs heures après le début du problème. Le site est probablement inaccessible depuis Internet, ou le sera bientôt (certificat).
+- **La sonde se tait** : aucun signal depuis plus de deux jours (période 1 jour, tolérance 1 jour, pour absorber les irrégularités de GitHub). Le site va peut-être très bien ; c'est la sonde qui ne tourne plus.
 
 Les alertes internes (`LorakusWebDown`, [web](web.md)) et la sentinelle ([production-down](production-down.md)) ne voient pas le chemin depuis Internet : DNS, liste de sécurité Oracle, `firewalld`, certificat. Celle-ci, si.
 
