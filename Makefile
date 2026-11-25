@@ -3,7 +3,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap dev test test-all lint format typecheck check \
         db-up db-down db-reset db-shell db-check migrate migration migrate-check \
-        image up down logs obs-up obs-check alert-test probe-check \
+        image up down logs obs-up obs-check alert-test probe-check zap-check \
         backup-image backup restore-test \
         pr merge deploy deploy-skip-staging rollback prod-status release-pr release new-module
 
@@ -47,7 +47,7 @@ format: ## Formate le code et corrige ce qui peut l'etre automatiquement
 typecheck: ## Verifie les types (pyright strict)
 > $(UV) run pyright
 
-check: lint typecheck test-all db-check obs-check probe-check ## Tout verifier avant d'ouvrir une PR
+check: lint typecheck test-all db-check obs-check probe-check zap-check ## Tout verifier avant d'ouvrir une PR
 
 # Sonde externe : Python du runner GitHub (3.12), bibliotheque standard seulement.
 PROBE := uv --directory infra/probe run --project ../../backend --locked
@@ -56,6 +56,14 @@ probe-check: ## Sonde externe (infra/probe) : style, types stricts, tests contre
 > $(UV) run ruff format --check ../infra/probe
 > $(PROBE) pyright --pythonversion 3.12 external_probe.py test_external_probe.py
 > $(PROBE) python -m unittest test_external_probe
+
+# Barriere du scan ZAP : meme regles (Python du runner, bibliotheque standard seulement).
+ZAP := uv --directory infra/zap run --project ../../backend --locked
+zap-check: ## Barriere du scan ZAP (infra/zap) : style, types stricts, tests
+> $(UV) run ruff check ../infra/zap
+> $(UV) run ruff format --check ../infra/zap
+> $(ZAP) pyright --pythonversion 3.12 zap_gate.py test_zap_gate.py
+> $(ZAP) python -m unittest test_zap_gate
 
 front-dev: ## Lance l'interface en local (http://localhost:5173), /api relaye vers localhost:8001
 > cd frontend && pnpm dev

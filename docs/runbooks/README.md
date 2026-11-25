@@ -15,6 +15,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Rappels et notifications : signaux, Web Push, Telegram](notifications.md) | `LorakusSignalsDispatchLate`, `LorakusSignalsDispatchErrors`, `LorakusInterventionDuplicate`, `LorakusNotificationsFailing`, `LorakusTelegramPollStopped` |
 | [Accès public : Caddy, limites, origine](web.md) | `LorakusWebDown`, `LorakusRateLimited`, `LorakusOriginRefused` |
 | [Déploiement en échec](deploy-failed.md) | Aucune : le workflow `Deploy` est rouge |
+| [Scan ZAP en échec](zap.md) | Aucune : le workflow `ZAP baseline` est rouge (e-mail de GitHub) |
 | [Restaurer une sauvegarde](restore.md) | Aucune : procédure appelée par les autres runbooks |
 | [Traces et journaux : Tempo, Loki](observability.md) | `LorakusTempoDown`, `LorakusLokiDown` |
 | [Pièges déjà rencontrés](pitfalls.md) | — |

@@ -1,0 +1,199 @@
+# Plan ZAP (Automation Framework) du scan passif de Lorakus (P6, PR 57). Lance par
+# .github/workflows/zap.yml contre le staging ephemere (https://lorakus.localhost), jamais
+# contre la production. Un seul passage : le robot et quelques requetes de l'API sans
+# session, les autres requetes de l'API avec la session d'un compte de test
+# (${LORAKUS_ZAP_SESSION}, jamais ecrite dans le depot). ZAP 2.17 ne remplace pas les
+# variables dans les en-tetes : le workflow les remplace lui-meme avant le scan.
+# Aucune attaque : robot classique et requetes GET de l'API, puis regles passives seulement.
+#
+# Echec : decide par infra/zap/zap_gate.py sur le rapport JSON (toute alerte de risque Low ou
+# plus, sauf exception ci-dessous, chacune justifiee ; Informational listees sans bloquer).
+# ZAP lui-meme echoue si le plan echoue, dont une reponse inattendue du job requestor.
+# Ajouter une exception = une ligne de justification et, si besoin, un ADR.
+# Runbook : docs/runbooks/zap.md.
+
+env:
+  contexts:
+    - name: lorakus
+      urls:
+        - https://lorakus.localhost
+      includePaths:
+        - "https://lorakus\\.localhost.*"
+      excludePaths:
+        # Documentation de l'API : publiee hors production seulement (lorakus/api/app.py).
+        - "https://lorakus\\.localhost/api/docs.*"
+        - "https://lorakus\\.localhost/api/openapi\\.json.*"
+        # Le robot ne doit pas fermer la session du passage authentifie.
+        - "https://lorakus\\.localhost/api/v1/auth/logout.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      enableTags: false
+
+  # Exceptions acceptees (avant les robots : un filtre ne s'applique qu'aux alertes suivantes).
+  - type: alertFilter
+    alertFilters:
+      # style-src 'unsafe-inline' : Radix injecte des styles en ligne (fenetres de dialogue).
+      # Accepte par l'ADR 0038 ; les scripts restent limites a 'self'.
+      # 10055-6 : la variante "style-src unsafe-inline" seule ; les autres alertes CSP (dont
+      # script-src) restent bloquantes.
+      - ruleId: 10055-6
+        newRisk: False Positive
+      # 2 "Private IP Disclosure" sur l'export de ses propres donnees seulement : il contient le
+      # journal d'audit complet avec les adresses de connexion (droit d'acces RGPD ; l'ecran
+      # d'audit les masque). En staging, la connexion du compte de test vient du reseau Docker
+      # (172.x). Une adresse privee ailleurs reste bloquante.
+      - ruleId: 2
+        newRisk: False Positive
+        url: "https://lorakus\\.localhost/api/v1/data/export"
+        urlRegex: true
+
+  - type: spider
+    parameters:
+      context: lorakus
+      url: https://lorakus.localhost
+      maxDuration: 2
+
+  # Application a page unique : le robot classique ne voit que index.html et les fichiers
+  # qu'il reference, jamais les reponses de l'API. On les demande donc explicitement : routes
+  # GET sans parametre (liste a tenir a jour, verifiee par backend/tests/unit/test_zap_plan.py).
+  # /api/v1/auth/me verifie la session dans les deux sens : 401 sans, 200 avec. Sinon un
+  # cookie perdu rendrait le scan anonyme sans que personne ne le voie.
+  - type: requestor
+    requests:
+      # Sans session : l'API doit refuser.
+      - url: https://lorakus.localhost/api/v1/auth/me
+        method: GET
+        responseCode: 401
+      - url: https://lorakus.localhost/api/v1/account/settings
+        method: GET
+        responseCode: 401
+      - url: https://lorakus.localhost/api/v1/data/export
+        method: GET
+        responseCode: 401
+      # Avec la session : la premiere verifie qu'elle est bien acceptee.
+      - url: https://lorakus.localhost/api/v1/auth/me
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+        responseCode: 200
+      - url: https://lorakus.localhost/api/health
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/health/ready
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/academic/assessments
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/academic/courses
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/account/settings
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/agents
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/assistant/conversations
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/auth/api-keys
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/auth/api-keys/scopes
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/auth/audit
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/calendars/subscriptions
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/data/export
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/memory/facts
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/memory/settings
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/modules
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/modules/health
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/notifications/cards
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/notifications/push
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/planning/today
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/preparations
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/projects/ideas
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/projects/projects
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/telegram
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+      - url: https://lorakus.localhost/api/v1/tools
+        method: GET
+        headers:
+          - "Cookie: __Host-lorakus_session=${LORAKUS_ZAP_SESSION}"
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/out
+      reportFile: zap-baseline.json
+      reportTitle: Lorakus - ZAP baseline
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/out
+      reportFile: zap-baseline.html
+      reportTitle: Lorakus - ZAP baseline

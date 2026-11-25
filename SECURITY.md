@@ -115,8 +115,9 @@ Table append-only `core_audit_events`. Obligatoire : connexions et échecs, chan
 | --- | --- | --- |
 | Chaque PR | Ruff, pyright, Bandit, Semgrep (règles maison : `user_id` obligatoire, pas d'import de SDK IA hors providers), Gitleaks, pip-audit, tests d'isolation, corpus d'injections (`tests/security/`) et règles de l'évaluation du modèle sur faux modèle, import-linter, CodeQL | Continu |
 | Chaque image | Trivy : vulnérabilités (échec sur `critical` corrigeable), secrets (échec dès `high`, exceptions étroites dans `infra/ci/trivy-secret.yaml`) | Chaque build |
-| Nightly staging | OWASP ZAP baseline, E2E | Chaque nuit |
-| Mensuel | ZAP complet, évaluation du vrai modèle (`model-eval.yml`, le 3 du mois), revue manuelle (Burp), revue des permissions d'outils, checklist OWASP ASVS niveau 2 et OWASP LLM Top 10 | 1er week-end du mois |
+| Chaque semaine | OWASP ZAP baseline (`zap.yml`, ADR 0043) sur le staging de la CI, jamais la production : robot sur l'interface et toutes les routes GET de l'API, avec et sans session, règles passives ; échec sur toute alerte de risque Low ou plus non acceptée dans `infra/zap/baseline.yaml` | Le lundi, à la demande et sur toute PR qui touche son outillage |
+| Nightly staging | E2E | Chaque nuit |
+| Mensuel | Revue des versions épinglées hors Dependabot (image ZAP de `zap.yml`, Gitleaks et Trivy de `ci.yml` : version publiée depuis au moins 14 jours), ZAP complet, évaluation du vrai modèle (`model-eval.yml`, le 3 du mois), revue manuelle (Burp), revue des permissions d'outils, checklist OWASP ASVS niveau 2 et OWASP LLM Top 10 | 1er week-end du mois |
 | Phase 16 | Agent Red Team isolé qui planifie et exécute les campagnes et ouvre des issues | Déclenché |
 
 Format de rapport (template d'issue `security-finding`) : description, preuve reproductible, sévérité CVSS 4.0, impact, reproduction, recommandation, statut (`open`, `fixed`, `accepted-risk`). Une vulnérabilité `high` ou plus bloque la promotion vers la production.

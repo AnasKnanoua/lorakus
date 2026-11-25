@@ -52,3 +52,7 @@ Mesuré du 22 au 25 novembre : programmée toutes les 15 minutes (environ 240 pa
 - La sonde garde son rôle de **contrôle de la configuration publique** : certificat (seuil d'un sixième de sa durée de vie, soit 15 jours sur 90 : quelques passages par jour suffisent), DNS, port 80, routage de `/api`, HSTS. Elle est programmée quatre fois par jour (`17 */6 * * *`), sans compter sur cette fréquence.
 - Check `lorakus-public` : période 1 jour, tolérance 1 jour. Un échec vu par la sonde prévient toujours tout de suite ; seul le silence devient tolérant.
 - **Disponibilité vue d'Internet** : pas couverte par la sonde. Un service de surveillance dédié (contrôles toutes les quelques minutes) est proposé au propriétaire, ce qui revient sur le rejet ci-dessus d'un fournisseur de plus ; décision en attente (`PROJECT_STATE.md`). D'ici là : la sentinelle (serveur disparu, moins de 10 minutes) et `LorakusWebDown` (Caddy arrêté) restent les seules alertes rapides.
+
+## Amendement du 2026-11-25 (PR 57) : nom du staging
+
+Le staging se sert sous `lorakus.localhost` au lieu de `localhost` (`staging-test.sh`) : Java, donc ZAP, n'envoie pas de SNI pour un nom sans point, et Caddy refuse alors la poignée de main TLS. curl résout seul les noms en `.localhost` vers la machine : les vérifications du staging sont inchangées (rejouées en local avec curl 8.5, celui des runners). Le scan ZAP du staging est décrit par l'ADR 0043.
