@@ -26,6 +26,9 @@ WORK="${STAGING_WORK:-$(mktemp -d)}"
 export LORAKUS_ROOT="$WORK/lorakus"
 DEPLOY="$LORAKUS_ROOT/app/infra/deploy/deploy.sh"
 READY_URL=http://127.0.0.1:8001/api/health/ready
+# Nom a point : Java (ZAP) n'envoie pas de SNI pour "localhost" et Caddy refuse alors la
+# poignee de main. curl resout tout nom en .localhost vers la machine (zap.yml, PR 57).
+STAGING_HOST=lorakus.localhost
 FAKE_B2="$WORK/fake-b2"
 AGE_KEY="$WORK/age.key"
 
@@ -74,12 +77,12 @@ deploy_new() {
 
 # Acces public par Caddy, avec le certificat de la CA locale (LORAKUS_TLS=internal).
 check_public_access() {
-  local https=https://localhost headers code
+  local https=https://$STAGING_HOST headers code
   curl -fsSk --max-time 10 "$https/api/health/ready" >/dev/null || fail "API injoignable par Caddy en HTTPS"
   headers=$(curl -fsSk -D - -o /dev/null "$https/")
   grep -qiF "content-security-policy: default-src 'self'" <<<"$headers" || fail "CSP absente"
   # Ecriture depuis l'interface : passe le controle d'origine (401 : identifiants faux).
-  code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://localhost' \
+  code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H "Origin: https://$STAGING_HOST" \
     -H 'Content-Type: application/json' -d '{"email":"x@example.com","password":"faux"}' \
     "$https/api/v1/auth/login")
   [ "$code" = "401" ] || fail "connexion depuis l'interface : code $code au lieu de 401"
@@ -87,7 +90,7 @@ check_public_access() {
   code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://evil.example' \
     -H 'Content-Type: application/json' -d '{}' "$https/api/v1/auth/login")
   [ "$code" = "403" ] || fail "ecriture d'une autre origine : code $code au lieu de 403"
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: localhost' http://127.0.0.1/)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $STAGING_HOST" http://127.0.0.1/)
   [ "$code" = "308" ] || fail "HTTP -> HTTPS : code $code au lieu de 308"
   echo "OK : acces public par Caddy (HTTPS, en-tetes, origine, redirection)"
 }
@@ -131,7 +134,7 @@ random_hex() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 umask 077
 cat > "$LORAKUS_ROOT/.env" <<ENV
 LORAKUS_ENVIRONMENT=staging
-LORAKUS_PUBLIC_HOST=localhost
+LORAKUS_PUBLIC_HOST=$STAGING_HOST
 LORAKUS_TLS=internal
 POSTGRES_DB=lorakus
 POSTGRES_USER=lorakus_admin

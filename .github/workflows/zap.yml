@@ -1,0 +1,122 @@
+# Scan passif OWASP ZAP (P6, PR 57) contre le staging ephemere, jamais contre la production.
+#   1. monte la version de main (sur une PR : sa base) avec staging-test.sh (ADR 0037) ;
+#   2. cree un compte de test et ouvre une session ;
+#   3. lance le plan infra/zap/baseline.yaml (robot classique + routes GET de l'API, regles
+#      passives seulement) avec une image ZAP epinglee ;
+#   4. infra/zap/zap_gate.py decide : echec sur toute alerte Low ou plus non acceptee.
+# Rapports JSON et HTML en artefact (14 jours). Runbook : docs/runbooks/zap.md.
+name: ZAP baseline
+
+on:
+  schedule:
+    # Le lundi ; GitHub peut retarder ou sauter un run programme (voir la sonde externe).
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+  # Rejoue le scan quand son propre outillage change (version testee : celle de main).
+  pull_request:
+    paths:
+      - .github/workflows/zap.yml
+      - infra/zap/**
+      - infra/staging/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zap-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # ZAP 2.17.0, publiee le 2025-12-15 ; image du 2026-11-03 (amd64 et arm64). Hors Dependabot :
+  # revue mensuelle des versions epinglees (SECURITY.md, section 9).
+  ZAP_IMAGE: zaproxy/zap-stable:20261103@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+
+jobs:
+  zap:
+    name: zap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Recuperer le code (historique complet)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Trouver les images de cette version
+        env:
+          # Sur une PR : la version de main a sa base (les images d'une PR ne sont pas publiees) ;
+          # seul l'outillage du scan vient de la PR.
+          COMMIT: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -o pipefail
+          # Dossier du staging, connu des etapes suivantes (compte de test).
+          echo "STAGING_WORK=$RUNNER_TEMP/staging" >> "$GITHUB_ENV"
+          # Meme version avant et apres : staging-test.sh suit le chemin du redeploiement.
+          ./infra/deploy/resolve-images.sh "$COMMIT" > "$RUNNER_TEMP/images.env"
+          {
+            sed 's/^/PREV_/' "$RUNNER_TEMP/images.env"
+            sed 's/^/NEW_/' "$RUNNER_TEMP/images.env"
+            echo "PREV_COMMIT=$COMMIT"
+            echo "NEW_COMMIT=$COMMIT"
+          } >> "$GITHUB_ENV"
+
+      - name: Installer age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+      - name: Monter le staging
+        run: ./infra/staging/staging-test.sh
+
+      - name: Creer le compte de test et ouvrir une session
+        run: |
+          set -o pipefail
+          export LORAKUS_ROOT="$STAGING_WORK/lorakus"
+          password=$(openssl rand -base64 24)
+          echo "::add-mask::$password"
+          printf '%s\n%s\n%s\n' zap@staging.invalid "$password" "$password" \
+            | ./infra/deploy/deploy.sh compose run --rm --no-deps -T api python -m lorakus.cli create-owner
+          jar="$RUNNER_TEMP/cookies.txt"
+          code=$(curl -sk -c "$jar" -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Origin: https://lorakus.localhost' -H 'Content-Type: application/json' \
+            --data-binary @- https://lorakus.localhost/api/v1/auth/login \
+            <<<"{\"email\":\"zap@staging.invalid\",\"password\":\"$password\"}")
+          [ "$code" = "204" ] || { echo "::error::connexion du compte de test : code $code"; exit 1; }
+          session=$(awk '$6 == "__Host-lorakus_session" { print $7 }' "$jar")
+          [ -n "$session" ] || { echo "::error::cookie de session absent"; exit 1; }
+          echo "::add-mask::$session"
+          echo "LORAKUS_ZAP_SESSION=$session" >> "$GITHUB_ENV"
+          rm -f "$jar"
+
+      - name: Scanner avec ZAP
+        run: |
+          work="$RUNNER_TEMP/zap"
+          mkdir -p "$work/out"
+          # L'image tourne avec l'utilisateur zap (uid 1000), pas celui du runner.
+          chmod -R 777 "$work"
+          # ZAP 2.17 ne remplace pas les variables dans les en-tetes : le plan est rendu ici.
+          # shellcheck disable=SC2016 # ${LORAKUS_ZAP_SESSION} est le texte a remplacer.
+          python3 -c 'import os, sys; sys.stdout.write(sys.stdin.read().replace("${LORAKUS_ZAP_SESSION}", os.environ["LORAKUS_ZAP_SESSION"]))' \
+            < infra/zap/baseline.yaml > "$work/plan.yaml"
+          status=0
+          docker run --rm --network host --add-host lorakus.localhost:127.0.0.1 \
+            -v "$work:/zap/wrk:rw" "$ZAP_IMAGE" zap.sh -cmd -autorun /zap/wrk/plan.yaml || status=$?
+          # Le plan rendu porte la session : il ne quitte jamais le runner.
+          rm -f "$work/plan.yaml"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::le plan ZAP a echoue (code $status) : voir le journal ci-dessus"
+            exit 1
+          fi
+
+      - name: Decider
+        run: |
+          set -o pipefail
+          python3 -I infra/zap/zap_gate.py "$RUNNER_TEMP/zap/out/zap-baseline.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Garder les rapports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-baseline
+          path: ${{ runner.temp }}/zap/out/
+          retention-days: 14
+          if-no-files-found: ignore
