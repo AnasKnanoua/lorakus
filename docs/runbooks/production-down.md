@@ -24,7 +24,7 @@ ssh -o ConnectTimeout=10 lorakus-prod 'uptime && df -h / && free -m && systemctl
 Puis sur le serveur ([session](README.md#session)) :
 
 ```bash
-dc ps prometheus alertmanager && dc logs --tail 30 alertmanager && curl -sS -o /dev/null -w "healthchecks=%{http_code}\n" https://hc-ping.com
+dc ps -a prometheus alertmanager && dc logs --tail 30 alertmanager && curl -sS -o /dev/null -w "healthchecks=%{http_code}\n" https://hc-ping.com
 ```
 
 ## Causes probables

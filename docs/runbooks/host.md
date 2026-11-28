@@ -8,7 +8,7 @@ Préparer la session : [README](README.md#session).
 
 ### Symptôme
 
-Moins de 10 % de mémoire disponible depuis 10 minutes. Repère : environ 1,3 Go utilisés sur 5,6 Go le 2026-11-10.
+Moins de 10 % de mémoire disponible depuis 10 minutes. Repère : 2,3 Go utilisés sur 5,6 Go le 2026-11-18 (mesures de clôture de la P3, `PROJECT_STATE.md`), avec l'API, le worker, Tempo et Loki.
 
 ### Vérifications
 
@@ -42,7 +42,7 @@ Prometheus ne collecte plus les métriques du serveur depuis 5 minutes : disque,
 ### Vérifications
 
 ```bash
-dc ps node-exporter && dc logs --tail 30 node-exporter
+dc ps -a node-exporter && dc logs --tail 30 node-exporter
 ```
 
 ### Causes probables

@@ -24,7 +24,7 @@ Prometheus ne collecte plus le service depuis 10 minutes.
 ### Vérifications
 
 ```bash
-dc ps tempo loki && dc logs --tail 50 tempo && dc logs --tail 50 loki && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}'
+dc ps -a tempo loki && dc logs --tail 50 tempo && dc logs --tail 50 loki && docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}'
 ```
 
 ### Causes probables

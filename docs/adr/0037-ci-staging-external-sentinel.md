@@ -51,7 +51,18 @@ Mesuré du 22 au 25 novembre : programmée toutes les 15 minutes (environ 240 pa
 
 - La sonde garde son rôle de **contrôle de la configuration publique** : certificat (seuil d'un sixième de sa durée de vie, soit 15 jours sur 90 : quelques passages par jour suffisent), DNS, port 80, routage de `/api`, HSTS. Elle est programmée quatre fois par jour (`17 */6 * * *`), sans compter sur cette fréquence.
 - Check `lorakus-public` : période 1 jour, tolérance 1 jour. Un échec vu par la sonde prévient toujours tout de suite ; seul le silence devient tolérant.
-- **Disponibilité vue d'Internet** : pas couverte par la sonde. Un service de surveillance dédié (contrôles toutes les quelques minutes) est proposé au propriétaire, ce qui revient sur le rejet ci-dessus d'un fournisseur de plus ; décision en attente (`PROJECT_STATE.md`). D'ici là : la sentinelle (serveur disparu, moins de 10 minutes) et `LorakusWebDown` (Caddy arrêté) restent les seules alertes rapides.
+- **Disponibilité vue d'Internet** : pas couverte par la sonde. Un service de surveillance dédié (contrôles toutes les quelques minutes) est proposé au propriétaire, ce qui revient sur le rejet ci-dessus d'un fournisseur de plus ; tranché le même jour (D-L, section suivante).
+
+## Décision du 2026-11-25 (D-L) : UptimeRobot pour la disponibilité vue d'Internet
+
+- **Validée par le propriétaire**, qui a créé la sonde le 2026-11-25 sur son propre compte UptimeRobot (formule gratuite) : type HTTP(s), sur le code de la réponse, `https://app.lorakus.app/api/health/ready`, toutes les 5 minutes, alertes sur Discord et par e-mail.
+- **Type HTTP plutôt que « mot-clé »** (recommandé à l'origine) : UptimeRobot ne permet pas de changer le type après la création, et le contrôle du corps (`{"status": "ok"}`, donc que `/api` mène bien à l'API) est déjà fait par la sonde externe. Seule conséquence : une page HTML servie en 200 à la place de l'API passe pour UptimeRobot ; la sonde la voit au passage suivant.
+- **Partage des rôles** : UptimeRobot dit vite que le site ne répond plus (Caddy, API, base, réseau, DNS, certificat refusé) ; la sonde dit ce qui casse dans la configuration publique ; la sentinelle dit que le serveur a disparu ; `LorakusWebDown` dit, depuis l'intérieur, que Caddy ne répond plus.
+- **Ce que reçoit UptimeRobot** : une requête publique sans session ; la réponse ne contient que `{"status": "ok"}` (ou `unavailable`). Aucun secret à gérer, aucune donnée personnelle.
+- **Pourquoi revenir sur le rejet du 2026-11-22** : ce rejet supposait que la sonde GitHub tournait toutes les 15 minutes, ce qui était faux (correction ci-dessus). Un fournisseur de plus coûte un compte ; ne pas voir une panne pendant des heures coûte plus.
+- **Délais mesurés** (exercice du 2026-11-27, arrêt de `web` en production, une mesure, `docs/incidents/2026-11-27-exercice-web-arrete.md`) : depuis l'arrêt, `LorakusWebDown` sur Discord en 2 min 44 s, UptimeRobot en 5 min 10 s (panne tombée juste après une vérification réussie) ; après la remise en service, « Résolu » en 1 min 58 s et retour d'UptimeRobot en 4 min 29 s.
+- **Limite** : personne ne surveille UptimeRobot lui-même ; sa dernière vérification se regarde à la revue mensuelle des outils (`SECURITY.md` §9).
+- Runbook : `docs/runbooks/external-probe.md` ; réglages : `DEPLOYMENT.md` §4.7.
 
 ## Amendement du 2026-11-25 (PR 57) : nom du staging
 

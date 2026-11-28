@@ -134,7 +134,7 @@ ssh -t lorakus-prod 'sudo -iu deploy /opt/lorakus/app/infra/deploy/deploy.sh com
 
 Vérifications depuis le Dell : `curl -sI https://app.lorakus.app/ | head -3` (HTTP/2 200), puis sur le téléphone, installer l'application depuis Chrome (« Ajouter à l'écran d'accueil »). Les journaux de Caddy doivent montrer les vraies adresses des visiteurs (`dc logs --tail 20 web`), pas une adresse en `172.`.
 
-### 4.7 Sonde externe de l'adresse publique (PR 56, une fois)
+### 4.7 Surveillance externe de l'adresse publique (PR 56 et D-L, une fois)
 
 Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner GitHub quelques fois par jour (redirection HTTP, certificat, `/api/health/ready`, HSTS) et prévient un second check healthchecks.io ([runbook](docs/runbooks/external-probe.md)).
 
@@ -148,6 +148,17 @@ Le workflow `External probe` sonde `https://app.lorakus.app` depuis un runner Gi
 3. Vérifier : le run `External probe` est vert, son résumé commence par `OK app.lorakus.app`, et healthchecks.io affiche « up » avec ce compte rendu.
 
 GitHub ne lance les workflows programmés que depuis `main`, et sans garantie de fréquence (4 à 12 heures d'écart mesurées pour une programmation toutes les 15 minutes) ; il les désactive après 60 jours sans activité sur le dépôt (la sonde se tait alors, et healthchecks.io prévient).
+
+**Disponibilité vue d'Internet : UptimeRobot** (décision D-L, 2026-11-25). La sonde ci-dessus ne peut pas dire vite que le site ne répond plus ; UptimeRobot le fait. Sonde créée par le propriétaire le 2026-11-25, sur son propre compte (formule gratuite) :
+
+| Réglage | Valeur |
+| --- | --- |
+| Type | HTTP(s), sur le code de la réponse. Le type « mot-clé » n'est pas modifiable après la création : la sonde n'a pas été recréée, la sonde externe vérifie déjà le corps de la réponse |
+| Adresse | `https://app.lorakus.app/api/health/ready` |
+| Intervalle | 5 minutes |
+| Alertes | Discord (salon des alertes d'exploitation) et e-mail du propriétaire |
+
+Aucune clé ni secret : UptimeRobot ne fait qu'une requête publique sans session. Délai mesuré une fois (exercice du 2026-11-27, `docs/incidents/`) : alerte 5 min 10 s après l'arrêt de Caddy, retour 4 min 29 s après sa remise en service. Runbook : [surveillance externe](docs/runbooks/external-probe.md).
 
 ## 5. Migrations en production
 
