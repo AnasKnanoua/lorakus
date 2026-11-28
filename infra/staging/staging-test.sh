@@ -205,12 +205,12 @@ dc exec -T postgres psql -v ON_ERROR_STOP=1 -U lorakus_admin -d lorakus -q \
   -c "insert into lorakus.staging_marker (note) values ('ecrite-apres-la-sauvegarde')" </dev/null
 latest=$(backups | tail -n 1)
 age --decrypt --identity "$AGE_KEY" --output "$WORK/restore.dump" "$latest"
-dc stop api
+dc stop api worker
 dc exec -T postgres psql -v ON_ERROR_STOP=1 -U lorakus_admin -d lorakus \
   -c 'DROP SCHEMA IF EXISTS lorakus CASCADE' </dev/null
 dc exec -T postgres pg_restore -U lorakus_admin -d lorakus --single-transaction --exit-on-error < "$WORK/restore.dump"
 dc run --rm -T migrate </dev/null
-dc up -d --wait api
+dc up -d --wait api worker
 expect_release "$NEW_COMMIT"
 check_public_access
 [ "$(marker)" = "ecrite-avant-la-mise-a-jour" ] \

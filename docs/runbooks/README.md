@@ -9,7 +9,7 @@ Un runbook répond à une seule question : **« l'alerte vient de tomber, je fai
 | [Disque plein](disk-full.md) | `LorakusDiskSpaceLow`, `LorakusDiskSpaceCritical` |
 | [Mémoire basse, métriques du serveur absentes](host.md) | `LorakusHostMemoryLow`, `LorakusNodeExporterDown` |
 | [Production disparue](production-down.md) | Message healthchecks.io « lorakus-prod is DOWN », `LorakusHeartbeatFailing` |
-| [Accès public vu d'Internet : sonde externe](external-probe.md) | Message healthchecks.io « lorakus-public is DOWN » |
+| [Accès public vu d'Internet : UptimeRobot et sonde externe](external-probe.md) | Alerte UptimeRobot (Discord et e-mail) ; message healthchecks.io « lorakus-public is DOWN » |
 | [Worker : jobs et événements](worker.md) | `LorakusWorkerDown`, `LorakusWorkerStalled`, `LorakusWorkerHighMemory`, `LorakusOutboxBacklog`, `LorakusOutboxDeadEvents` |
 | [Moteur IA et assistant](ai.md) | `LorakusAiProviderFailing`, `LorakusAiUsageNotRecorded`, `LorakusAiSpendHigh`, `LorakusAiBudgetReached`, `LorakusAssistantInternalError`, `LorakusAssistantEmptyReplies` |
 | [Rappels et notifications : signaux, Web Push, Telegram](notifications.md) | `LorakusSignalsDispatchLate`, `LorakusSignalsDispatchErrors`, `LorakusInterventionDuplicate`, `LorakusNotificationsFailing`, `LorakusTelegramPollStopped` |
@@ -38,12 +38,13 @@ cd /opt/lorakus/app && dc() { docker compose -f compose.yml -f compose.observabi
 
 ## Règles valables pour tous les runbooks
 
-- **Observer avant d'agir** : `dc ps`, `dc logs --tail 100 <service>`, `df -h /`, `free -m`. Noter l'heure et ce qui est constaté.
+- **Observer avant d'agir** : `dc ps -a` (sans `-a`, un service arrêté n'apparaît pas du tout), `dc logs --tail 100 <service>`, `df -h /`, `free -m`. Noter l'heure et ce qui est constaté.
 - **Jamais** `docker volume prune`, `docker system prune --volumes` ni `dc down -v` : les volumes contiennent la base de données.
 - **Jamais** de modification à la main dans `/opt/lorakus/app` : ce dossier est remis sur un commit de `main` à chaque déploiement. Une correction passe par une PR puis `gh workflow run deploy.yml`.
 - `docker compose run` et `docker compose exec` lancés depuis un script ou une boucle : toujours `-T </dev/null` (voir [pièges](pitfalls.md)).
 - Ne jamais toucher à `oraclevps` (Anime Notif) : il est hors du périmètre de Lorakus.
 - Après un incident réel : une note dans `docs/incidents/AAAA-MM-JJ-titre.md` sous 7 jours (`SECURITY.md`), et le runbook corrigé s'il était faux ou incomplet.
+- **Exercices** : un runbook n'est fiable qu'une fois suivi à la lettre sur une vraie panne provoquée. Fait : [web](web.md) le 2026-11-27 ([note](../incidents/2026-11-27-exercice-web-arrete.md)).
 
 ## Commandes utiles
 

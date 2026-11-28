@@ -22,7 +22,7 @@ Puis l'état réel du serveur, qui seul fait foi :
 gh workflow run deploy.yml -f action=status
 ```
 
-ou, sur le serveur : `/opt/lorakus/app/infra/deploy/deploy.sh status && dc ps && curl -fsS http://127.0.0.1:8001/api/health/ready`.
+ou, sur le serveur : `/opt/lorakus/app/infra/deploy/deploy.sh status && dc ps -a && curl -fsS http://127.0.0.1:8001/api/health/ready`.
 
 ## Causes probables
 

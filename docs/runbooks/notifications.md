@@ -66,7 +66,13 @@ dc exec -T worker python -c 'import json, os, urllib.request; t = os.environ["LO
 ## Actions
 
 1. **Dispatch en retard** : lire l'erreur du dernier job `signals.dispatch` dans les journaux. Base injoignable : [api-down](api-down.md). Worker bloqué : [worker](worker.md). Rien d'évident : `dc restart worker`, puis vérifier qu'un passage a lieu dans la minute (l'alerte retombe). Aucun rappel n'est perdu : les signaux en attente sont repris au passage suivant.
-2. **Traitement en erreur** : relever le nom du signal et la trace dans `signal_dispatch_crashed`, ouvrir une PR de correction avec un test qui reproduit le cas. En attendant, le signal fautif peut être retiré sans rien envoyer : `update lorakus.core_signals set status = 'withdrawn', outcome = 'ops' where id = '<id>'` (noter l'heure et la raison).
+2. **Traitement en erreur** : relever l'identifiant du signal (`signal=` dans `signal_dispatch_crashed`) et la trace, ouvrir une PR de correction avec un test qui reproduit le cas. En attendant, le signal fautif peut être retiré sans rien envoyer (remplacer `<id>`, noter l'heure et la raison) :
+
+   ```bash
+   dc exec -T postgres psql -U lorakus_admin -d lorakus -c "update lorakus.core_signals set status = 'withdrawn', outcome = 'ops', next_check_at = null, locked_until = null where id = '<id>' and status = 'active'" </dev/null
+   ```
+
+   `UPDATE 1` attendu. Un signal retiré n'a plus d'échéance (`next_check_at`) : la contrainte `status` de la table refuse un retrait qui la garde (l'ancienne version de cette commande échouait ainsi, trouvé par `test_runbook_sql.py`).
 3. **Doublon refusé** : vérifier l'heure (déploiement en cours ou non). Hors déploiement, ouvrir une PR ; ne rien changer à la contrainte d'unicité, c'est elle qui a empêché le second envoi.
 4. **Envois en échec** : un seul appareil touché → le retirer depuis la page Notifications et le réactiver. Tous touchés → vérifier la sortie réseau (`dc exec -T worker python -c 'import urllib.request; print(urllib.request.urlopen("https://fcm.googleapis.com", timeout=10).status)'`, une réponse HTTP même en erreur suffit) et que `LORAKUS_VAPID_PRIVATE_KEY` n'a pas changé (`push_without_vapid_keys` dans les journaux : clé absente) dans `/opt/lorakus/.env`. Telegram seul touché → envoyer un message au bot pour vérifier qu'il n'est pas bloqué.
 5. **Relève Telegram arrêtée** :

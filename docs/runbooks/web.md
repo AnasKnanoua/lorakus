@@ -6,16 +6,32 @@ Préparer la session : [README](README.md#session).
 
 ## Symptôme
 
-- `LorakusWebDown` : Prometheus ne joint plus Caddy (service `web`) depuis 2 minutes. L'interface `https://app.lorakus.app` et l'API ne répondent plus depuis Internet ; l'API peut encore répondre sur `127.0.0.1:8001`.
-- `LorakusRateLimited` : plus de 20 requêtes refusées en 15 minutes par les limites par utilisateur (erreur 429, `Retry-After`). Un appel IA refusé pour le rythme reçoit le message de secours « courte pause ».
-- `LorakusOriginRefused` : des écritures (POST, PUT, PATCH, DELETE) ont été refusées en 403 `origin_refused` parce qu'elles venaient d'un autre site.
-- Certificat invalide, expiré ou qui n'est plus renouvelé, DNS ou ports fermés vus d'Internet : message healthchecks.io « lorakus-public is DOWN » ([sonde externe](external-probe.md)), avec la raison.
+### LorakusWebDown
+
+Prometheus ne joint plus Caddy (service `web`, port interne 8081) depuis 2 minutes. L'interface `https://app.lorakus.app` et l'API ne répondent plus depuis Internet ; l'API peut encore répondre sur `127.0.0.1:8001`. UptimeRobot, qui interroge `https://app.lorakus.app/api/health/ready` de l'extérieur, prévient aussi (Discord et e-mail, [surveillance externe](external-probe.md)).
+
+Délais mesurés une fois, à l'exercice du 2026-11-27 ([note](../incidents/2026-11-27-exercice-web-arrete.md)), depuis l'arrêt de Caddy : `LorakusWebDown` sur Discord après 2 min 44 s, UptimeRobot après 5 min 10 s. Après la remise en service : « Résolu » après 1 min 58 s, retour d'UptimeRobot après 4 min 29 s. Le délai d'UptimeRobot dépend du moment de la panne dans son cycle de 5 minutes ; « Résolu » part au plus tard 5 minutes après le message de panne (intervalle de groupe d'Alertmanager). Une autre panne peut donc être vue plus tôt ou plus tard.
+
+### LorakusRateLimited
+
+Plus de 20 requêtes refusées en 15 minutes par les limites par utilisateur (erreur 429, `Retry-After`). Un appel IA refusé pour le rythme reçoit le message de secours « courte pause ».
+
+### LorakusOriginRefused
+
+Plus de 5 écritures (POST, PUT, PATCH, DELETE) refusées en 15 minutes, en 403 `origin_refused`, parce qu'elles venaient d'un autre site.
+
+### Vu d'Internet seulement
+
+- Alerte UptimeRobot sans `LorakusWebDown` : la production tourne, mais Internet ne la joint pas (DNS, liste de sécurité Oracle, `firewalld`, certificat) ou l'API répond 503 ([surveillance externe](external-probe.md)).
+- Certificat invalide, expiré ou qui n'est plus renouvelé, DNS ou port 80 fermé : message healthchecks.io « lorakus-public is DOWN » ([sonde externe](external-probe.md)), avec la raison.
 
 ## Vérifications
 
 ```bash
-dc ps web api && dc logs --tail 50 web && curl -sS -o /dev/null -w '%{http_code}\n' -m 5 https://app.lorakus.app/
+dc ps -a web api && dc logs --tail 300 web | grep -v '"logger":"http.log.access"' | tail -15 && curl -sS -o /dev/null -w 'public=%{http_code}\n' -m 5 https://app.lorakus.app/
 ```
+
+Le `grep -v` retire le journal d'accès de Caddy (une ligne de plusieurs kilo-octets par requête, dont les passages d'UptimeRobot toutes les 5 minutes) : sans lui, ces lignes recouvrent l'écran (exercice du 2026-11-27). Restent les messages de Caddy lui-même : démarrage, arrêt, certificats, erreurs.
 
 ```bash
 echo | openssl s_client -connect app.lorakus.app:443 -servername app.lorakus.app 2>/dev/null | openssl x509 -noout -issuer -enddate
@@ -31,8 +47,10 @@ Depuis le Dell, hors du serveur : `curl -sI https://app.lorakus.app/ | head -5` 
 
 | Constat | Cause |
 | --- | --- |
+| `web` « Exited (0) », dernières lignes `shutting down apps` puis `shutdown complete` avec `SIGTERM`, sans déploiement récent | Caddy arrêté par une commande (`dc stop`, `dc down`) ou par un redémarrage de Docker : action 1 |
+| `web` « Exited » avec un autre code, ou « Restarting », sans déploiement récent | Caddy tombé seul : action 1, et garder les dernières lignes du journal pour la note d'incident |
 | `web` arrêté ou en boucle de redémarrage, juste après un déploiement | Version défectueuse : retour arrière |
-| `web` absent de `dc ps` | Version déployée sans image web (antérieure à la PR 35), ou `dc` lancé sans `--profile web` |
+| `web` absent de `dc ps -a` | Version déployée sans image web (antérieure à la PR 35), ou `dc` lancé sans `--profile web` |
 | Journaux `web` : `obtaining certificate` puis `error` ou `rateLimited` | Let's Encrypt n'arrive pas à valider : DNS de `app.lorakus.app` modifié, port 80 ou 443 fermé (liste de sécurité Oracle, `firewalld`) ou limite de Let's Encrypt (5 échecs par heure) |
 | Certificat valide, mais le Dell ne joint pas le site alors que le serveur oui | Réseau : liste de sécurité Oracle, `firewalld`, DNS |
 | `LorakusRateLimited` sans action de ta part | Script ou session volée qui insiste : regarder le journal d'audit (`/api/v1/auth/audit`) et les adresses dans `dc logs web` |
@@ -42,7 +60,7 @@ Depuis le Dell, hors du serveur : `curl -sI https://app.lorakus.app/ | head -5` 
 
 ## Actions
 
-1. **Caddy arrêté, sans déploiement récent** : `dc up -d --wait web`, puis revérifier. S'il retombe, lire `dc logs --tail 200 web` avant toute autre action.
+1. **Caddy arrêté, sans déploiement récent** : `dc up -d --wait web`, puis revérifier. S'il retombe, lire `dc logs --tail 300 web | grep -v '"logger":"http.log.access"'` avant toute autre action.
 2. **Après un déploiement** : retour à la version précédente depuis le Dell, `gh workflow run deploy.yml -f action=rollback`.
 3. **Certificat refusé par Let's Encrypt** : corriger d'abord la cause (DNS, ports), puis `dc restart web`. Ne pas redémarrer en boucle : chaque échec compte dans la limite de Let's Encrypt (5 par heure et par nom). Les certificats et le compte ACME sont dans le volume `caddy-data` : **ne jamais le supprimer**.
 4. **Session volée suspectée** : changer le mot de passe depuis l'application (toutes les sessions sont fermées) ; si le téléphone est perdu, `python -m lorakus.cli recover-second-factor` puis `enable-second-factor` sur le serveur (DEPLOYMENT.md §5).

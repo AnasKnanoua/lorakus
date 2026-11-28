@@ -17,7 +17,7 @@ Préparer la session : [README](README.md#session).
 ## Vérifications
 
 ```bash
-dc ps worker && dc logs --tail 80 worker
+dc ps -a worker && dc logs --tail 80 worker
 ```
 
 ```bash

@@ -44,13 +44,13 @@ NOM=lorakus-AAAAMMJJTHHMMSSZ.dump.age && umask 077 && docker compose -f compose.
 
 Le fichier déchiffré contient toutes les données en clair : il ne reste sur le serveur que le temps de la restauration. `scp` le dépose dans le dossier personnel du compte de l'alias `lorakus-prod` : si ce n'est pas `deploy`, le déplacer (`sudo mv … /home/deploy/ && sudo chown deploy: /home/deploy/lorakus-restore.dump`).
 
-### 2. Sur le serveur : arrêter l'API et mettre l'état actuel à l'abri
+### 2. Sur le serveur : arrêter l'API et le worker, mettre l'état actuel à l'abri
 
 ```bash
-dc stop api && /opt/lorakus/app/infra/deploy/deploy.sh backup
+dc stop api worker && /opt/lorakus/app/infra/deploy/deploy.sh backup
 ```
 
-Cette sauvegarde de l'état abîmé permet de revenir en arrière. Si elle échoue parce que la base ne répond plus, continuer : il n'y a plus rien à sauver.
+Le worker écrit aussi dans la base (rappels chaque minute, relève Telegram, événements) : il s'arrête avec l'API pour que rien ne s'écrive pendant la restauration. Cette sauvegarde de l'état abîmé permet de revenir en arrière. Si elle échoue parce que la base ne répond plus, continuer : il n'y a plus rien à sauver.
 
 ### 3. Restaurer
 
@@ -66,7 +66,7 @@ dc up -d --wait postgres && dc exec -T postgres psql -v ON_ERROR_STOP=1 -U lorak
 ### 4. Remettre en service
 
 ```bash
-dc run --rm -T migrate </dev/null && dc up -d --wait api && curl -fsS http://127.0.0.1:8001/api/health/ready && shred -u ~/lorakus-restore.dump
+dc run --rm -T migrate </dev/null && dc up -d --wait api worker && curl -fsS http://127.0.0.1:8001/api/health/ready && shred -u ~/lorakus-restore.dump
 ```
 
 Les migrations ramènent le schéma restauré au niveau attendu par la version en service.
@@ -82,10 +82,12 @@ Restaurer de la même façon la sauvegarde faite à l'étape 2 (la plus récente
 ## Après la restauration
 
 - Vérifier dans l'application que les données attendues sont là ; noter l'horodatage de la sauvegarde utilisée et la fenêtre de données perdue.
+- Les rappels envoyés pendant cette fenêtre ne sont plus enregistrés (`core_interventions`) : un rappel encore actif peut repartir une fois. À noter dans la note d'incident, pas à corriger.
 - `/opt/lorakus/app/infra/deploy/deploy.sh backup` pour repartir d'une sauvegarde saine.
 - Note d'incident dans `docs/incidents/`.
 
 ## Ce qui a été vérifié
 
 - 2026-11-10 : l'étape 3 (suppression du schéma, `pg_restore` en une transaction) a été rejouée sur un PostgreSQL 16 avec pgvector et les rôles de `infra/postgres/init/01-roles.sh`, dans deux cas : base vivante modifiée après la sauvegarde, et base neuve. Données, propriétaire du schéma, extension, droits de `lorakus_app` et privilèges par défaut retrouvés ; restauration rejouable deux fois de suite.
-- **Pas encore vérifié** : la procédure complète sur PostgreSQL 18 avec les conteneurs réels. À répéter sur le staging dès qu'il existe, puis une fois par trimestre.
+- Depuis le 2026-11-11, le staging de chaque déploiement (`infra/staging/staging-test.sh`, étape 5/6) rejoue les étapes 2 à 4 sur PostgreSQL 18 avec les vraies images : arrêt de l'API et du worker, suppression du schéma, `pg_restore` en une transaction, migrations, remise en service, puis vérification d'une donnée témoin écrite avant la sauvegarde et absente après (et lue par `lorakus_app`). Le worker est arrêté aussi depuis la PR 58.
+- Le téléchargement et le déchiffrement de l'étape 1 sont vérifiés par `make restore-test` (scénario 9). **Pas encore vérifié** : le transfert par `scp` vers le serveur, et la procédure entière sur la production réelle (à ne faire qu'en cas de besoin).

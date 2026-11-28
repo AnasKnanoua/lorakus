@@ -12,7 +12,7 @@ Préparer la session : [README](README.md#session).
 ## Vérifications
 
 ```bash
-dc ps && curl -fsS -m 5 http://127.0.0.1:8001/api/health/ready ; echo ; dc logs --tail 50 api
+dc ps -a && curl -fsS -m 5 http://127.0.0.1:8001/api/health/ready ; echo ; dc logs --tail 50 api
 ```
 
 ```bash
@@ -40,7 +40,7 @@ docker inspect -f '{{.State.Status}} redémarrages={{.RestartCount}} OOM={{.Stat
 3. **PostgreSQL arrêté** : `dc up -d --wait postgres`, lire `dc logs --tail 100 postgres`. S'il refuse de démarrer faute de place : [disk-full](disk-full.md). Si les données sont corrompues : [restore](restore.md).
 4. **Tout est arrêté** : `sudo systemctl status docker`, puis `dc up -d --wait`.
 5. **Mémoire élevée sans fuite évidente** : mesurer le modèle d'embeddings seul dans le conteneur, `dc run --rm -T --no-deps api python -m lorakus.ai.providers.check </dev/null` (conteneur jetable : jamais `dc exec` dans `api`, une seconde copie du modèle sous la même limite pourrait le faire tuer ; DEPLOYMENT.md).
-5. **Dégradation sans panne** (erreurs, lenteur, mémoire) : chercher la route en cause dans Grafana (tableau « Lorakus API »), relever l'identifiant de requête (`request_id`) d'une erreur dans `dc logs api`. `dc restart api` ne se justifie que pour la mémoire, et après avoir noté les chiffres.
+6. **Dégradation sans panne** (erreurs, lenteur, mémoire) : chercher la route en cause dans Grafana (tableau « Lorakus API »), relever l'identifiant de requête (`request_id`) d'une erreur dans `dc logs api`. `dc restart api` ne se justifie que pour la mémoire, et après avoir noté les chiffres.
 
 ## Retour arrière
 

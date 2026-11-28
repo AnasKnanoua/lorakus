@@ -62,7 +62,17 @@ docker exec -i "$CONTAINER" pg_restore -U restore_admin -d lorakus --exit-on-err
 
 echo "5/5 Verifications"
 q() { docker exec "$CONTAINER" psql -U restore_admin -d lorakus -qtA -c "$1"; }
-check "version du schema presente" "$(q 'select count(*) from lorakus.alembic_version')" "1"
+# Une version par branche de migrations : le Core, puis chaque module qui a les siennes
+# (5 lignes au 2026-11-28). Le Core doit y etre une seule fois, et chaque version doit exister
+# dans le depot : une version inconnue veut dire une sauvegarde d'un code plus recent que ce
+# depot (git pull), ou une base qui n'est pas celle de Lorakus.
+versions=$(q 'select version_num from lorakus.alembic_version' | LC_ALL=C sort)
+known=$(sed -n 's/^revision: str = "\(.*\)"$/\1/p' \
+  backend/alembic/versions/*.py backend/lorakus_modules/*/migrations/*.py | LC_ALL=C sort -u)
+echo "    versions du schema : $(tr '\n' ' ' <<<"$versions")"
+check "une seule version du Core" "$(grep -c '_core_' <<<"$versions")" "1"
+check "versions du schema connues du depot" \
+  "$(LC_ALL=C comm -23 <(printf '%s\n' "$versions") <(printf '%s\n' "$known") | tr '\n' ' ')" ""
 check "extension pgvector restauree" "$(q "select extname from pg_extension where extname = 'vector'")" "vector"
 check "schema lorakus appartient au migrateur" "$(q "select nspowner::regrole from pg_namespace where nspname = 'lorakus'")" "lorakus_migrator"
 

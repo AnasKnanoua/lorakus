@@ -7,7 +7,7 @@ Problèmes réellement rencontrés sur Lorakus, avec leur correction. À complé
 - **Symptôme** : après un redémarrage ou un simple événement réseau, `hostnamectl` affiche de nouveau le nom saisi à la création de l'instance.
 - **Cause** : sur les images Oracle, le script `oci-dhclient.sh` réapplique ce nom, par-dessus cloud-init et NetworkManager.
 - **Correction** : `PRESERVE_HOSTINFO=2` dans `/etc/oci-hostname.conf`, en plus des réglages cloud-init et NetworkManager. Avec la valeur `2`, Oracle ne met plus `/etc/hosts` à jour : y corriger l'alias à la main. Détail et vérification : `DEPLOYMENT.md` §2.1.
-- **Portée** : images Oracle uniquement. Sans objet sur la VM Azure.
+- **Portée** : images Oracle uniquement.
 
 ## `denied` à la première publication d'une image sur GHCR
 
